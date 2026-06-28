@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { socket } from '../App';
+import { socket, API_BASE } from '../App';
 import { Users, Play, Unlock, UserPlus, BookOpen, Plus, Save, AlertTriangle, ArrowLeft, Trash2, Square, Award, Download, Lock } from 'lucide-react';
 import * as htmlToImage from 'html-to-image';
 import { jsPDF } from 'jspdf';
@@ -28,7 +28,7 @@ interface Exam {
   duration_minutes: number;
   target_batch: string;
   full_marks: number;
-  status: 'DRAFT' | 'CREATED' | 'STARTED' | 'ENDED';
+  status: 'DRAFT' | 'CREATED' | 'STARTED' | 'PAUSED' | 'ENDED';
 }
 
 interface Section {
@@ -43,8 +43,8 @@ interface Section {
 interface ResultData {
   student_id: string;
   name: string;
-  class: string;
   score: number;
+  full_marks: number;
   status: string;
   tab_violation_count: number;
 }
@@ -96,8 +96,8 @@ export default function TeacherDashboard() {
   const fetchData = async () => {
     try {
       const [studentsRes, examsRes] = await Promise.all([
-        fetch('http://localhost:3001/api/students'),
-        fetch('http://localhost:3001/api/exams')
+        fetch(API_BASE + '/api/students'),
+        fetch(API_BASE + '/api/exams')
       ]);
       if (studentsRes.ok) setStudents(await studentsRes.json());
       if (examsRes.ok) {
@@ -113,7 +113,7 @@ export default function TeacherDashboard() {
 
   const checkRecovery = async () => {
     try {
-      const res = await fetch('http://localhost:3001/api/exams/active');
+      const res = await fetch(API_BASE + '/api/exams/active');
       if (res.ok) {
         const data = await res.json();
         if (data.active_exam) {
@@ -143,11 +143,24 @@ export default function TeacherDashboard() {
     };
   }, []);
 
+  // Local timer for TeacherDashboard to tick down active sessions
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setStudentsSession(prev => prev.map(student => {
+        if (student.status === 'EXAMINEE' && student.seconds_left !== null && student.seconds_left > 0) {
+          return { ...student, seconds_left: student.seconds_left - 1 };
+        }
+        return student;
+      }));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Whenever the builder exam changes, fetch its sections
   const fetchSections = async () => {
     if (!selectedExamIdBuilder) return;
     try {
-      const res = await fetch(`http://localhost:3001/api/exams/${selectedExamIdBuilder}/sections`);
+      const res = await fetch(`${API_BASE}/api/exams/${selectedExamIdBuilder}/sections`);
       if (res.ok) setBuilderSections(await res.json());
     } catch (e) { console.error(e); }
   };
@@ -169,7 +182,7 @@ export default function TeacherDashboard() {
     const fetchResults = async () => {
       if (!selectedResultExamId) return;
       try {
-        const res = await fetch(`http://localhost:3001/api/exams/${selectedResultExamId}/results`);
+        const res = await fetch(`${API_BASE}/api/exams/${selectedResultExamId}/results`);
         if (res.ok) {
           setResultsData(await res.json());
         }
@@ -223,7 +236,34 @@ export default function TeacherDashboard() {
     const confirm = window.confirm("WARNING: This will immediately end the exam for all students. Are you sure?");
     if (confirm) {
       socket.emit('teacher_stop_exam', { exam_id: selectedMonitorExamId });
-      fetchData();
+      setTimeout(fetchData, 500);
+    }
+  };
+
+  const handlePauseExam = () => {
+    if (!selectedMonitorExamId) return;
+    const confirm = window.confirm("Are you sure you want to pause this exam for all students?");
+    if (confirm) {
+      socket.emit('teacher_pause_exam', { exam_id: selectedMonitorExamId });
+      setTimeout(fetchData, 500);
+    }
+  };
+
+  const handleResumeExam = () => {
+    if (!selectedMonitorExamId) return;
+    const confirm = window.confirm("Are you sure you want to resume this exam?");
+    if (confirm) {
+      socket.emit('teacher_resume_exam', { exam_id: selectedMonitorExamId });
+      setTimeout(fetchData, 500);
+    }
+  };
+
+  const handleRestartExam = () => {
+    if (!selectedMonitorExamId) return;
+    const confirm = window.confirm("Are you sure you want to restart this ended exam? Students will be able to log back in.");
+    if (confirm) {
+      socket.emit('teacher_restart_exam', { exam_id: selectedMonitorExamId });
+      setTimeout(fetchData, 500);
     }
   };
 
@@ -284,7 +324,7 @@ export default function TeacherDashboard() {
     }
     
     try {
-      await fetch('http://localhost:3001/api/students', {
+      await fetch(API_BASE + '/api/students', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newStudent)
@@ -310,7 +350,7 @@ export default function TeacherDashboard() {
     const confirm = window.confirm("Are you sure you want to permanently delete this student and all their exam data?");
     if (confirm) {
       try {
-        await fetch(`http://localhost:3001/api/students/${student_id}`, { method: 'DELETE' });
+        await fetch(`${API_BASE}/api/students/${student_id}`, { method: 'DELETE' });
         fetchData();
         // If we are currently editing the deleted student, reset the form
         if (isEditingStudent && newStudent.student_id === student_id) {
@@ -330,7 +370,7 @@ export default function TeacherDashboard() {
   const handleCreateExam = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:3001/api/exams', {
+      const res = await fetch(API_BASE + '/api/exams', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(examForm)
@@ -349,7 +389,7 @@ export default function TeacherDashboard() {
     const password = window.prompt("WARNING: This will permanently delete this exam and all its questions/sessions.\n\nEnter password to confirm deletion:");
     if (password === 'ICST') {
       try {
-        await fetch(`http://localhost:3001/api/exams/${exam_id}`, { method: 'DELETE' });
+        await fetch(`${API_BASE}/api/exams/${exam_id}`, { method: 'DELETE' });
         if (selectedMonitorExamId === exam_id) setSelectedMonitorExamId('');
         fetchData();
       } catch (e) { console.error(e); }
@@ -364,7 +404,7 @@ export default function TeacherDashboard() {
     e.preventDefault();
     if (!selectedExamIdBuilder) return;
     try {
-      await fetch('http://localhost:3001/api/sections', {
+      await fetch(API_BASE + '/api/sections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ exam_id: selectedExamIdBuilder, ...newSectionForm })
@@ -377,7 +417,7 @@ export default function TeacherDashboard() {
   const handleDeleteSection = async (section_id: string) => {
     if (!window.confirm("Delete this section and all its questions?")) return;
     try {
-      await fetch(`http://localhost:3001/api/sections/${section_id}`, { method: 'DELETE' });
+      await fetch(`${API_BASE}/api/sections/${section_id}`, { method: 'DELETE' });
       fetchSections();
     } catch (e) { console.error(e); }
   };
@@ -385,7 +425,7 @@ export default function TeacherDashboard() {
   const handlePublishExam = async () => {
     if (!selectedExamIdBuilder) return;
     try {
-      const res = await fetch(`http://localhost:3001/api/exams/${selectedExamIdBuilder}/publish`, { method: 'POST' });
+      const res = await fetch(`${API_BASE}/api/exams/${selectedExamIdBuilder}/publish`, { method: 'POST' });
       const data = await res.json();
       if (data.success) {
         setSelectedExamIdBuilder(null);
@@ -419,7 +459,7 @@ export default function TeacherDashboard() {
     }
     
     try {
-      await fetch('http://localhost:3001/api/questions', {
+      await fetch(API_BASE + '/api/questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -537,26 +577,34 @@ export default function TeacherDashboard() {
               </div>
               
               <div className="flex items-center gap-3">
-                {derivedStatus === 'STARTED' ? (
-                  <button 
-                    onClick={handleStopExam}
-                    className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white shadow-md transform hover:scale-[1.02]"
-                  >
-                    <Square size={16} fill="currentColor" />
-                    Stop Exam
+                {derivedStatus === 'STARTED' && (
+                  <>
+                    <button onClick={handlePauseExam} className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white shadow-md">
+                      Pause Exam
+                    </button>
+                    <button onClick={handleStopExam} className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white shadow-md transform hover:scale-[1.02]">
+                      <Square size={16} fill="currentColor" /> Stop Exam
+                    </button>
+                  </>
+                )}
+                {derivedStatus === 'PAUSED' && (
+                  <>
+                    <button onClick={handleResumeExam} className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white shadow-md">
+                      <Play size={16} /> Resume Exam
+                    </button>
+                    <button onClick={handleStopExam} className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white shadow-md transform hover:scale-[1.02]">
+                      <Square size={16} fill="currentColor" /> Stop Exam
+                    </button>
+                  </>
+                )}
+                {derivedStatus === 'ENDED' && (
+                  <button onClick={handleRestartExam} className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 bg-indigo-500 hover:bg-indigo-600 text-white shadow-md transform hover:scale-[1.02]">
+                    <Play size={16} /> Restart Exam
                   </button>
-                ) : (
-                  <button 
-                    onClick={handleStartExam}
-                    disabled={derivedStatus !== 'CREATED'}
-                    className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${
-                      derivedStatus === 'CREATED' 
-                        ? 'bg-gradient-accent hover:opacity-90 text-white shadow-md transform hover:scale-[1.02]' 
-                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                    }`}
-                  >
-                    <Play size={16} />
-                    {derivedStatus === 'ENDED' ? 'Exam Ended' : 'Start Exam'}
+                )}
+                {derivedStatus === 'CREATED' && (
+                  <button onClick={handleStartExam} className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 bg-gradient-accent hover:opacity-90 text-white shadow-md transform hover:scale-[1.02]">
+                    <Play size={16} /> Start Exam
                   </button>
                 )}
               </div>
@@ -582,6 +630,7 @@ export default function TeacherDashboard() {
                     <th className="p-4 border-b border-slate-100">Name</th>
                     <th className="p-4 border-b border-slate-100">Password</th>
                     <th className="p-4 border-b border-slate-100">Status</th>
+                    <th className="p-4 border-b border-slate-100 text-center">Time Left</th>
                     <th className="p-4 border-b border-slate-100 text-center">Warnings</th>
                     <th className="p-4 border-b border-slate-100 text-right">Actions</th>
                   </tr>
@@ -589,7 +638,7 @@ export default function TeacherDashboard() {
                 <tbody className="divide-y divide-slate-100">
                   {studentsSession.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="p-8 text-center text-slate-400 font-medium">
+                      <td colSpan={7} className="p-8 text-center text-slate-400 font-medium">
                         No students found for this exam. Ensure the batch has registered students.
                       </td>
                     </tr>
@@ -600,6 +649,9 @@ export default function TeacherDashboard() {
                         <td className="p-4 font-medium text-slate-700">{student.name}</td>
                         <td className="p-4 font-mono text-sm text-slate-600 font-bold bg-slate-100 rounded px-2">{student.password_provided || 'N/A'}</td>
                         <td className="p-4">{getStatusBadge(student.status)}</td>
+                        <td className="p-4 text-center font-mono font-bold text-slate-700">
+                          {student.seconds_left !== null ? `${Math.floor(student.seconds_left / 60).toString().padStart(2, '0')}:${(student.seconds_left % 60).toString().padStart(2, '0')}` : '--:--'}
+                        </td>
                         <td className="p-4 text-center">
                           <span className={`font-bold ${student.tab_violation_count > 0 ? 'text-red-600' : 'text-slate-400'}`}>
                             {student.tab_violation_count}
@@ -1220,7 +1272,7 @@ export default function TeacherDashboard() {
                         <th className="p-4 border-r border-slate-200">Rank</th>
                         <th className="p-4 border-r border-slate-200">Student ID</th>
                         <th className="p-4 border-r border-slate-200">Name</th>
-                        <th className="p-4 border-r border-slate-200">Score</th>
+                        <th className="p-4 border-r border-slate-200">Score / Full Marks</th>
                         <th className="p-4 border-r border-slate-200 text-center">Violations</th>
                         <th className="p-4">Status</th>
                       </tr>
@@ -1231,7 +1283,9 @@ export default function TeacherDashboard() {
                           <td className="p-4 border-r border-slate-200 text-center font-extrabold">#{index + 1}</td>
                           <td className="p-4 border-r border-slate-200 font-bold">{res.student_id}</td>
                           <td className="p-4 border-r border-slate-200">{res.name}</td>
-                          <td className="p-4 border-r border-slate-200 font-extrabold text-primary-700">{res.score}</td>
+                          <td className="p-4 border-r border-slate-200 font-extrabold text-primary-700">
+                            {res.score} <span className="text-slate-400 font-medium text-sm">/ {res.full_marks}</span>
+                          </td>
                           <td className="p-4 border-r border-slate-200 text-center font-bold text-red-600">
                             {res.tab_violation_count > 0 ? res.tab_violation_count : '-'}
                           </td>

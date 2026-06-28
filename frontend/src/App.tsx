@@ -4,8 +4,9 @@ import ExamWorkspace from './pages/ExamWorkspace';
 import TeacherDashboard from './pages/TeacherDashboard';
 import { io } from 'socket.io-client';
 
-// Connect to the backend (adjust IP for LAN deployment)
-export const socket = io(import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001');
+// Connect to the backend (dynamically use current hostname to support LAN devices)
+export const API_BASE = import.meta.env.VITE_BACKEND_URL || `http://${window.location.hostname}:3001`;
+export const socket = io(API_BASE);
 
 function App() {
   return (

@@ -20,6 +20,7 @@ export default function ExamWorkspace() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
   useEffect(() => {
     if (!session_id) {
@@ -52,7 +53,6 @@ export default function ExamWorkspace() {
       setSecondsLeft(data.seconds_left);
     });
 
-    // Tab visibility violation handler
     const handleVisibilityChange = () => {
       if (document.hidden && status === 'STARTED') {
         socket.emit('tab_violation', { session_id });
@@ -62,7 +62,25 @@ export default function ExamWorkspace() {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
+    // Local countdown timer
+    let timer: ReturnType<typeof setInterval>;
+    if (status === 'STARTED' && secondsLeft !== null && secondsLeft > 0) {
+      timer = setInterval(() => {
+        setSecondsLeft(prev => {
+          if (prev === null || prev <= 0) {
+            clearInterval(timer);
+            if (prev === 0) {
+              socket.emit('student_submit_exam', { session_id });
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
     return () => {
+      if (timer) clearInterval(timer);
       socket.off('exam_started');
       socket.off('exam_paused');
       socket.off('exam_resumed');
@@ -76,6 +94,13 @@ export default function ExamWorkspace() {
     setAnswers(prev => ({ ...prev, [question_id]: option }));
     // Instant write strategy
     socket.emit('submit_answer', { session_id, question_id, selected_option: option });
+  };
+
+  const handleSubmitExam = () => {
+    const confirm = window.confirm("Are you sure you want to submit your exam? You cannot change your answers after submitting.");
+    if (confirm) {
+      socket.emit('student_submit_exam', { session_id });
+    }
   };
 
   const formatTime = (totalSeconds: number | null) => {
@@ -143,50 +168,132 @@ export default function ExamWorkspace() {
           </div>
         </div>
 
-        <button 
-          onClick={() => setLang(l => l === 'en' ? 'bn' : 'en')}
-          className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl font-bold transition-colors"
-        >
-          <Languages size={20} />
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={handleSubmitExam}
+            className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-5 py-2 rounded-xl font-bold transition-all shadow-md transform hover:scale-[1.02]"
+          >
+            <CheckCircle2 size={20} /> Submit Exam
+          </button>
+          
+          <button 
+            onClick={() => setLang(l => l === 'en' ? 'bn' : 'en')}
+            className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl font-bold transition-colors"
+          >
+            <Languages size={20} />
           {lang === 'en' ? 'বাংলা' : 'English'}
         </button>
       </div>
+    </div>
 
-      {/* Questions */}
-      <div className="space-y-6">
-        {questions.map((q, index) => (
-          <div key={q.question_id} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-            <div className="flex gap-4">
-              <div className="flex-shrink-0 w-10 h-10 bg-primary-100 text-primary-600 font-bold rounded-full flex items-center justify-center text-lg">
-                {index + 1}
-              </div>
-              <div className="flex-grow">
-                <h3 className="text-xl font-semibold text-slate-800 mb-6 mt-1">
-                  {lang === 'en' ? q.question_text_en : q.question_text_bn}
-                </h3>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {q.options_json.map((option, optIdx) => {
-                    const isSelected = answers[q.question_id] === option;
-                    return (
-                      <button
-                        key={optIdx}
-                        onClick={() => handleAnswerSelect(q.question_id, option)}
-                        className={`text-left px-5 py-4 rounded-xl border-2 font-medium transition-all ${
-                          isSelected 
-                            ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm' 
-                            : 'border-slate-200 hover:border-primary-200 hover:bg-slate-50 text-slate-600'
-                        }`}
-                      >
-                        {option}
-                      </button>
-                    )
-                  })}
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
+        
+        {/* Main Question Area */}
+        <div className="w-full lg:w-3/4 flex flex-col space-y-6">
+          {questions.length > 0 && (
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100">
+              <div className="flex gap-4">
+                <div className="flex-shrink-0 w-12 h-12 bg-gradient-accent text-white font-black rounded-2xl flex items-center justify-center text-xl shadow-md">
+                  {currentQuestionIndex + 1}
+                </div>
+                <div className="flex-grow">
+                  <h3 className="text-2xl font-semibold text-slate-800 mb-8 mt-2 leading-relaxed">
+                    {lang === 'en' 
+                      ? questions[currentQuestionIndex].question_text_en 
+                      : questions[currentQuestionIndex].question_text_bn}
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {questions[currentQuestionIndex].options_json.map((option, optIdx) => {
+                      const isSelected = answers[questions[currentQuestionIndex].question_id] === option;
+                      return (
+                        <button
+                          key={optIdx}
+                          onClick={() => handleAnswerSelect(questions[currentQuestionIndex].question_id, option)}
+                          className={`text-left px-6 py-5 rounded-2xl border-2 font-bold transition-all transform hover:scale-[1.01] ${
+                            isSelected 
+                              ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm' 
+                              : 'border-slate-200 hover:border-primary-300 hover:bg-slate-50 text-slate-600'
+                          }`}
+                        >
+                          {option}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Navigation Controls */}
+          <div className="flex items-center justify-between bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+            <button
+              onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
+              disabled={currentQuestionIndex === 0}
+              className={`px-6 py-3 rounded-xl font-bold transition-colors ${
+                currentQuestionIndex === 0 
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                  : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+              }`}
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setCurrentQuestionIndex(prev => Math.min(questions.length - 1, prev + 1))}
+              disabled={currentQuestionIndex === questions.length - 1}
+              className={`px-6 py-3 rounded-xl font-bold transition-colors ${
+                currentQuestionIndex === questions.length - 1
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  : 'bg-primary-600 hover:bg-primary-700 text-white shadow-md'
+              }`}
+            >
+              Next
+            </button>
           </div>
-        ))}
+        </div>
+
+        {/* Question Palette Sidebar */}
+        <div className="w-full lg:w-1/4 bg-white p-6 rounded-3xl shadow-sm border border-slate-100 lg:sticky lg:top-48">
+          <h3 className="font-extrabold text-slate-800 text-lg mb-6 flex items-center justify-between">
+            <span>Question Palette</span>
+            <span className="text-sm font-bold bg-slate-100 text-slate-500 px-3 py-1 rounded-full">
+              {Object.keys(answers).length} / {questions.length}
+            </span>
+          </h3>
+          <div className="grid grid-cols-4 gap-3">
+            {questions.map((q, idx) => {
+              const isAnswered = answers[q.question_id] !== undefined;
+              const isCurrent = idx === currentQuestionIndex;
+              return (
+                <button
+                  key={q.question_id}
+                  onClick={() => setCurrentQuestionIndex(idx)}
+                  className={`w-full aspect-square rounded-xl font-black text-sm flex items-center justify-center transition-all ${
+                    isCurrent ? 'ring-4 ring-primary-300 scale-110 z-10' : 'hover:scale-105'
+                  } ${
+                    isAnswered 
+                      ? 'bg-green-500 text-white shadow-md' 
+                      : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                  }`}
+                >
+                  {idx + 1}
+                </button>
+              );
+            })}
+          </div>
+          
+          <div className="mt-8 space-y-3 border-t border-slate-100 pt-6">
+            <div className="flex items-center gap-3 text-sm font-bold text-slate-600">
+              <div className="w-4 h-4 rounded-md bg-green-500"></div>
+              <span>Answered</span>
+            </div>
+            <div className="flex items-center gap-3 text-sm font-bold text-slate-600">
+              <div className="w-4 h-4 rounded-md bg-slate-100 border border-slate-200"></div>
+              <span>Not Visited / Left</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

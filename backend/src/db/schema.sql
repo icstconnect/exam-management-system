@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS exams (
   duration_minutes INTEGER NOT NULL,
   target_batch VARCHAR(50) NOT NULL,
   full_marks INTEGER NOT NULL DEFAULT 100,
-  status VARCHAR(20) NOT NULL CHECK (status IN ('DRAFT', 'CREATED', 'STARTED', 'ENDED')),
+  status VARCHAR(20) NOT NULL CHECK (status IN ('DRAFT', 'CREATED', 'STARTED', 'PAUSED', 'ENDED')),
   scheduled_start TIMESTAMP,
   actual_start_time TIMESTAMP,
   actual_end_time TIMESTAMP
