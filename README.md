@@ -53,9 +53,21 @@ The system uses a PostgreSQL database running inside a Docker container.
 
 ## 🟢 How to Turn On the System (Daily Usage)
 
-Whenever you want to start the exam system, you need to run both the database, the backend, and the frontend.
+### The Easiest Way: One-Click Start 🚀
+I've created a `start.bat` file in the main folder. 
+Simply **double-click `start.bat`**, and it will automatically:
+1. Turn on the database.
+2. Open a new window running the backend server.
+3. Open a new window running the frontend server.
 
-### Step 1: Ensure Database is Running
+*(To shut everything down, just close those two black terminal windows!)*
+
+---
+
+### Manual Startup Method
+If you prefer to start them manually, follow these steps:
+
+#### Step 1: Ensure Database is Running
 Open a terminal in the root folder and run:
 ```bash
 docker-compose start
