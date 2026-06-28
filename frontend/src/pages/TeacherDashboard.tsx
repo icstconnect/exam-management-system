@@ -80,13 +80,12 @@ export default function TeacherDashboard() {
   const [builderSections, setBuilderSections] = useState<Section[]>([]);
   const [newSectionForm, setNewSectionForm] = useState({ title: '', section_marks: 20, section_type: 'MCQ' });
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
-  const [questionForm, setQuestionForm] = useState({ text_en: '', text_bn: '', options: ['', '', '', ''], correct_answer: '', marks: 1 });
+  const [questionForm, setQuestionForm] = useState({ text_en: '', text_bn: '', options: ['', '', '', ''], correct_answer: '', marks: 1, fitb_blanks: [''], fitb_extras: [] as string[] });
   const [builderStatus, setBuilderStatus] = useState('');
 
   // Monitor State
   const [selectedMonitorExamId, setSelectedMonitorExamId] = useState<string>('');
   const [studentsSession, setStudentsSession] = useState<StudentSession[]>([]);
-  const [globalStatus, setGlobalStatus] = useState<'CREATED' | 'STARTED' | 'ENDED'>('CREATED');
   const [recoveryPrompt, setRecoveryPrompt] = useState<Exam | null>(null);
 
   // Results State
@@ -131,7 +130,7 @@ export default function TeacherDashboard() {
     
     socket.on('dashboard_update', (data: { students: StudentSession[], status: any }) => {
       setStudentsSession(data.students);
-      if (data.status) setGlobalStatus(data.status);
+      // Status is now derived directly from examsList
     });
 
     socket.on('student_status_update', (data: Partial<StudentSession>) => {
@@ -215,7 +214,6 @@ export default function TeacherDashboard() {
     const confirm = window.confirm("Are you sure you want to start this exam?");
     if (confirm) {
       socket.emit('teacher_start_exam', { exam_id: selectedMonitorExamId });
-      setGlobalStatus('STARTED');
       fetchData(); // Refresh list to update status
     }
   };
@@ -225,7 +223,6 @@ export default function TeacherDashboard() {
     const confirm = window.confirm("WARNING: This will immediately end the exam for all students. Are you sure?");
     if (confirm) {
       socket.emit('teacher_stop_exam', { exam_id: selectedMonitorExamId });
-      setGlobalStatus('ENDED');
       fetchData();
     }
   };
@@ -415,7 +412,10 @@ export default function TeacherDashboard() {
       finalOptions = ['True', 'False'];
       if (!finalCorrect) finalCorrect = 'True';
     } else if (qType === 'FITB') {
-      finalOptions = [];
+      const validBlanks = questionForm.fitb_blanks.map(b => b.trim()).filter(b => b !== '');
+      const validExtras = questionForm.fitb_extras.map(e => e.trim()).filter(e => e !== '');
+      finalCorrect = JSON.stringify(validBlanks);
+      finalOptions = [...validBlanks, ...validExtras];
     }
     
     try {
@@ -436,7 +436,7 @@ export default function TeacherDashboard() {
       fetchSections();
       setBuilderStatus('Question added successfully!');
       setTimeout(() => setBuilderStatus(''), 3000);
-      setQuestionForm({ ...questionForm, text_en: '', text_bn: '', options: ['', '', '', ''], correct_answer: '' });
+      setQuestionForm({ ...questionForm, text_en: '', text_bn: '', options: ['', '', '', ''], correct_answer: '', fitb_blanks: [''], fitb_extras: [] });
     } catch (e) { console.error(e); }
   };
 
@@ -511,52 +511,57 @@ export default function TeacherDashboard() {
       </div>
 
       {/* MONITOR TAB */}
-      {activeTab === 'MONITOR' && (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <div className="flex flex-col md:flex-row md:items-center justify-between bg-white p-6 rounded-2xl shadow-sm border border-slate-100 gap-4">
-            <div>
-              <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight">Master Control Panel</h2>
-              <div className="flex items-center gap-3 mt-2">
-                <span className="text-slate-500 font-bold text-sm">Select Target Exam:</span>
-                <select 
-                  value={selectedMonitorExamId} 
-                  onChange={(e) => setSelectedMonitorExamId(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 block p-2 font-bold"
-                >
-                  {examsList.map(ex => (
-                    <option key={ex.exam_id} value={ex.exam_id}>
-                      {ex.title} ({ex.target_batch}) - {ex.status}
-                    </option>
-                  ))}
-                </select>
+      {activeTab === 'MONITOR' && (() => {
+        const currentMonitorExam = examsList.find(e => e.exam_id === selectedMonitorExamId);
+        const derivedStatus = currentMonitorExam ? currentMonitorExam.status : 'CREATED';
+        
+        return (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div className="flex flex-col md:flex-row md:items-center justify-between bg-white p-6 rounded-2xl shadow-sm border border-slate-100 gap-4">
+              <div>
+                <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight">Master Control Panel</h2>
+                <div className="flex items-center gap-3 mt-2">
+                  <span className="text-slate-500 font-bold text-sm">Select Target Exam:</span>
+                  <select 
+                    value={selectedMonitorExamId} 
+                    onChange={(e) => setSelectedMonitorExamId(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 block p-2 font-bold"
+                  >
+                    {examsList.map(ex => (
+                      <option key={ex.exam_id} value={ex.exam_id}>
+                        {ex.title} ({ex.target_batch}) - {ex.status}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                {derivedStatus === 'STARTED' ? (
+                  <button 
+                    onClick={handleStopExam}
+                    className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white shadow-md transform hover:scale-[1.02]"
+                  >
+                    <Square size={16} fill="currentColor" />
+                    Stop Exam
+                  </button>
+                ) : (
+                  <button 
+                    onClick={handleStartExam}
+                    disabled={derivedStatus !== 'CREATED'}
+                    className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${
+                      derivedStatus === 'CREATED' 
+                        ? 'bg-gradient-accent hover:opacity-90 text-white shadow-md transform hover:scale-[1.02]' 
+                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    }`}
+                  >
+                    <Play size={16} />
+                    {derivedStatus === 'ENDED' ? 'Exam Ended' : 'Start Exam'}
+                  </button>
+                )}
               </div>
             </div>
-            
-            <div className="flex items-center gap-3">
-              {globalStatus === 'STARTED' ? (
-                <button 
-                  onClick={handleStopExam}
-                  className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white shadow-md transform hover:scale-[1.02]"
-                >
-                  <Square size={16} fill="currentColor" />
-                  Stop Exam
-                </button>
-              ) : (
-                <button 
-                  onClick={handleStartExam}
-                  disabled={globalStatus !== 'CREATED'}
-                  className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${
-                    globalStatus === 'CREATED' 
-                      ? 'bg-gradient-accent hover:opacity-90 text-white shadow-md transform hover:scale-[1.02]' 
-                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                  }`}
-                >
-                  <Play size={16} />
-                  {globalStatus === 'ENDED' ? 'Exam Ended' : 'Start Exam'}
-                </button>
-              )}
-            </div>
-          </div>
+
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
@@ -619,7 +624,8 @@ export default function TeacherDashboard() {
             </div>
           </div>
         </div>
-      )}
+      );
+      })()}
 
       {/* REGISTRATION TAB */}
       {activeTab === 'REGISTRATION' && (
@@ -1031,9 +1037,55 @@ export default function TeacherDashboard() {
                                         )}
 
                                         {sec.section_type === 'FITB' && (
-                                          <div className="space-y-3 bg-white p-4 rounded-xl border border-slate-200">
-                                            <label className="block text-sm font-bold text-slate-700">Correct Answer (The word to fill in)</label>
-                                            <input required type="text" value={questionForm.correct_answer} onChange={e => setQuestionForm({...questionForm, correct_answer: e.target.value})} className="w-full p-2.5 border rounded-lg text-sm outline-none" placeholder="e.g. Mitochondria" />
+                                          <div className="space-y-4 bg-white p-4 rounded-xl border border-slate-200">
+                                            <div>
+                                              <label className="block text-sm font-bold text-slate-700 mb-2">Blank Answers</label>
+                                              <p className="text-xs text-slate-500 mb-3">Add the correct answers for each blank in order. Use `___` in the question text above to indicate where these blanks appear.</p>
+                                              <div className="space-y-2">
+                                                {questionForm.fitb_blanks.map((blank, i) => (
+                                                  <div key={`blank-${i}`} className="flex gap-2 items-center">
+                                                    <span className="font-bold text-slate-400 text-sm w-16">Blank {i+1}</span>
+                                                    <input required type="text" value={blank} onChange={e => {
+                                                      const newBlanks = [...questionForm.fitb_blanks];
+                                                      newBlanks[i] = e.target.value;
+                                                      setQuestionForm({...questionForm, fitb_blanks: newBlanks});
+                                                    }} className="flex-1 p-2 border rounded-lg text-sm outline-none" placeholder="Correct word..." />
+                                                    {questionForm.fitb_blanks.length > 1 && (
+                                                      <button type="button" onClick={() => {
+                                                        const newBlanks = questionForm.fitb_blanks.filter((_, idx) => idx !== i);
+                                                        setQuestionForm({...questionForm, fitb_blanks: newBlanks});
+                                                      }} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={16}/></button>
+                                                    )}
+                                                  </div>
+                                                ))}
+                                              </div>
+                                              <button type="button" onClick={() => setQuestionForm({...questionForm, fitb_blanks: [...questionForm.fitb_blanks, '']})} className="mt-3 text-sm font-bold text-primary-600 hover:text-primary-700 flex items-center gap-1">
+                                                <Plus size={16} /> Add Another Blank
+                                              </button>
+                                            </div>
+
+                                            <div className="pt-4 border-t border-slate-100">
+                                              <label className="block text-sm font-bold text-slate-700 mb-2">Extra Distractor Options (Optional)</label>
+                                              <p className="text-xs text-slate-500 mb-3">Add incorrect words to the word bank to make the question harder.</p>
+                                              <div className="space-y-2">
+                                                {questionForm.fitb_extras.map((extra, i) => (
+                                                  <div key={`extra-${i}`} className="flex gap-2 items-center">
+                                                    <input type="text" value={extra} onChange={e => {
+                                                      const newExtras = [...questionForm.fitb_extras];
+                                                      newExtras[i] = e.target.value;
+                                                      setQuestionForm({...questionForm, fitb_extras: newExtras});
+                                                    }} className="flex-1 p-2 border rounded-lg text-sm outline-none" placeholder="Distractor word..." />
+                                                    <button type="button" onClick={() => {
+                                                      const newExtras = questionForm.fitb_extras.filter((_, idx) => idx !== i);
+                                                      setQuestionForm({...questionForm, fitb_extras: newExtras});
+                                                    }} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={16}/></button>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                              <button type="button" onClick={() => setQuestionForm({...questionForm, fitb_extras: [...questionForm.fitb_extras, '']})} className="mt-3 text-sm font-bold text-slate-500 hover:text-slate-700 flex items-center gap-1">
+                                                <Plus size={16} /> Add Distractor Option
+                                              </button>
+                                            </div>
                                           </div>
                                         )}
 
@@ -1046,7 +1098,7 @@ export default function TeacherDashboard() {
                                   ) : (
                                     <button onClick={() => {
                                       setActiveSectionId(sec.section_id);
-                                      setQuestionForm({ text_en: '', text_bn: '', options: ['', '', '', ''], correct_answer: '', marks: Math.min(1, secMarksLeft) });
+                                      setQuestionForm({ text_en: '', text_bn: '', options: ['', '', '', ''], correct_answer: '', marks: Math.min(1, secMarksLeft), fitb_blanks: [''], fitb_extras: [] });
                                     }} className="mt-4 w-full border-2 border-dashed border-slate-300 hover:border-primary-400 text-slate-500 hover:text-primary-600 font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors">
                                       <Plus size={20} /> Add Question
                                     </button>

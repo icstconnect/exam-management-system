@@ -284,9 +284,22 @@ io.on('connection', (socket: Socket) => {
   // Teacher selecting an exam to monitor
   socket.on('monitor_exam', async (data: { exam_id: string }) => {
     try {
-      const examRes = await pool.query("SELECT status FROM exams WHERE exam_id = $1", [data.exam_id]);
+      const examRes = await pool.query("SELECT target_batch, status FROM exams WHERE exam_id = $1", [data.exam_id]);
       if (examRes.rows.length > 0) {
-        const { status } = examRes.rows[0];
+        const { target_batch, status } = examRes.rows[0];
+        
+        // Auto-generate sessions for any newly added students in the batch
+        if (status === 'CREATED') {
+          const allStudentsRes = await pool.query("SELECT student_id, name FROM students WHERE batch = $1", [target_batch]);
+          for (const student of allStudentsRes.rows) {
+            const password = `${student.name.split(' ')[0].toUpperCase()}@${student.student_id}`;
+            await pool.query(
+              "INSERT INTO exam_sessions (exam_id, student_id, status, password_provided) VALUES ($1, $2, 'LOGGED_IN', $3) ON CONFLICT (exam_id, student_id) DO NOTHING",
+              [data.exam_id, student.student_id, password]
+            );
+          }
+        }
+
         const studentsRes = await pool.query(`
           SELECT s.student_id, s.name, es.session_id, es.status, es.password_provided, es.tab_violation_count, es.seconds_left
           FROM exam_sessions es
