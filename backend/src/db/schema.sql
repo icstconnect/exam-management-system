@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS exams (
   status VARCHAR(20) NOT NULL CHECK (status IN ('DRAFT', 'CREATED', 'STARTED', 'PAUSED', 'ENDED')),
   scheduled_start TIMESTAMP,
   actual_start_time TIMESTAMP,
-  actual_end_time TIMESTAMP
+  actual_end_time TIMESTAMP,
+  global_seconds_left INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS exam_sections (
@@ -46,7 +47,7 @@ CREATE TABLE IF NOT EXISTS exam_sessions (
   session_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   exam_id UUID NOT NULL REFERENCES exams(exam_id) ON DELETE CASCADE,
   student_id VARCHAR(3) NOT NULL REFERENCES students(student_id) ON DELETE CASCADE,
-  status VARCHAR(20) NOT NULL CHECK (status IN ('LOGGED_IN', 'EXAMINEE', 'PAUSED', 'COMPLETED', 'ABSENT')),
+  status VARCHAR(20) NOT NULL CHECK (status IN ('READY', 'LOGGED_IN', 'EXAMINEE', 'PAUSED', 'COMPLETED', 'ABSENT')),
   password_provided VARCHAR(100) NOT NULL,
   tab_violation_count INTEGER NOT NULL DEFAULT 0,
   seconds_left INTEGER,

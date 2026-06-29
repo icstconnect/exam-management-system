@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { socket, API_BASE } from '../App';
-import { Users, Play, Unlock, UserPlus, BookOpen, Plus, Save, AlertTriangle, ArrowLeft, Trash2, Square, Award, Download, Lock, Edit } from 'lucide-react';
+import { Users, Play, Unlock, UserPlus, BookOpen, Plus, Save, AlertTriangle, ArrowLeft, Trash2, Square, Award, Download, Lock, Edit, Eye, X, ChevronLeft, ChevronRight, CheckCircle2, XCircle } from 'lucide-react';
 import * as htmlToImage from 'html-to-image';
 import { jsPDF } from 'jspdf';
 
@@ -95,6 +95,46 @@ export default function TeacherDashboard() {
   const [selectedResultExamId, setSelectedResultExamId] = useState<string>('');
   const [resultsData, setResultsData] = useState<ResultData[]>([]);
   const resultsRef = useRef<HTMLDivElement>(null);
+
+  // Answer Sheet View State
+  const [selectedStudentForAnswers, setSelectedStudentForAnswers] = useState<string | null>(null);
+  const [answerSheetData, setAnswerSheetData] = useState<any>(null);
+  const [isAnswerSheetLoading, setIsAnswerSheetLoading] = useState(false);
+
+  const openAnswerSheet = async (student_id: string) => {
+    setSelectedStudentForAnswers(student_id);
+    setAnswerSheetData(null);
+    setIsAnswerSheetLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/exams/${selectedResultExamId}/results/${student_id}/answers`);
+      if (res.ok) {
+        setAnswerSheetData(await res.json());
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsAnswerSheetLoading(false);
+    }
+  };
+
+  const closeAnswerSheet = () => {
+    setSelectedStudentForAnswers(null);
+    setAnswerSheetData(null);
+  };
+  
+  const navigateAnswerSheet = (direction: 'prev' | 'next') => {
+    if (!selectedStudentForAnswers || resultsData.length === 0) return;
+    const currentIndex = resultsData.findIndex(r => r.student_id === selectedStudentForAnswers);
+    if (currentIndex === -1) return;
+    
+    let newIndex = currentIndex;
+    if (direction === 'prev' && currentIndex > 0) newIndex = currentIndex - 1;
+    if (direction === 'next' && currentIndex < resultsData.length - 1) newIndex = currentIndex + 1;
+    
+    if (newIndex !== currentIndex) {
+      openAnswerSheet(resultsData[newIndex].student_id);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -273,6 +313,28 @@ export default function TeacherDashboard() {
 
   const handleUnpauseStudent = (session_id: string) => {
     socket.emit('teacher_unpause_student', { session_id });
+  };
+
+  const handleInitializeAll = () => {
+    if (!selectedMonitorExamId) return;
+    const confirm = window.confirm("Are you sure you want to initialize all students? This will assign them passwords and get them ready for the exam.");
+    if (confirm) {
+      socket.emit('teacher_initialize_exam', { exam_id: selectedMonitorExamId });
+      setTimeout(fetchData, 500);
+    }
+  };
+
+  const handleInitializeStudent = (student_id: string) => {
+    if (!selectedMonitorExamId) return;
+    socket.emit('teacher_initialize_student', { exam_id: selectedMonitorExamId, student_id });
+  };
+
+  const handleHardResetStudent = (student_id: string) => {
+    if (!selectedMonitorExamId) return;
+    const confirm = window.confirm("Are you sure you want to HARD RESET this student? This will permanently delete all their current answers, force them out of the exam, and give them a generic 'ICST' password to start over.");
+    if (confirm) {
+      socket.emit('teacher_hard_reset_student', { exam_id: selectedMonitorExamId, student_id });
+    }
   };
 
   const handleLogin = (e: React.FormEvent) => {
@@ -670,7 +732,12 @@ export default function TeacherDashboard() {
                 </div>
                 <h3 className="font-bold text-slate-800 text-lg">Active Sessions Tracker</h3>
               </div>
-              <span className="text-sm font-bold text-slate-400">Total Assigned: {studentsSession.length}</span>
+              <div className="flex items-center gap-4">
+                <button onClick={handleInitializeAll} className="px-4 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-sm font-bold rounded-lg shadow-sm transition-colors">
+                  Initialize All
+                </button>
+                <span className="text-sm font-bold text-slate-400 border border-slate-200 bg-white px-3 py-1 rounded-lg">Total Assigned: {studentsSession.length}</span>
+              </div>
             </div>
             
             <div className="overflow-x-auto">
@@ -709,15 +776,33 @@ export default function TeacherDashboard() {
                           </span>
                         </td>
                         <td className="p-4 text-right">
-                          {student.status === 'PAUSED' && (
-                            <button 
-                              onClick={() => handleUnpauseStudent(student.session_id)}
-                              className="inline-flex items-center gap-1.5 text-xs font-bold bg-green-50 hover:bg-green-100 text-green-700 px-3 py-1.5 rounded-lg transition-colors"
-                            >
-                              <Unlock size={14} />
-                              Unpause
-                            </button>
-                          )}
+                          <div className="flex items-center justify-end gap-2">
+                            {student.status === 'PAUSED' && (
+                              <button 
+                                onClick={() => handleUnpauseStudent(student.session_id)}
+                                className="inline-flex items-center gap-1.5 text-xs font-bold bg-green-50 hover:bg-green-100 text-green-700 px-3 py-1.5 rounded-lg transition-colors"
+                              >
+                                <Unlock size={14} />
+                                Unpause
+                              </button>
+                            )}
+                            {(!student.password_provided || student.password_provided === '') && (
+                              <button 
+                                onClick={() => handleInitializeStudent(student.student_id)}
+                                className="inline-flex items-center gap-1.5 text-xs font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg transition-colors"
+                              >
+                                Initialize
+                              </button>
+                            )}
+                            {student.password_provided && (
+                              <button 
+                                onClick={() => handleHardResetStudent(student.student_id)}
+                                className="inline-flex items-center gap-1.5 text-xs font-bold bg-red-50 hover:bg-red-100 text-red-700 px-3 py-1.5 rounded-lg transition-colors"
+                              >
+                                Hard Reset
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -1361,7 +1446,8 @@ export default function TeacherDashboard() {
                         <th className="p-4 border-r border-slate-200">Name</th>
                         <th className="p-4 border-r border-slate-200">Score / Full Marks</th>
                         <th className="p-4 border-r border-slate-200 text-center">Violations</th>
-                        <th className="p-4">Status</th>
+                        <th className="p-4 border-r border-slate-200">Status</th>
+                        <th className="p-4 border-l border-slate-200 text-center" data-html2canvas-ignore="true">View</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200">
@@ -1376,10 +1462,15 @@ export default function TeacherDashboard() {
                           <td className="p-4 border-r border-slate-200 text-center font-bold text-red-600">
                             {res.tab_violation_count > 0 ? res.tab_violation_count : '-'}
                           </td>
-                          <td className="p-4 font-bold text-sm">
+                          <td className="p-4 border-r border-slate-200 font-bold text-sm">
                             <span className={`${res.status === 'COMPLETED' ? 'text-green-600' : 'text-slate-500'}`}>
                               {res.status}
                             </span>
+                          </td>
+                          <td className="p-4 border-l border-slate-200 text-center" data-html2canvas-ignore="true">
+                            <button onClick={() => openAnswerSheet(res.student_id)} className="text-primary-600 hover:text-primary-800 transition-colors p-2 rounded-full hover:bg-primary-50" title="View Answer Sheet">
+                              <Eye size={18} />
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -1409,6 +1500,202 @@ export default function TeacherDashboard() {
           )}
         </div>
       )}
+
+      {/* ANSWER SHEET MODAL */}
+      {selectedStudentForAnswers && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex flex-col md:flex-row justify-center items-center p-4">
+          <div className="bg-white w-full max-w-5xl h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="bg-slate-800 text-white p-6 flex items-center justify-between shadow-md z-10">
+              <div className="flex items-center gap-4">
+                <button onClick={() => navigateAnswerSheet('prev')} className="p-2 hover:bg-slate-700 rounded-full transition-colors" title="Previous Student">
+                  <ChevronLeft size={24} />
+                </button>
+                <div>
+                  <h2 className="text-2xl font-extrabold tracking-tight">Answer Sheet Review</h2>
+                  {answerSheetData && (
+                    <p className="text-slate-300 font-medium text-sm mt-1">
+                      {answerSheetData.student.name} ({answerSheetData.student.student_id}) - {answerSheetData.student.class}
+                    </p>
+                  )}
+                </div>
+                <button onClick={() => navigateAnswerSheet('next')} className="p-2 hover:bg-slate-700 rounded-full transition-colors" title="Next Student">
+                  <ChevronRight size={24} />
+                </button>
+              </div>
+              <button onClick={closeAnswerSheet} className="p-2 bg-slate-700 hover:bg-red-500 rounded-full transition-colors shadow-sm">
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto bg-slate-50 p-6 md:p-8 custom-scrollbar">
+              {isAnswerSheetLoading || !answerSheetData ? (
+                <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-4">
+                  <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="font-bold tracking-wider uppercase text-sm">Loading Answer Sheet...</p>
+                </div>
+              ) : (
+                <div className="max-w-4xl mx-auto space-y-8">
+                  {/* Summary Card */}
+                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <div>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Exam</p>
+                      <p className="font-bold text-slate-800">{answerSheetData.student.exam_title}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Score</p>
+                      <p className="font-extrabold text-2xl text-primary-700">{answerSheetData.student.score} <span className="text-lg text-slate-400">/ {answerSheetData.student.full_marks}</span></p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Percentage</p>
+                      <p className="font-bold text-slate-800">{answerSheetData.student.full_marks > 0 ? Math.round((answerSheetData.student.score / answerSheetData.student.full_marks) * 100) : 0}%</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Status</p>
+                      <p className={`font-bold ${answerSheetData.student.status === 'COMPLETED' ? 'text-green-600' : 'text-amber-500'}`}>{answerSheetData.student.status}</p>
+                    </div>
+                  </div>
+
+                  {/* Group Questions by Section */}
+                  {(() => {
+                    let qData = answerSheetData.answers || [];
+                    
+                    const sectionsObj: Record<string, { title: string, type: string, questions: any[] }> = {};
+                    qData.forEach((q: any) => {
+                      const secId = q.section_id || (q.question_type === 'FITB' ? 'default_fitb' : 'default_mcq');
+                      const secTitle = q.section_title || (q.question_type === 'FITB' ? 'Fill in the Blanks' : 'General Questions');
+                      if (!sectionsObj[secId]) sectionsObj[secId] = { title: secTitle, type: q.question_type, questions: [] };
+                      sectionsObj[secId].questions.push(q);
+                    });
+
+                    return Object.entries(sectionsObj).map(([secId, sec]) => (
+                      <div key={secId} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div className="bg-slate-100 border-b border-slate-200 px-6 py-3 flex items-center gap-2 text-slate-700 font-extrabold uppercase tracking-wider text-sm">
+                          {sec.title}
+                        </div>
+                        <div className="divide-y divide-slate-100">
+                          {sec.questions.map((q: any, idx: number) => {
+                            const studentAns = q.student_answer;
+                            const isCorrect = q.is_correct;
+                            
+                            return (
+                              <div key={q.question_id} className="p-6 md:p-8">
+                                <div className="flex gap-4 mb-6">
+                                  <div className="flex-shrink-0 w-10 h-10 bg-slate-100 text-slate-600 font-black rounded-xl flex items-center justify-center text-lg">
+                                    {idx + 1}
+                                  </div>
+                                  <div className="flex-grow">
+                                    {q.question_type === 'FITB' ? (
+                                      <h3 className="text-xl font-semibold text-slate-800 leading-relaxed">
+                                        {q.question_text_en.split('___').map((part: string, pIdx: number, partsArr: string[]) => {
+                                          if (pIdx === partsArr.length - 1) return <span key={pIdx}>{part}</span>;
+                                          return <span key={pIdx}>{part}<span className="inline-block mx-1 w-16 border-b-2 border-slate-300"></span></span>;
+                                        })}
+                                      </h3>
+                                    ) : (
+                                      <h3 className="text-xl font-semibold text-slate-800 leading-relaxed">{q.question_text_en}</h3>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Render Answers Based on Question Type */}
+                                <div className="ml-14 bg-slate-50 p-5 rounded-xl border border-slate-200">
+                                  {q.question_type === 'FITB' ? (
+                                    <div className="space-y-4">
+                                      {(() => {
+                                        try {
+                                          const correctArr = JSON.parse(q.correct_answer || '[]');
+                                          const studentArr = studentAns ? JSON.parse(studentAns) : [];
+                                          return correctArr.map((corrOpt: string, bIdx: number) => {
+                                            const sOpt = studentArr[bIdx];
+                                            const isBlankCorrect = sOpt === corrOpt;
+                                            return (
+                                              <div key={bIdx} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 pb-4 border-b border-slate-200 last:border-0 last:pb-0">
+                                                <div className="w-20 font-bold text-slate-400 text-sm uppercase tracking-wider">Blank {bIdx + 1}</div>
+                                                <div className="flex-1">
+                                                  <div className="flex items-center gap-2 mb-1">
+                                                    <span className="text-xs font-bold text-slate-500 w-16">Student:</span>
+                                                    <span className={`px-3 py-1 rounded-lg text-sm font-bold ${!sOpt ? 'bg-slate-200 text-slate-500 italic' : isBlankCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                      {sOpt || '(Left Blank)'}
+                                                    </span>
+                                                  </div>
+                                                  <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-bold text-slate-500 w-16">Correct:</span>
+                                                    <span className="px-3 py-1 rounded-lg text-sm font-bold bg-slate-200 text-slate-700">
+                                                      {corrOpt}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                                <div className="flex items-center justify-end w-10">
+                                                  {isBlankCorrect ? <CheckCircle2 className="text-green-500" size={24} /> : <XCircle className="text-red-500" size={24} />}
+                                                </div>
+                                              </div>
+                                            );
+                                          });
+                                        } catch (e) { return <p className="text-red-500 font-bold">Error parsing FITB answers.</p>; }
+                                      })()}
+                                    </div>
+                                  ) : q.question_type === 'MCQ' || q.question_type === 'TF' ? (
+                                    <div className="flex flex-col sm:flex-row gap-6">
+                                      <div className="flex-1">
+                                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Student Answer</div>
+                                        <div className={`p-3 rounded-xl border-2 font-bold ${!studentAns ? 'bg-slate-100 border-slate-200 text-slate-500 italic' : isCorrect ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                                          {studentAns || 'Not Answered'}
+                                        </div>
+                                      </div>
+                                      <div className="flex-1">
+                                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Correct Answer</div>
+                                        <div className="p-3 rounded-xl border-2 bg-slate-100 border-slate-200 text-slate-700 font-bold">
+                                          {q.correct_answer}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-4">
+                                      <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
+                                        <AlertTriangle size={16} /> Generic Text View
+                                      </div>
+                                      <div>
+                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Student Answer</span>
+                                        <div className="bg-white p-3 rounded-lg border border-slate-200 text-slate-700 whitespace-pre-wrap font-medium">
+                                          {studentAns || '(Left Blank)'}
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Correct Answer / Reference</span>
+                                        <div className="bg-white p-3 rounded-lg border border-slate-200 text-slate-700 whitespace-pre-wrap font-medium">
+                                          {q.correct_answer}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Marks Banner */}
+                                  <div className={`mt-5 flex items-center justify-between px-4 py-2 rounded-lg font-extrabold text-sm ${isCorrect ? 'bg-green-100 text-green-800' : 'bg-slate-200 text-slate-600'}`}>
+                                    <div className="flex items-center gap-2">
+                                      {isCorrect ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
+                                      <span>{isCorrect ? 'Correct' : 'Incorrect'}</span>
+                                    </div>
+                                    <div className="text-right">
+                                      {isCorrect ? q.marks : 0} <span className="opacity-60">/ {q.marks} Marks</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
