@@ -133,6 +133,21 @@ app.delete('/api/exams/:id', async (req, res) => {
   }
 });
 
+app.put('/api/exams/:id', async (req, res) => {
+  try {
+    const exam_id = req.params.id;
+    const { title, duration_minutes, full_marks } = req.body;
+    await pool.query(
+      "UPDATE exams SET title = $1, duration_minutes = $2, full_marks = $3 WHERE exam_id = $4",
+      [title, duration_minutes, full_marks, exam_id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update exam' });
+  }
+});
+
 app.get('/api/exams/:id/results', async (req, res) => {
   try {
     const exam_id = req.params.id;
@@ -210,6 +225,21 @@ app.post('/api/questions', async (req, res) => {
   }
 });
 
+app.put('/api/questions/:id', async (req, res) => {
+  try {
+    const question_id = req.params.id;
+    const { question_text_en, question_text_bn, options_json, correct_answer, marks } = req.body;
+    await pool.query(
+      "UPDATE questions SET question_text_en = $1, question_text_bn = $2, options_json = $3, correct_answer = $4, marks = $5 WHERE question_id = $6",
+      [question_text_en, question_text_bn, JSON.stringify(options_json), correct_answer, marks, question_id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update question' });
+  }
+});
+
 app.get('/api/exams/active', async (req, res) => {
   try {
     // Check if there is an interrupted exam (status = 'STARTED')
@@ -261,19 +291,24 @@ io.on('connection', (socket: Socket) => {
   socket.on('student_login', async (data: { student_id: string; password_provided: string }) => {
     try {
       const { student_id, password_provided } = data;
-      // Fetch latest exam
-      const examRes = await pool.query("SELECT exam_id FROM exams ORDER BY scheduled_start DESC LIMIT 1");
-      if (examRes.rows.length === 0) return socket.emit('login_error', { message: 'No active exams.' });
-      const exam_id = examRes.rows[0].exam_id;
 
-      // Fetch session from DB
-      const result = await pool.query(
-        'SELECT * FROM exam_sessions WHERE student_id = $1 AND exam_id = $2',
-        [student_id, exam_id]
-      );
+      // Find the most relevant active session for the student
+      const result = await pool.query(`
+        SELECT es.*, e.status as exam_global_status 
+        FROM exam_sessions es
+        JOIN exams e ON es.exam_id = e.exam_id
+        WHERE es.student_id = $1 AND e.status != 'ENDED'
+        ORDER BY 
+          CASE WHEN e.status = 'STARTED' THEN 1
+               WHEN e.status = 'PAUSED' THEN 2
+               WHEN e.status = 'CREATED' THEN 3
+               ELSE 4 END,
+          e.scheduled_start DESC NULLS LAST
+        LIMIT 1
+      `, [student_id]);
 
       if (result.rows.length === 0) {
-        socket.emit('login_error', { message: 'Invalid credentials or no session found.' });
+        socket.emit('login_error', { message: 'No active exams found for your account.' });
         return;
       }
 
@@ -291,7 +326,7 @@ io.on('connection', (socket: Socket) => {
       
       // Join socket room
       socket.join(session.session_id);
-      socket.join(`exam_${exam_id}`); // Group room for the exam
+      socket.join(`exam_${session.exam_id}`); // Group room for the exam
       
       socket.emit('login_success', { session_id: session.session_id, student_id });
       
@@ -321,15 +356,13 @@ io.on('connection', (socket: Socket) => {
         const { target_batch, status } = examRes.rows[0];
         
         // Auto-generate sessions for any newly added students in the batch
-        if (status === 'CREATED') {
-          const allStudentsRes = await pool.query("SELECT student_id, name FROM students WHERE batch = $1", [target_batch]);
-          for (const student of allStudentsRes.rows) {
-            const password = `${student.name.split(' ')[0].toUpperCase()}@${student.student_id}`;
-            await pool.query(
-              "INSERT INTO exam_sessions (exam_id, student_id, status, password_provided) VALUES ($1, $2, 'LOGGED_IN', $3) ON CONFLICT (exam_id, student_id) DO NOTHING",
-              [data.exam_id, student.student_id, password]
-            );
-          }
+        const allStudentsRes = await pool.query("SELECT student_id, name FROM students WHERE batch = $1", [target_batch]);
+        for (const student of allStudentsRes.rows) {
+          const password = `${student.name.split(' ')[0].toUpperCase()}@${student.student_id}`;
+          await pool.query(
+            "INSERT INTO exam_sessions (exam_id, student_id, status, password_provided) VALUES ($1, $2, 'LOGGED_IN', $3) ON CONFLICT (exam_id, student_id) DO NOTHING",
+            [data.exam_id, student.student_id, password]
+          );
         }
 
         const studentsRes = await pool.query(`
@@ -353,11 +386,21 @@ io.on('connection', (socket: Socket) => {
         socket.join(`exam_${session.exam_id}`);
         
         // Power-cut resilience: if exam is already started and they reconnect
-        const examRes = await pool.query("SELECT status FROM exams WHERE exam_id = $1", [session.exam_id]);
+        const examRes = await pool.query("SELECT status, duration_minutes FROM exams WHERE exam_id = $1", [session.exam_id]);
         if (examRes.rows[0].status === 'STARTED' && session.status !== 'PAUSED') {
+          // Initialize seconds_left if it was null (e.g. late added student)
+          let currentSecondsLeft = session.seconds_left;
+          if (currentSecondsLeft === null) {
+            currentSecondsLeft = examRes.rows[0].duration_minutes * 60;
+            await pool.query("UPDATE exam_sessions SET seconds_left = $1 WHERE session_id = $2", [currentSecondsLeft, data.session_id]);
+          }
+          
+          // Set status to EXAMINEE because they are actively taking the exam
+          await pool.query("UPDATE exam_sessions SET status = 'EXAMINEE' WHERE session_id = $1", [data.session_id]);
+
           // Fetch questions
           const questionsRes = await pool.query("SELECT question_id, question_type, question_text_en, question_text_bn, options_json FROM questions WHERE exam_id = $1", [session.exam_id]);
-          socket.emit('exam_started', { questions: questionsRes.rows, seconds_left: session.seconds_left });
+          socket.emit('exam_started', { questions: questionsRes.rows, seconds_left: currentSecondsLeft });
         }
       }
     } catch(e) { console.error(e); }
@@ -508,8 +551,47 @@ io.on('connection', (socket: Socket) => {
     try {
       const exam_id = data.exam_id;
       await pool.query("UPDATE exams SET status = 'STARTED', actual_end_time = NULL WHERE exam_id = $1", [exam_id]);
-      await pool.query("UPDATE exam_sessions SET status = 'EXAMINEE', tab_violation_count = 0 WHERE exam_id = $1", [exam_id]);
-      io.to(`exam_${exam_id}`).emit('exam_resumed');
+      
+      const examRes = await pool.query("SELECT duration_minutes FROM exams WHERE exam_id = $1", [exam_id]);
+      const durationSeconds = examRes.rows[0].duration_minutes * 60;
+      
+      await pool.query("UPDATE exam_sessions SET status = 'LOGGED_IN', seconds_left = $2, score = NULL, tab_violation_count = 0 WHERE exam_id = $1", [durationSeconds, exam_id]);
+      
+      // Clear old timer if any
+      if (activeExamTimers.has(exam_id)) {
+        clearInterval(activeExamTimers.get(exam_id)!);
+      }
+
+      // Start new timer
+      const timer = setInterval(async () => {
+        try {
+          const examCheck = await pool.query("SELECT status FROM exams WHERE exam_id = $1", [exam_id]);
+          if (examCheck.rows.length === 0 || examCheck.rows[0].status === 'ENDED') {
+            clearInterval(timer);
+            activeExamTimers.delete(exam_id);
+            return;
+          }
+
+          if (examCheck.rows[0].status === 'PAUSED') {
+            return; // Do nothing while paused
+          }
+
+          // Decrement time for active sessions
+          await pool.query("UPDATE exam_sessions SET seconds_left = GREATEST(0, seconds_left - 1) WHERE exam_id = $1 AND status = 'EXAMINEE' AND seconds_left > 0", [exam_id]);
+          
+          // Force submit sessions that hit 0
+          const expiredSessions = await pool.query("SELECT session_id FROM exam_sessions WHERE exam_id = $1 AND status = 'EXAMINEE' AND seconds_left = 0", [exam_id]);
+          for (const row of expiredSessions.rows) {
+            await forceSubmitExam(row.session_id);
+          }
+        } catch (e) {
+          console.error('Timer error', e);
+        }
+      }, 1000);
+      
+      activeExamTimers.set(exam_id, timer);
+
+      io.to(`exam_${exam_id}`).emit('exam_resumed'); // Forces logged in students to proceed
     } catch (e) { console.error(e); }
   });
 

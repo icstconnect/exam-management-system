@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { socket, API_BASE } from '../App';
-import { Users, Play, Unlock, UserPlus, BookOpen, Plus, Save, AlertTriangle, ArrowLeft, Trash2, Square, Award, Download, Lock } from 'lucide-react';
+import { Users, Play, Unlock, UserPlus, BookOpen, Plus, Save, AlertTriangle, ArrowLeft, Trash2, Square, Award, Download, Lock, Edit } from 'lucide-react';
 import * as htmlToImage from 'html-to-image';
 import { jsPDF } from 'jspdf';
 
@@ -75,6 +75,8 @@ export default function TeacherDashboard() {
   const [creatingExam, setCreatingExam] = useState(false);
   const [examForm, setExamForm] = useState({ title: '', duration_minutes: 30, target_batch: BATCHES[0], full_marks: 100 });
   const [selectedExamIdBuilder, setSelectedExamIdBuilder] = useState<string | null>(null);
+  const [editingExamId, setEditingExamId] = useState<string | null>(null);
+  const [editExamForm, setEditExamForm] = useState({ title: '', duration_minutes: 30, full_marks: 100 });
   
   // Section & Question Builder State
   const [builderSections, setBuilderSections] = useState<Section[]>([]);
@@ -82,6 +84,7 @@ export default function TeacherDashboard() {
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
   const [questionForm, setQuestionForm] = useState({ text_en: '', text_bn: '', options: ['', '', '', ''], correct_answer: '', marks: 1, fitb_blanks: [''], fitb_extras: [] as string[] });
   const [builderStatus, setBuilderStatus] = useState('');
+  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
 
   // Monitor State
   const [selectedMonitorExamId, setSelectedMonitorExamId] = useState<string>('');
@@ -173,6 +176,7 @@ export default function TeacherDashboard() {
   // Whenever the monitor exam changes, fetch its students
   useEffect(() => {
     if (selectedMonitorExamId) {
+      setStudentsSession([]); // Clear immediately for visual feedback
       socket.emit('monitor_exam', { exam_id: selectedMonitorExamId });
     }
   }, [selectedMonitorExamId]);
@@ -398,6 +402,21 @@ export default function TeacherDashboard() {
     }
   };
 
+  const handleUpdateExam = async () => {
+    if (!editingExamId) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/exams/${editingExamId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editExamForm)
+      });
+      if (res.ok) {
+        setEditingExamId(null);
+        fetchData();
+      }
+    } catch (e) { console.error(e); }
+  };
+
   // Handlers for Exam Builder
 
   const handleCreateSection = async (e: React.FormEvent) => {
@@ -412,6 +431,32 @@ export default function TeacherDashboard() {
       fetchSections();
       setNewSectionForm({ title: '', section_marks: 20, section_type: 'MCQ' });
     } catch (e) { console.error(e); }
+  };
+
+  const handleEditQuestion = (q: any, sectionId: string) => {
+    setActiveSectionId(sectionId);
+    setEditingQuestionId(q.question_id);
+    
+    let fitb_blanks = [''];
+    let fitb_extras: string[] = [];
+    
+    if (q.question_type === 'FITB') {
+      try {
+        fitb_blanks = JSON.parse(q.correct_answer);
+        const allOptions = q.options_json || [];
+        fitb_extras = allOptions.filter((opt: string) => !fitb_blanks.includes(opt));
+      } catch(e) {}
+    }
+    
+    setQuestionForm({
+      text_en: q.question_text_en,
+      text_bn: q.question_text_bn,
+      options: q.question_type === 'MCQ' ? [...(q.options_json || []), '', '', '', ''].slice(0, 4) : ['', '', '', ''],
+      correct_answer: q.question_type === 'MCQ' || q.question_type === 'TF' ? q.correct_answer : '',
+      marks: q.marks,
+      fitb_blanks: fitb_blanks.length ? fitb_blanks : [''],
+      fitb_extras
+    });
   };
 
   const handleDeleteSection = async (section_id: string) => {
@@ -459,8 +504,13 @@ export default function TeacherDashboard() {
     }
     
     try {
-      await fetch(API_BASE + '/api/questions', {
-        method: 'POST',
+      const url = editingQuestionId 
+        ? `${API_BASE}/api/questions/${editingQuestionId}`
+        : `${API_BASE}/api/questions`;
+      const method = editingQuestionId ? 'PUT' : 'POST';
+
+      await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           exam_id: selectedExamIdBuilder,
@@ -474,8 +524,9 @@ export default function TeacherDashboard() {
         })
       });
       fetchSections();
-      setBuilderStatus('Question added successfully!');
+      setBuilderStatus(editingQuestionId ? 'Question updated successfully!' : 'Question added successfully!');
       setTimeout(() => setBuilderStatus(''), 3000);
+      setEditingQuestionId(null);
       setQuestionForm({ ...questionForm, text_en: '', text_bn: '', options: ['', '', '', ''], correct_answer: '', fitb_blanks: [''], fitb_extras: [] });
     } catch (e) { console.error(e); }
   };
@@ -824,7 +875,21 @@ export default function TeacherDashboard() {
                   <tbody className="divide-y divide-slate-100">
                     {examsList.length === 0 ? (
                       <tr><td colSpan={5} className="p-8 text-center text-slate-400 font-bold">No exams created yet.</td></tr>
-                    ) : examsList.map(exam => (
+                    ) : examsList.map(exam => editingExamId === exam.exam_id ? (
+                      <tr key={exam.exam_id} className="bg-slate-50 border-b border-slate-100">
+                        <td colSpan={5} className="p-4">
+                          <div className="flex flex-col sm:flex-row gap-4 items-center">
+                            <input value={editExamForm.title} onChange={e => setEditExamForm({...editExamForm, title: e.target.value})} className="flex-1 w-full sm:w-auto p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Exam Title" />
+                            <input type="number" value={editExamForm.duration_minutes} onChange={e => setEditExamForm({...editExamForm, duration_minutes: parseInt(e.target.value)})} className="w-full sm:w-24 p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Mins" />
+                            <input type="number" value={editExamForm.full_marks} onChange={e => setEditExamForm({...editExamForm, full_marks: parseInt(e.target.value)})} className="w-full sm:w-24 p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Marks" />
+                            <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                              <button onClick={handleUpdateExam} className="flex-1 sm:flex-none bg-primary-600 hover:bg-primary-700 text-white px-6 py-2.5 rounded-xl font-bold transition-colors shadow-sm">Save</button>
+                              <button onClick={() => setEditingExamId(null)} className="flex-1 sm:flex-none bg-slate-200 hover:bg-slate-300 text-slate-700 px-6 py-2.5 rounded-xl font-bold transition-colors">Cancel</button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
                       <tr key={exam.exam_id} className="hover:bg-slate-50 transition-colors">
                         <td className="p-4 font-bold text-slate-800 text-base">{exam.title}</td>
                         <td className="p-4 font-bold text-primary-700">{exam.target_batch}</td>
@@ -841,6 +906,15 @@ export default function TeacherDashboard() {
                         </td>
                         <td className="p-4 text-right">
                           <div className="flex items-center justify-end gap-2">
+                            {exam.status === 'DRAFT' && (
+                              <button 
+                                onClick={() => { setEditingExamId(exam.exam_id); setEditExamForm({ title: exam.title, duration_minutes: exam.duration_minutes, full_marks: exam.full_marks }); }}
+                                className="text-amber-500 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 p-2 rounded-lg transition-colors"
+                                title="Edit Exam"
+                              >
+                                <Edit size={18} />
+                              </button>
+                            )}
                             {exam.status === 'DRAFT' ? (
                               <button 
                                 onClick={() => setSelectedExamIdBuilder(exam.exam_id)}
@@ -1001,10 +1075,17 @@ export default function TeacherDashboard() {
                             <div className="p-6 space-y-4">
                               {/* Questions inside section */}
                               {sec.questions.map((q, qidx) => (
-                                <div key={q.question_id} className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                <div key={q.question_id} className={`p-4 rounded-xl border ${editingQuestionId === q.question_id ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}>
                                   <div className="flex justify-between items-start mb-2">
                                     <h5 className="font-bold text-slate-700 text-lg">Q{qidx + 1}. {q.question_text_en}</h5>
-                                    <span className="bg-primary-100 text-primary-700 font-bold px-3 py-1 rounded-lg text-sm">{q.marks} Marks</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="bg-primary-100 text-primary-700 font-bold px-3 py-1 rounded-lg text-sm">{q.marks} Marks</span>
+                                      {exam.status === 'DRAFT' && (
+                                        <button onClick={() => handleEditQuestion(q, sec.section_id)} className="p-1 text-amber-500 hover:text-amber-700 hover:bg-amber-100 rounded-lg transition-colors">
+                                          <Edit size={16} />
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
                                   <p className="text-slate-600 mb-3">{q.question_text_bn}</p>
                                   {q.question_type === 'MCQ' && (
@@ -1141,9 +1222,15 @@ export default function TeacherDashboard() {
                                           </div>
                                         )}
 
-                                        <div className="flex gap-2 pt-2">
-                                          <button type="submit" className="bg-primary-600 hover:bg-primary-700 text-white font-bold py-2 px-6 rounded-lg">Save Question</button>
-                                          <button type="button" onClick={() => setActiveSectionId(null)} className="bg-white hover:bg-slate-100 text-slate-700 font-bold py-2 px-6 rounded-lg border border-slate-200">Cancel</button>
+                                        <div className="flex justify-between items-center pt-4">
+                                          <button type="submit" className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-xl font-bold transition-colors shadow-sm w-full md:w-auto">
+                                            {editingQuestionId ? 'Update Question' : 'Add Question'}
+                                          </button>
+                                          {editingQuestionId && (
+                                            <button type="button" onClick={() => { setEditingQuestionId(null); setActiveSectionId(null); setQuestionForm({ text_en: '', text_bn: '', options: ['', '', '', ''], correct_answer: '', marks: 1, fitb_blanks: [''], fitb_extras: [] }); }} className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-8 py-3 rounded-xl font-bold transition-colors w-full md:w-auto ml-2">
+                                              Cancel
+                                            </button>
+                                          )}
                                         </div>
                                       </form>
                                     </div>

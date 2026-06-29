@@ -54,11 +54,19 @@ The system uses a PostgreSQL database running inside a Docker container.
 ## 🟢 How to Turn On the System (Daily Usage)
 
 ### The Easiest Way: One-Click Start 🚀
+
+> [!WARNING]
+> **Important:** Make sure **Docker Desktop** is open and running on your computer first! The database cannot start if Docker is closed.
+
 I've created a `start.bat` file in the main folder. 
-Simply **double-click `start.bat`**, and it will automatically:
-1. Turn on the database.
-2. Open a new window running the backend server.
-3. Open a new window running the frontend server.
+Simply **double-click `start.bat`** in your file explorer!
+
+Alternatively, if you want to run it from your VS Code terminal, type this exactly and press Enter:
+```bash
+.\start.bat
+```
+
+*(This script will automatically turn on the database and pop open two new terminal windows for the Backend and Frontend!)*
 
 *(To shut everything down, just close those two black terminal windows!)*
 
