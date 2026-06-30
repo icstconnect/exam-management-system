@@ -21,6 +21,18 @@ const io = new Server(server, {
 
 const PORT = parseInt(process.env.PORT || '3001', 10);
 
+// Initialize DB schema additions if needed
+pool.query(`
+CREATE TABLE IF NOT EXISTS download_audit_logs (
+  log_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id VARCHAR(3) NOT NULL,
+  exam_id UUID NOT NULL,
+  session_id UUID NOT NULL,
+  download_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  ip_address VARCHAR(45)
+);
+`).catch(console.error);
+
 const activeExamTimers = new Map<string, NodeJS.Timeout>();
 
 // Simple API routes
@@ -202,6 +214,65 @@ app.get('/api/exams/:id/results/:student_id/answers', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch answer sheet' });
+  }
+});
+
+app.get('/api/student-sessions/:session_id/submitted-answers', async (req, res) => {
+  try {
+    const { session_id } = req.params;
+    
+    const sessionRes = await pool.query(`
+      SELECT s.name, s.student_id, s.class, es.status, ex.title as exam_title, ex.duration_minutes
+      FROM exam_sessions es
+      JOIN students s ON es.student_id = s.student_id
+      JOIN exams ex ON es.exam_id = ex.exam_id
+      WHERE es.session_id = $1
+    `, [session_id]);
+    
+    if (sessionRes.rows.length === 0) return res.status(404).json({ error: 'Session not found' });
+    const sessionData = sessionRes.rows[0];
+
+    const qaRes = await pool.query(`
+      SELECT 
+        q.question_id, q.section_id, q.question_type, q.question_text_en, q.question_text_bn,
+        q.options_json, sec.title as section_title, sr.selected_option as student_answer
+      FROM questions q
+      JOIN exam_sessions es ON es.exam_id = q.exam_id
+      LEFT JOIN exam_sections sec ON q.section_id = sec.section_id
+      LEFT JOIN student_responses sr ON sr.session_id = es.session_id AND sr.question_id = q.question_id
+      WHERE es.session_id = $1
+      ORDER BY sec.section_id, q.question_id
+    `, [session_id]);
+
+    res.json({
+      student: sessionData,
+      answers: qaRes.rows
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch submitted answers' });
+  }
+});
+
+app.post('/api/student-sessions/:session_id/audit-log', async (req, res) => {
+  try {
+    const { session_id } = req.params;
+    const ip_address = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+
+    const sessionRes = await pool.query("SELECT student_id, exam_id FROM exam_sessions WHERE session_id = $1", [session_id]);
+    if (sessionRes.rows.length === 0) return res.status(404).json({ error: 'Session not found' });
+
+    const { student_id, exam_id } = sessionRes.rows[0];
+
+    await pool.query(
+      "INSERT INTO download_audit_logs (student_id, exam_id, session_id, ip_address) VALUES ($1, $2, $3, $4)",
+      [student_id, exam_id, session_id, ip_address]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to log download' });
   }
 });
 
@@ -440,11 +511,13 @@ io.on('connection', (socket: Socket) => {
         
         // Power-cut resilience: if exam is already started and they reconnect
         const examRes = await pool.query("SELECT status, duration_minutes, global_seconds_left FROM exams WHERE exam_id = $1", [session.exam_id]);
+        
+        if (session.status === 'COMPLETED' || examRes.rows[0].status === 'ENDED') {
+          socket.emit('exam_completed');
+          return;
+        }
+
         if (examRes.rows[0].status === 'STARTED') {
-          if (session.status === 'COMPLETED') {
-            socket.emit('exam_completed');
-            return;
-          }
           if (session.status === 'PAUSED') {
             socket.emit('exam_paused');
             return;

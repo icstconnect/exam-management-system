@@ -1,7 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { socket } from '../App';
-import { Languages, AlertTriangle, Clock, CheckCircle2, ChevronRight, X } from 'lucide-react';
+import { socket, API_BASE } from '../App';
+import { Languages, AlertTriangle, Clock, CheckCircle2, ChevronRight, X, Download } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 interface Section {
   section_id: string;
@@ -40,6 +42,9 @@ export default function ExamWorkspace() {
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const pdfRef = useRef<HTMLDivElement>(null);
+  const [pdfData, setPdfData] = useState<any>(null);
 
   useEffect(() => {
     if (!session_id) {
@@ -375,6 +380,76 @@ export default function ExamWorkspace() {
     );
   }
   
+  const handleDownloadPdf = async () => {
+    if (isDownloadingPdf || !session_id) return;
+    setIsDownloadingPdf(true);
+
+    try {
+      // 1. Fetch sanitized PDF data
+      const res = await fetch(`${API_BASE}/api/student-sessions/${session_id}/submitted-answers`);
+      if (!res.ok) throw new Error('Failed to fetch data');
+      const data = await res.json();
+      setPdfData(data);
+
+      // 2. Wait for React to render the hidden DOM
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // 3. Generate PDF
+      if (pdfRef.current) {
+        const canvas = await html2canvas(pdfRef.current, { scale: 2, useCORS: true });
+        const imgData = canvas.toDataURL('image/jpeg', 1.0);
+        
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+        
+        let heightLeft = pdfHeight;
+        let position = 0;
+        let page = 1;
+
+        // Header watermark text config
+        const addWatermark = () => {
+          pdf.setTextColor(200, 200, 200);
+          pdf.setFontSize(60);
+          pdf.setFont('helvetica', 'bold');
+          pdf.saveGraphicsState();
+          pdf.setGState(new pdf.GState({opacity: 0.15}));
+          pdf.text("STUDENT RESPONSE COPY", pdfWidth / 2, pdf.internal.pageSize.getHeight() / 2, { angle: 45, align: 'center' });
+          pdf.restoreGraphicsState();
+          
+          pdf.setFontSize(10);
+          pdf.setTextColor(150, 150, 150);
+          pdf.text(`Page ${page}`, pdfWidth - 20, pdf.internal.pageSize.getHeight() - 10);
+          pdf.text(`Generated: ${new Date().toLocaleString()}`, 10, pdf.internal.pageSize.getHeight() - 10);
+        };
+        
+        pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight);
+        addWatermark();
+        heightLeft -= pdf.internal.pageSize.getHeight();
+        
+        while (heightLeft >= 0) {
+          position = heightLeft - pdfHeight;
+          pdf.addPage();
+          page++;
+          pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight);
+          addWatermark();
+          heightLeft -= pdf.internal.pageSize.getHeight();
+        }
+        
+        pdf.save(`${data.student.name.replace(/\s+/g, '_')}_Answers.pdf`);
+
+        // 4. Log Audit Download
+        await fetch(`${API_BASE}/api/student-sessions/${session_id}/audit-log`, { method: 'POST' });
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsDownloadingPdf(false);
+      setPdfData(null);
+    }
+  };
+
   if (status === 'COMPLETED') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
@@ -385,6 +460,88 @@ export default function ExamWorkspace() {
         <p className="text-slate-600 font-medium max-w-sm mb-8">
           Your answers have been saved successfully. You may now close this window or return to the main menu.
         </p>
+
+        <button 
+          onClick={handleDownloadPdf}
+          disabled={isDownloadingPdf}
+          className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-md transition-all transform hover:scale-[1.02]"
+        >
+          {isDownloadingPdf ? (
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          ) : (
+            <Download size={20} />
+          )}
+          {isDownloadingPdf ? 'Generating PDF...' : 'Download My Submitted Answer Sheet (PDF)'}
+        </button>
+
+        {/* Hidden PDF Layout */}
+        {pdfData && (
+          <div className="absolute left-[-9999px] top-[-9999px]">
+            <div ref={pdfRef} style={{ backgroundColor: '#ffffff', color: '#1e293b' }} className="p-10 w-[800px] text-left">
+              <div style={{ borderColor: '#1e293b' }} className="text-center mb-8 border-b-2 pb-6">
+                <h1 style={{ color: '#0f172a' }} className="text-2xl font-black tracking-wider">INSTITUTE OF COMPUTER SCIENCE AND TECHNOLOGY CHOWBERIA</h1>
+                <h2 style={{ color: '#334155' }} className="text-xl font-bold mt-2">Student Response Sheet (Not Evaluated)</h2>
+              </div>
+
+              <div style={{ backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }} className="grid grid-cols-2 gap-4 mb-8 text-sm font-bold p-4 rounded-xl border">
+                <div><span style={{ color: '#64748b' }} className="uppercase">Student Name:</span> <br/>{pdfData.student.name}</div>
+                <div><span style={{ color: '#64748b' }} className="uppercase">Student ID:</span> <br/>{pdfData.student.student_id}</div>
+                <div><span style={{ color: '#64748b' }} className="uppercase">Examination:</span> <br/>{pdfData.student.exam_title}</div>
+                <div><span style={{ color: '#64748b' }} className="uppercase">Class:</span> <br/>{pdfData.student.class}</div>
+              </div>
+
+              <div className="space-y-6">
+                {(() => {
+                  let sectionsGroup: any = {};
+                  pdfData.answers.forEach((q: any) => {
+                    const sec = q.section_title || 'General';
+                    if (!sectionsGroup[sec]) sectionsGroup[sec] = [];
+                    sectionsGroup[sec].push(q);
+                  });
+
+                  return Object.entries(sectionsGroup).map(([secTitle, qs]: [string, any]) => (
+                    <div key={secTitle} className="mb-6">
+                      <h3 style={{ color: '#334155', backgroundColor: '#f1f5f9' }} className="text-lg font-black uppercase p-2 rounded-lg mb-4">{secTitle}</h3>
+                      <div className="space-y-6 pl-4">
+                        {qs.map((q: any, idx: number) => {
+                          const isBlank = q.student_answer === null || q.student_answer === undefined || q.student_answer === '';
+                          return (
+                            <div key={q.question_id} style={{ borderColor: '#f1f5f9' }} className="border-b pb-4">
+                              <div className="flex gap-3 mb-2">
+                                <span style={{ color: '#64748b' }} className="font-black">{idx + 1}.</span>
+                                <div style={{ color: '#1e293b' }} className="font-bold leading-relaxed whitespace-pre-wrap">{q.question_text_en}</div>
+                              </div>
+                              <div style={{ backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }} className="ml-7 mt-2 p-3 rounded-lg border">
+                                <p style={{ color: '#94a3b8' }} className="text-xs font-black uppercase mb-1">Your Submission:</p>
+                                {q.question_type === 'FITB' ? (
+                                  <div className="space-y-2">
+                                    {(() => {
+                                      try {
+                                        const stdAns = JSON.parse(q.student_answer || '[]');
+                                        if (stdAns.length === 0) return <span style={{ color: '#64748b' }} className="italic font-bold">No Answer Submitted</span>;
+                                        return stdAns.map((ans: string, i: number) => (
+                                          <div key={i} className="text-sm font-bold">Blank {i+1}: <span style={{ color: '#1e293b', backgroundColor: '#ffffff', borderColor: '#e2e8f0' }} className="px-2 py-1 rounded border">{ans || '(Left Blank)'}</span></div>
+                                        ));
+                                      } catch(e) { return <span style={{ color: '#64748b' }} className="italic">Error parsing blanks</span>; }
+                                    })()}
+                                  </div>
+                                ) : (
+                                  <p style={{ color: isBlank ? '#64748b' : '#1e293b' }} className={`font-bold ${isBlank ? 'italic' : ''}`}>
+                                    {isBlank ? 'No Answer Submitted' : q.student_answer}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

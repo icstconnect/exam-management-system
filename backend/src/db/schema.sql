@@ -1,6 +1,6 @@
 -- exam-management-system/backend/src/db/schema.sql
 
-DROP TABLE IF EXISTS student_responses, exam_sessions, questions, exam_sections, exams, students CASCADE;
+DROP TABLE IF EXISTS student_responses, exam_sessions, questions, exam_sections, exams, students, download_audit_logs CASCADE;
 
 CREATE TABLE IF NOT EXISTS students (
   student_id VARCHAR(3) PRIMARY KEY,
@@ -62,4 +62,13 @@ CREATE TABLE IF NOT EXISTS student_responses (
   selected_option TEXT,
   is_correct BOOLEAN,
   PRIMARY KEY (session_id, question_id)
+);
+
+CREATE TABLE IF NOT EXISTS download_audit_logs (
+  log_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id VARCHAR(3) NOT NULL,
+  exam_id UUID NOT NULL,
+  session_id UUID NOT NULL,
+  download_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  ip_address VARCHAR(45)
 );
