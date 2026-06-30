@@ -192,7 +192,7 @@ app.get('/api/exams/:id/results/:student_id/answers', async (req, res) => {
       LEFT JOIN exam_sessions es ON es.exam_id = q.exam_id AND es.student_id = $2
       LEFT JOIN student_responses sr ON sr.session_id = es.session_id AND sr.question_id = q.question_id
       WHERE q.exam_id = $1
-      ORDER BY sec.section_id, q.created_at
+      ORDER BY sec.section_id
     `, [exam_id, student_id]);
 
     res.json({
