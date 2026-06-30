@@ -1484,39 +1484,54 @@ export default function TeacherDashboard() {
                   <table className="w-full text-left border-collapse border border-slate-200">
                     <thead className="bg-slate-100">
                       <tr className="text-slate-700 text-sm uppercase tracking-wider font-extrabold border-b border-slate-300">
-                        <th className="p-4 border-r border-slate-200">Rank</th>
+                        <th className="p-4 border-r border-slate-200 text-center">Rank</th>
                         <th className="p-4 border-r border-slate-200">Student ID</th>
                         <th className="p-4 border-r border-slate-200">Name</th>
-                        <th className="p-4 border-r border-slate-200">Score / Full Marks</th>
+                        <th className="p-4 border-r border-slate-200 text-center">Score / Full</th>
+                        <th className="p-4 border-r border-slate-200 text-center">%</th>
                         <th className="p-4 border-r border-slate-200 text-center">Violations</th>
-                        <th className="p-4 border-r border-slate-200">Status</th>
+                        <th className="p-4 border-r border-slate-200 text-center">Status</th>
                         <th className="p-4 border-l border-slate-200 text-center" data-html2canvas-ignore="true">View</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200">
-                      {resultsData.map((res, index) => (
-                        <tr key={res.student_id} className="hover:bg-slate-50 text-slate-800 font-medium">
-                          <td className="p-4 border-r border-slate-200 text-center font-extrabold">#{index + 1}</td>
-                          <td className="p-4 border-r border-slate-200 font-bold">{res.student_id}</td>
-                          <td className="p-4 border-r border-slate-200">{res.name}</td>
-                          <td className="p-4 border-r border-slate-200 font-extrabold text-primary-700">
-                            {res.score} <span className="text-slate-400 font-medium text-sm">/ {res.full_marks}</span>
-                          </td>
-                          <td className="p-4 border-r border-slate-200 text-center font-bold text-red-600">
-                            {res.tab_violation_count > 0 ? res.tab_violation_count : '-'}
-                          </td>
-                          <td className="p-4 border-r border-slate-200 font-bold text-sm">
-                            <span className={`${res.status === 'COMPLETED' ? 'text-green-600' : 'text-slate-500'}`}>
-                              {res.status}
-                            </span>
-                          </td>
-                          <td className="p-4 border-l border-slate-200 text-center" data-html2canvas-ignore="true">
-                            <button onClick={() => openAnswerSheet(res.student_id)} className="text-primary-600 hover:text-primary-800 transition-colors p-2 rounded-full hover:bg-primary-50" title="View Answer Sheet">
-                              <Eye size={18} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                      {resultsData.map((res, index) => {
+                        const isAbsent = !res.status || res.status === 'READY' || res.status === 'LOGGED_IN';
+                        const displayStatus = isAbsent ? 'Absent' : 'Completed';
+                        const rankDisplay = isAbsent ? '—' : `#${index + 1}`;
+                        const percentage = res.full_marks > 0 ? Math.round((res.score / res.full_marks) * 100) : 0;
+                        
+                        return (
+                          <tr key={res.student_id} className="hover:bg-slate-50 text-slate-800 font-medium">
+                            <td className="p-4 border-r border-slate-200 text-center font-extrabold text-slate-500">{rankDisplay}</td>
+                            <td className="p-4 border-r border-slate-200 font-bold">{res.student_id}</td>
+                            <td className="p-4 border-r border-slate-200">{res.name}</td>
+                            <td className="p-4 border-r border-slate-200 text-center font-extrabold text-primary-700">
+                              {isAbsent ? <span className="text-slate-400 font-normal">—</span> : <>{res.score} <span className="text-slate-400 font-medium text-sm">/ {res.full_marks}</span></>}
+                            </td>
+                            <td className="p-4 border-r border-slate-200 text-center font-bold text-slate-700">
+                              {isAbsent ? <span className="text-slate-400 font-normal">—</span> : `${percentage}%`}
+                            </td>
+                            <td className="p-4 border-r border-slate-200 text-center font-bold text-red-600">
+                              {isAbsent ? <span className="text-slate-400 font-normal">—</span> : (res.tab_violation_count > 0 ? res.tab_violation_count : '-')}
+                            </td>
+                            <td className="p-4 border-r border-slate-200 text-center font-bold text-sm">
+                              <span className={`px-3 py-1 rounded-full ${isAbsent ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                                {displayStatus}
+                              </span>
+                            </td>
+                            <td className="p-4 border-l border-slate-200 text-center" data-html2canvas-ignore="true">
+                              {!isAbsent ? (
+                                <button onClick={() => openAnswerSheet(res.student_id)} className="text-primary-600 hover:text-primary-800 transition-colors p-2 rounded-full hover:bg-primary-50 inline-flex items-center justify-center" title="View Answer Sheet">
+                                  <Eye size={18} />
+                                </button>
+                              ) : (
+                                <span className="text-slate-300 inline-flex items-center justify-center p-2"><Eye size={18} /></span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                   

@@ -164,12 +164,22 @@ app.get('/api/exams/:id/results', async (req, res) => {
   try {
     const exam_id = req.params.id;
     const result = await pool.query(`
-      SELECT s.student_id, s.name, s.class, es.score, es.status, es.tab_violation_count, ex.full_marks
-      FROM exam_sessions es
-      JOIN students s ON es.student_id = s.student_id
-      JOIN exams ex ON es.exam_id = ex.exam_id
-      WHERE es.exam_id = $1
-      ORDER BY es.score DESC, s.name ASC
+      SELECT 
+        s.student_id, 
+        s.name, 
+        s.class, 
+        COALESCE(es.score, 0) as score, 
+        es.status, 
+        COALESCE(es.tab_violation_count, 0) as tab_violation_count, 
+        ex.full_marks
+      FROM exams ex
+      JOIN students s ON s.batch = ex.target_batch
+      LEFT JOIN exam_sessions es ON s.student_id = es.student_id AND es.exam_id = ex.exam_id
+      WHERE ex.exam_id = $1
+      ORDER BY 
+        CASE WHEN es.status = 'COMPLETED' THEN 1 ELSE 2 END ASC,
+        es.score DESC NULLS LAST, 
+        s.name ASC
     `, [exam_id]);
     res.json(result.rows);
   } catch (err) {
