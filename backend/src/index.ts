@@ -171,7 +171,7 @@ app.get('/api/exams/:id/results/:student_id/answers', async (req, res) => {
     const { id: exam_id, student_id } = req.params;
     
     const sessionRes = await pool.query(`
-      SELECT s.name, s.student_id, s.class, es.score, es.status, ex.title as exam_title, ex.full_marks, es.started_at, es.completed_at
+      SELECT s.name, s.student_id, s.class, es.score, es.status, ex.title as exam_title, ex.full_marks
       FROM exam_sessions es
       JOIN students s ON es.student_id = s.student_id
       JOIN exams ex ON es.exam_id = ex.exam_id
@@ -296,6 +296,11 @@ app.get('/api/exams/active', async (req, res) => {
 // Helper to force submit an exam
 async function forceSubmitExam(session_id: string) {
   try {
+    const sessionCheck = await pool.query("SELECT status FROM exam_sessions WHERE session_id = $1", [session_id]);
+    if (sessionCheck.rows.length === 0 || sessionCheck.rows[0].status === 'COMPLETED') {
+      return; // Already submitted or not found
+    }
+
     const scoreRes = await pool.query(`
       SELECT COALESCE(SUM(q.marks), 0) as total_score
       FROM student_responses sr
@@ -311,7 +316,15 @@ async function forceSubmitExam(session_id: string) {
       RETURNING student_id
     `, [session_id, final_score]);
 
-    io.to(session_id).emit('exam_completed', { score: final_score });
+    const fullMarksRes = await pool.query(`
+      SELECT e.full_marks 
+      FROM exams e 
+      JOIN exam_sessions es ON e.exam_id = es.exam_id 
+      WHERE es.session_id = $1
+    `, [session_id]);
+    const full_marks = fullMarksRes.rows[0]?.full_marks || 0;
+
+    io.to(session_id).emit('exam_completed', { score: final_score, full_marks });
     
     if (res.rows.length > 0) {
       io.to('teacher_dashboard').emit('student_status_update', {
@@ -716,6 +729,11 @@ io.on('connection', (socket: Socket) => {
         await forceSubmitExam(row.session_id);
       }
       
+      if (activeExamTimers.has(exam_id)) {
+        clearInterval(activeExamTimers.get(exam_id)!);
+        activeExamTimers.delete(exam_id);
+      }
+
       io.to(`exam_${exam_id}`).emit('exam_ended', { message: 'The exam has been stopped by the teacher.' });
       
       io.to('teacher_dashboard').emit('exam_status_update', { exam_id, status: 'ENDED' });

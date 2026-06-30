@@ -117,6 +117,10 @@ export default function ExamWorkspace() {
     socket.on('exam_paused', () => setStatus('PAUSED'));
     socket.on('exam_resumed', () => setStatus('STARTED'));
     socket.on('exam_completed', () => setStatus('COMPLETED'));
+    socket.on('exam_ended', () => {
+      // Backend handles submission, we just wait for exam_completed or transition here
+      setStatus('COMPLETED');
+    });
     socket.on('time_tick', (data: { seconds_left: number }) => setSecondsLeft(data.seconds_left));
 
     return () => {
@@ -124,6 +128,7 @@ export default function ExamWorkspace() {
       socket.off('exam_paused');
       socket.off('exam_resumed');
       socket.off('exam_completed');
+      socket.off('exam_ended');
       socket.off('time_tick');
     };
   }, [session_id, navigate]);
@@ -372,13 +377,13 @@ export default function ExamWorkspace() {
   
   if (status === 'COMPLETED') {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
         <div className="w-24 h-24 mb-6 rounded-full bg-green-100 flex items-center justify-center">
           <CheckCircle2 className="text-green-500" size={40} />
         </div>
         <h2 className="text-3xl font-extrabold text-green-600 mb-2">Exam Finished!</h2>
-        <p className="text-slate-600 font-medium max-w-sm">
-          Your answers have been saved successfully. You may now close this window.
+        <p className="text-slate-600 font-medium max-w-sm mb-8">
+          Your answers have been saved successfully. You may now close this window or return to the main menu.
         </p>
       </div>
     );

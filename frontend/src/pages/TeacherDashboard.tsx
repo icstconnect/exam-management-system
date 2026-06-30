@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { socket, API_BASE } from '../App';
-import { Users, Play, Unlock, UserPlus, BookOpen, Plus, Save, AlertTriangle, ArrowLeft, Trash2, Square, Award, Download, Lock, Edit, Eye, X, ChevronLeft, ChevronRight, CheckCircle2, XCircle } from 'lucide-react';
+import { Users, Play, Unlock, UserPlus, BookOpen, Plus, Save, AlertTriangle, ArrowLeft, Trash2, Square, Award, Download, Lock, Edit, Eye, X, ChevronLeft, ChevronRight, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
 import * as htmlToImage from 'html-to-image';
 import { jsPDF } from 'jspdf';
 
@@ -90,6 +90,8 @@ export default function TeacherDashboard() {
   const [selectedMonitorExamId, setSelectedMonitorExamId] = useState<string>('');
   const [studentsSession, setStudentsSession] = useState<StudentSession[]>([]);
   const [recoveryPrompt, setRecoveryPrompt] = useState<Exam | null>(null);
+  const [examSecondsLeft, setExamSecondsLeft] = useState<number | null>(null);
+  const [isEnding, setIsEnding] = useState(false);
 
   // Results State
   const [selectedResultExamId, setSelectedResultExamId] = useState<string>('');
@@ -171,8 +173,11 @@ export default function TeacherDashboard() {
     fetchData();
     checkRecovery();
     
-    socket.on('dashboard_update', (data: { students: StudentSession[], status: any }) => {
+    socket.on('dashboard_update', (data: { students: StudentSession[], status: any, global_seconds_left?: number }) => {
       setStudentsSession(data.students);
+      if (data.global_seconds_left !== undefined) {
+        setExamSecondsLeft(data.global_seconds_left);
+      }
       // Status is now derived directly from examsList
     });
 
@@ -180,13 +185,21 @@ export default function TeacherDashboard() {
       setStudentsSession(prev => prev.map(s => s.student_id === data.student_id ? { ...s, ...data } : s));
     });
 
+    socket.on('exam_status_update', (data: { exam_id: string, status: string }) => {
+      setExamsList(prev => prev.map(e => e.exam_id === data.exam_id ? { ...e, status: data.status as any } : e));
+      if (data.status === 'ENDED') {
+        setIsEnding(false);
+      }
+    });
+
     return () => {
       socket.off('dashboard_update');
       socket.off('student_status_update');
+      socket.off('exam_status_update');
     };
   }, []);
 
-  // Local timer for TeacherDashboard to tick down active sessions
+  // Local timer for TeacherDashboard to tick down active sessions and main exam
   useEffect(() => {
     const timer = setInterval(() => {
       setStudentsSession(prev => prev.map(student => {
@@ -195,6 +208,7 @@ export default function TeacherDashboard() {
         }
         return student;
       }));
+      setExamSecondsLeft(prev => (prev !== null && prev > 0) ? prev - 1 : prev);
     }, 1000);
     return () => clearInterval(timer);
   }, []);
@@ -221,7 +235,7 @@ export default function TeacherDashboard() {
     }
   }, [selectedMonitorExamId]);
 
-  // Whenever the results exam changes, fetch its results
+  // Whenever the results exam changes or exam ends, fetch its results
   useEffect(() => {
     const fetchResults = async () => {
       if (!selectedResultExamId) return;
@@ -233,7 +247,7 @@ export default function TeacherDashboard() {
       } catch (e) { console.error(e); }
     };
     fetchResults();
-  }, [selectedResultExamId]);
+  }, [selectedResultExamId, examsList.find(e => e.exam_id === selectedResultExamId)?.status]);
 
   // Result Export Handlers
   const handleDownloadPDF = async () => {
@@ -275,10 +289,11 @@ export default function TeacherDashboard() {
     }
   };
 
-  const handleStopExam = () => {
+  const handleEndExam = () => {
     if (!selectedMonitorExamId) return;
-    const confirm = window.confirm("WARNING: This will immediately end the exam for all students. Are you sure?");
+    const confirm = window.confirm("Are you sure you want to end this examination? All students will be submitted immediately.");
     if (confirm) {
+      setIsEnding(true);
       socket.emit('teacher_stop_exam', { exam_id: selectedMonitorExamId });
       setTimeout(fetchData, 500);
     }
@@ -331,9 +346,18 @@ export default function TeacherDashboard() {
 
   const handleHardResetStudent = (student_id: string) => {
     if (!selectedMonitorExamId) return;
-    const confirm = window.confirm("Are you sure you want to HARD RESET this student? This will permanently delete all their current answers, force them out of the exam, and give them a generic 'ICST' password to start over.");
+    const confirm = window.confirm("Are you sure you want to HARD RESET this student? This will permanently delete their entire session, clear all answers, and revoke their password. They will need to be initialized again.");
     if (confirm) {
       socket.emit('teacher_hard_reset_student', { exam_id: selectedMonitorExamId, student_id });
+    }
+  };
+
+  const handleHardResetExam = () => {
+    if (!selectedMonitorExamId) return;
+    const confirm = window.confirm("WARNING: Are you sure you want to HARD RESET THE ENTIRE EXAM? This will permanently delete ALL student sessions, passwords, results, and progress for this exam. It cannot be undone.");
+    if (confirm) {
+      socket.emit('teacher_hard_reset_exam', { exam_id: selectedMonitorExamId });
+      setTimeout(fetchData, 500);
     }
   };
 
@@ -695,8 +719,8 @@ export default function TeacherDashboard() {
                     <button onClick={handlePauseExam} className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white shadow-md">
                       Pause Exam
                     </button>
-                    <button onClick={handleStopExam} className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white shadow-md transform hover:scale-[1.02]">
-                      <Square size={16} fill="currentColor" /> Stop Exam
+                    <button onClick={handleEndExam} className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white shadow-md transform hover:scale-[1.02]">
+                      <Square size={16} fill="currentColor" /> End Exam
                     </button>
                   </>
                 )}
@@ -705,8 +729,8 @@ export default function TeacherDashboard() {
                     <button onClick={handleResumeExam} className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white shadow-md">
                       <Play size={16} /> Resume Exam
                     </button>
-                    <button onClick={handleStopExam} className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white shadow-md transform hover:scale-[1.02]">
-                      <Square size={16} fill="currentColor" /> Stop Exam
+                    <button onClick={handleEndExam} className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white shadow-md transform hover:scale-[1.02]">
+                      <Square size={16} fill="currentColor" /> End Exam
                     </button>
                   </>
                 )}
@@ -720,17 +744,32 @@ export default function TeacherDashboard() {
                     <Play size={16} /> Start Exam
                   </button>
                 )}
+                {/* Global Hard Reset Exam */}
+                <button onClick={handleHardResetExam} className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 bg-red-100 hover:bg-red-200 text-red-700 shadow-md transform hover:scale-[1.02]">
+                  <RotateCcw size={16} /> Hard Reset Exam
+                </button>
               </div>
             </div>
 
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="bg-primary-50 p-2 rounded-lg text-primary-600">
-                  <Users size={20} />
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-3">
+                  <div className="bg-primary-50 p-2 rounded-lg text-primary-600">
+                    <Users size={20} />
+                  </div>
+                  <h3 className="font-bold text-slate-800 text-lg">Active Sessions Tracker</h3>
                 </div>
-                <h3 className="font-bold text-slate-800 text-lg">Active Sessions Tracker</h3>
+                {/* Global Timer added here */}
+                {(derivedStatus === 'STARTED' || derivedStatus === 'PAUSED' || isEnding) && (
+                  <div className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200">
+                    <div className="text-sm font-bold text-slate-500">Live Exam Time:</div>
+                    <div className={`text-xl font-black font-mono tracking-wider ${isEnding ? 'text-amber-500' : examSecondsLeft && examSecondsLeft < 60 ? 'text-red-500 animate-pulse' : 'text-slate-800'}`}>
+                      {isEnding ? 'ENDING...' : examSecondsLeft !== null ? `${Math.floor(examSecondsLeft / 60).toString().padStart(2, '0')}:${(examSecondsLeft % 60).toString().padStart(2, '0')}` : '--:--'}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-4">
                 <button onClick={handleInitializeAll} className="px-4 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-sm font-bold rounded-lg shadow-sm transition-colors">
