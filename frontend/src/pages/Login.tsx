@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { socket } from '../App';
 import { UserCircle, KeyRound, ArrowRight } from 'lucide-react';
@@ -10,6 +10,10 @@ export default function Login() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    document.title = "Exam Portal";
+  }, []);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();

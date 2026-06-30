@@ -62,6 +62,10 @@ export default function TeacherDashboard() {
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState('');
 
+  useEffect(() => {
+    document.title = "Teacher Panel";
+  }, []);
+
   const [activeTab, setActiveTab] = useState<'MONITOR' | 'REGISTRATION' | 'EXAMS' | 'RESULTS'>('MONITOR');
   
   // Registration State

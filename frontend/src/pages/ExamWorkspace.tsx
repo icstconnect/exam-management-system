@@ -27,6 +27,10 @@ export default function ExamWorkspace() {
   
   const [status, setStatus] = useState<'WAITING' | 'STARTED' | 'PAUSED' | 'COMPLETED'>('WAITING');
   const [lang, setLang] = useState<'en' | 'bn'>('en');
+
+  useEffect(() => {
+    document.title = "Exam Portal";
+  }, []);
   
   const [sections, setSections] = useState<Section[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
