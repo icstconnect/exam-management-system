@@ -86,7 +86,7 @@ export default function TeacherDashboard() {
   const [builderSections, setBuilderSections] = useState<Section[]>([]);
   const [newSectionForm, setNewSectionForm] = useState({ title: '', section_marks: 20, section_type: 'MCQ' });
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
-  const [questionForm, setQuestionForm] = useState({ text_en: '', text_bn: '', options: ['', '', '', ''], correct_answer: '', marks: 1, fitb_blanks: [''], fitb_extras: [] as string[] });
+  const [questionForm, setQuestionForm] = useState({ text_en: '', text_bn: '', options: ['', '', '', ''], correct_answer: '', marks: 1, fitb_blanks: [''], fitb_extras: [] as string[], match_pairs: [{ left: '', right: '' }, { left: '', right: '' }] });
   const [builderStatus, setBuilderStatus] = useState('');
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
 
@@ -139,6 +139,68 @@ export default function TeacherDashboard() {
     
     if (newIndex !== currentIndex) {
       openAnswerSheet(resultsData[newIndex].student_id);
+    }
+  };
+
+  const handleDownloadAnswerSheet = () => {
+    if (!answerSheetData) return;
+    try {
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      let y = 20;
+      pdf.setFontSize(16);
+      pdf.text(`Answer Sheet: ${answerSheetData.student.name}`, 10, y);
+      y += 10;
+      pdf.setFontSize(12);
+      pdf.text(`Student ID: ${answerSheetData.student.student_id} | Class: ${answerSheetData.student.class}`, 10, y);
+      y += 10;
+      
+      const qData = answerSheetData.answers || [];
+      qData.forEach((q: any, idx: number) => {
+        if (y > 270) { pdf.addPage(); y = 20; }
+        const questionText = pdf.splitTextToSize(`${idx + 1}. ${q.question_text_en}`, 180);
+        pdf.text(questionText, 10, y);
+        y += questionText.length * 6 + 2;
+
+        pdf.setFont('helvetica', 'italic');
+        if (q.question_type === 'MATCH') {
+          let studentMap: Record<string, string> = {};
+          try { studentMap = q.student_answer ? JSON.parse(q.student_answer) : {}; } catch(e) {}
+          if (Object.keys(studentMap).length === 0) {
+            pdf.text('No Match Submitted', 15, y);
+            y += 8;
+          } else {
+            Object.entries(studentMap).forEach(([left, right]) => {
+              if (y > 280) { pdf.addPage(); y = 20; }
+              const matchLine = pdf.splitTextToSize(`${left} --------> ${right}`, 175);
+              pdf.text(matchLine, 15, y);
+              y += matchLine.length * 5 + 1;
+            });
+          }
+        } else if (q.question_type === 'FITB') {
+          let stdAns: string[] = [];
+          try { stdAns = q.student_answer ? JSON.parse(q.student_answer) : []; } catch(e) {}
+          if (stdAns.length === 0) {
+            pdf.text('No Answer Submitted', 15, y);
+            y += 8;
+          } else {
+            stdAns.forEach((ans, i) => {
+              if (y > 280) { pdf.addPage(); y = 20; }
+              pdf.text(`Blank ${i+1}: ${ans || '(Left Blank)'}`, 15, y);
+              y += 6;
+            });
+          }
+        } else {
+          pdf.text(q.student_answer || 'No Answer Submitted', 15, y);
+          y += 8;
+        }
+        pdf.setFont('helvetica', 'normal');
+        y += 4;
+      });
+
+      pdf.save(`AnswerSheet_${answerSheetData.student.student_id}.pdf`);
+    } catch (e) {
+      console.error("Error generating answer sheet PDF", e);
+      alert("Failed to generate PDF answer sheet.");
     }
   };
 
@@ -365,6 +427,20 @@ export default function TeacherDashboard() {
     }
   };
 
+  const handleClearOldScores = () => {
+    if (!selectedResultExamId) return;
+    const pwd = window.prompt("WARNING: This will completely wipe all past records and results for this exam. To confirm, type 'ICST'");
+    if (pwd === 'ICST') {
+      socket.emit('teacher_clear_old_scores', { exam_id: selectedResultExamId });
+      setTimeout(() => {
+        setSelectedResultExamId('');
+        fetchData();
+      }, 500);
+    } else if (pwd !== null) {
+      alert("Incorrect password. Aborting.");
+    }
+  };
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (authPassword === 'ICST') {
@@ -529,6 +605,7 @@ export default function TeacherDashboard() {
     
     let fitb_blanks = [''];
     let fitb_extras: string[] = [];
+    let match_pairs = [{ left: '', right: '' }, { left: '', right: '' }];
     
     if (q.question_type === 'FITB') {
       try {
@@ -536,6 +613,14 @@ export default function TeacherDashboard() {
         const allOptions = q.options_json || [];
         fitb_extras = allOptions.filter((opt: string) => !fitb_blanks.includes(opt));
       } catch(e) {}
+    } else if (q.question_type === 'MATCH') {
+      try {
+        const correctMap = JSON.parse(q.correct_answer);
+        match_pairs = Object.keys(correctMap).map(k => ({ left: k, right: correctMap[k] }));
+      } catch(e) {}
+      const sectionMarks = builderSections.find(s => s.section_id === sectionId)?.section_marks || 2;
+      while (match_pairs.length < sectionMarks) match_pairs.push({ left: '', right: '' });
+      if (match_pairs.length > sectionMarks) match_pairs = match_pairs.slice(0, sectionMarks);
     }
     
     setQuestionForm({
@@ -545,7 +630,8 @@ export default function TeacherDashboard() {
       correct_answer: q.question_type === 'MCQ' || q.question_type === 'TF' ? q.correct_answer : '',
       marks: q.marks,
       fitb_blanks: fitb_blanks.length ? fitb_blanks : [''],
-      fitb_extras
+      fitb_extras,
+      match_pairs
     });
   };
 
@@ -591,6 +677,17 @@ export default function TeacherDashboard() {
       const validExtras = questionForm.fitb_extras.map(e => e.trim()).filter(e => e !== '');
       finalCorrect = JSON.stringify(validBlanks);
       finalOptions = [...validBlanks, ...validExtras];
+    } else if (qType === 'MATCH') {
+      const validPairs = questionForm.match_pairs.filter(p => p.left.trim() !== '' && p.right.trim() !== '');
+      const leftArr = validPairs.map(p => p.left.trim());
+      const rightArr = validPairs.map(p => p.right.trim());
+      const correctMap: Record<string, string> = {};
+      validPairs.forEach(p => { correctMap[p.left.trim()] = p.right.trim(); });
+      finalCorrect = JSON.stringify(correctMap);
+      finalOptions = { 
+        left: [...leftArr].sort(() => Math.random() - 0.5), 
+        right: [...rightArr].sort(() => Math.random() - 0.5) 
+      } as any;
     }
     
     try {
@@ -610,14 +707,14 @@ export default function TeacherDashboard() {
           question_text_bn: questionForm.text_bn,
           options_json: finalOptions,
           correct_answer: finalCorrect.trim(),
-          marks: questionForm.marks
+          marks: qType === 'MATCH' ? (questionForm.match_pairs || []).length : questionForm.marks
         })
       });
       fetchSections();
       setBuilderStatus(editingQuestionId ? 'Question updated successfully!' : 'Question added successfully!');
       setTimeout(() => setBuilderStatus(''), 3000);
       setEditingQuestionId(null);
-      setQuestionForm({ ...questionForm, text_en: '', text_bn: '', options: ['', '', '', ''], correct_answer: '', fitb_blanks: [''], fitb_extras: [] });
+      setQuestionForm({ ...questionForm, text_en: '', text_bn: '', options: ['', '', '', ''], correct_answer: '', fitb_blanks: [''], fitb_extras: [], match_pairs: [{ left: '', right: '' }, { left: '', right: '' }] });
     } catch (e) { console.error(e); }
   };
 
@@ -1043,19 +1140,12 @@ export default function TeacherDashboard() {
                                 <Edit size={18} />
                               </button>
                             )}
-                            {exam.status === 'DRAFT' ? (
+                            {!['STARTED', 'PAUSED', 'RUNNING'].includes(exam.status) && (
                               <button 
                                 onClick={() => setSelectedExamIdBuilder(exam.exam_id)}
                                 className="text-primary-600 hover:text-primary-800 font-bold text-sm bg-primary-50 hover:bg-primary-100 px-4 py-2 rounded-lg transition-colors flex items-center gap-1"
                               >
-                                Resume Draft
-                              </button>
-                            ) : exam.status === 'CREATED' && (
-                              <button 
-                                onClick={() => setSelectedExamIdBuilder(exam.exam_id)}
-                                className="text-primary-600 hover:text-primary-800 font-bold text-sm bg-primary-50 hover:bg-primary-100 px-4 py-2 rounded-lg transition-colors"
-                              >
-                                View Questions
+                                {exam.status === 'DRAFT' ? 'Resume Draft' : 'Edit Questions'}
                               </button>
                             )}
                             <button 
@@ -1124,6 +1214,7 @@ export default function TeacherDashboard() {
                   const secQuestionsMarks = sec.questions.reduce((sum, q) => sum + q.marks, 0);
                   return sec.section_marks - secQuestionsMarks === 0;
                 });
+                const isEditable = !['STARTED', 'PAUSED', 'RUNNING'].includes(exam.status);
                 const canPublish = exam.status === 'DRAFT' && globalMarksLeft === 0 && allSectionsFilled && builderSections.length > 0;
 
                 return (
@@ -1179,6 +1270,8 @@ export default function TeacherDashboard() {
                       {builderSections.map((sec, idx) => {
                         const secQuestionsMarks = sec.questions.reduce((sum, q) => sum + q.marks, 0);
                         const secMarksLeft = sec.section_marks - secQuestionsMarks;
+                        const currentQuestionMarks = (activeSectionId === sec.section_id && editingQuestionId) ? (sec.questions.find(q => q.question_id === editingQuestionId)?.marks || 0) : 0;
+                        const effectiveMaxMarks = secMarksLeft + currentQuestionMarks;
                         return (
                           <div key={sec.section_id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                             <div className="bg-slate-100 p-4 border-b border-slate-200 flex justify-between items-center">
@@ -1192,7 +1285,7 @@ export default function TeacherDashboard() {
                                   <span className="text-sm font-bold text-slate-500 mr-2">Left to Fill:</span>
                                   <span className={`font-black text-lg ${secMarksLeft === 0 ? 'text-green-500' : 'text-orange-500'}`}>{secMarksLeft}</span>
                                 </div>
-                                {exam.status === 'DRAFT' && (
+                                {isEditable && (
                                   <button onClick={() => handleDeleteSection(sec.section_id)} className="ml-4 p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                                     <Trash2 size={18} />
                                   </button>
@@ -1208,7 +1301,7 @@ export default function TeacherDashboard() {
                                     <h5 className="font-bold text-slate-700 text-lg">Q{qidx + 1}. {q.question_text_en}</h5>
                                     <div className="flex items-center gap-2">
                                       <span className="bg-primary-100 text-primary-700 font-bold px-3 py-1 rounded-lg text-sm">{q.marks} Marks</span>
-                                      {exam.status === 'DRAFT' && (
+                                      {isEditable && (
                                         <button onClick={() => handleEditQuestion(q, sec.section_id)} className="p-1 text-amber-500 hover:text-amber-700 hover:bg-amber-100 rounded-lg transition-colors">
                                           <Edit size={16} />
                                         </button>
@@ -1240,15 +1333,22 @@ export default function TeacherDashboard() {
                               ))}
 
                               {/* Add Question Form for this section */}
-                              {exam.status === 'DRAFT' && (
-                                secMarksLeft > 0 ? (
+                              {isEditable && (
+                                (effectiveMaxMarks > 0 || (activeSectionId === sec.section_id && editingQuestionId)) ? (
                                   activeSectionId === sec.section_id ? (
                                     <div className="bg-primary-50 p-6 rounded-xl border border-primary-100 mt-4 animate-in fade-in slide-in-from-top-2">
-                                      <h5 className="font-bold text-primary-800 mb-4 flex items-center gap-2"><Plus size={18} /> Add {sec.section_type} Question to {sec.title}</h5>
+                                      <h5 className="font-bold text-primary-800 mb-4 flex items-center gap-2"><Plus size={18} /> {editingQuestionId ? 'Edit' : 'Add'} {sec.section_type} Question for {sec.title}</h5>
                                       <form onSubmit={handleAddQuestion} className="space-y-4">
                                         <div>
-                                          <label className="block text-sm font-bold text-slate-700 mb-1">Marks (Max {secMarksLeft})</label>
-                                          <input required type="number" min="1" max={secMarksLeft} value={questionForm.marks} onChange={e => setQuestionForm({...questionForm, marks: parseInt(e.target.value)})} className="w-full p-2.5 border rounded-xl outline-none" />
+                                          <label className="block text-sm font-bold text-slate-700 mb-1">Marks (Max {effectiveMaxMarks})</label>
+                                          {sec.section_type === 'MATCH' ? (
+                                            <>
+                                              <input disabled type="number" value={(questionForm.match_pairs || []).length} className="w-full p-2.5 border rounded-xl outline-none bg-slate-100 text-slate-500 cursor-not-allowed" />
+                                              <p className="text-xs text-primary-600 mt-1 font-bold">Marks for Matching questions are automatically set to 1 per pair.</p>
+                                            </>
+                                          ) : (
+                                            <input required type="number" min="1" max={effectiveMaxMarks} value={questionForm.marks} onChange={e => setQuestionForm({...questionForm, marks: parseInt(e.target.value)})} className="w-full p-2.5 border rounded-xl outline-none" />
+                                          )}
                                         </div>
                                         
                                         <div>
@@ -1350,12 +1450,39 @@ export default function TeacherDashboard() {
                                           </div>
                                         )}
 
+                                        {sec.section_type === 'MATCH' && (
+                                          <div className="space-y-4 bg-white p-4 rounded-xl border border-slate-200">
+                                            <div>
+                                              <label className="block text-sm font-bold text-slate-700 mb-2">Matching Pairs</label>
+                                              <p className="text-xs text-slate-500 mb-3">Add left and right pairs. These will be automatically shuffled when presented to students.</p>
+                                              <div className="space-y-3">
+                                                {(questionForm.match_pairs || []).map((pair, i) => (
+                                                  <div key={`match-${i}`} className="flex gap-3 items-center">
+                                                    <span className="font-bold text-slate-400 text-sm w-12">Pair {i+1}</span>
+                                                    <input required type="text" value={pair.left} onChange={e => {
+                                                      const newPairs = [...(questionForm.match_pairs || [])];
+                                                      newPairs[i].left = e.target.value;
+                                                      setQuestionForm({...questionForm, match_pairs: newPairs});
+                                                    }} className="flex-1 p-2 border rounded-lg text-sm outline-none" placeholder="Left item..." />
+                                                    <span className="text-slate-400 font-bold px-2">→</span>
+                                                    <input required type="text" value={pair.right} onChange={e => {
+                                                      const newPairs = [...(questionForm.match_pairs || [])];
+                                                      newPairs[i].right = e.target.value;
+                                                      setQuestionForm({...questionForm, match_pairs: newPairs});
+                                                    }} className="flex-1 p-2 border rounded-lg text-sm outline-none" placeholder="Right match..." />
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        )}
+
                                         <div className="flex justify-between items-center pt-4">
                                           <button type="submit" className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-xl font-bold transition-colors shadow-sm w-full md:w-auto">
                                             {editingQuestionId ? 'Update Question' : 'Add Question'}
                                           </button>
                                           {editingQuestionId && (
-                                            <button type="button" onClick={() => { setEditingQuestionId(null); setActiveSectionId(null); setQuestionForm({ text_en: '', text_bn: '', options: ['', '', '', ''], correct_answer: '', marks: 1, fitb_blanks: [''], fitb_extras: [] }); }} className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-8 py-3 rounded-xl font-bold transition-colors w-full md:w-auto ml-2">
+                                            <button type="button" onClick={() => { setEditingQuestionId(null); setActiveSectionId(null); setQuestionForm({ text_en: '', text_bn: '', options: ['', '', '', ''], correct_answer: '', marks: 1, fitb_blanks: [''], fitb_extras: [], match_pairs: [{ left: '', right: '' }, { left: '', right: '' }] }); }} className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-8 py-3 rounded-xl font-bold transition-colors w-full md:w-auto ml-2">
                                               Cancel
                                             </button>
                                           )}
@@ -1363,12 +1490,15 @@ export default function TeacherDashboard() {
                                       </form>
                                     </div>
                                   ) : (
-                                    <button onClick={() => {
-                                      setActiveSectionId(sec.section_id);
-                                      setQuestionForm({ text_en: '', text_bn: '', options: ['', '', '', ''], correct_answer: '', marks: Math.min(1, secMarksLeft), fitb_blanks: [''], fitb_extras: [] });
-                                    }} className="mt-4 w-full border-2 border-dashed border-slate-300 hover:border-primary-400 text-slate-500 hover:text-primary-600 font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors">
-                                      <Plus size={20} /> Add Question
-                                    </button>
+                                    (sec.section_type !== 'MATCH' || sec.questions.length === 0) && (
+                                      <button onClick={() => {
+                                        setActiveSectionId(sec.section_id);
+                                        const initialPairs = sec.section_type === 'MATCH' ? Array(sec.section_marks).fill(0).map(() => ({left: '', right: ''})) : [{ left: '', right: '' }, { left: '', right: '' }];
+                                        setQuestionForm({ text_en: '', text_bn: '', options: ['', '', '', ''], correct_answer: '', marks: sec.section_type === 'MATCH' ? sec.section_marks : Math.min(1, effectiveMaxMarks), fitb_blanks: [''], fitb_extras: [], match_pairs: initialPairs });
+                                      }} className="mt-4 w-full border-2 border-dashed border-slate-300 hover:border-primary-400 text-slate-500 hover:text-primary-600 font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors">
+                                        <Plus size={20} /> Add Question
+                                      </button>
+                                    )
                                   )
                                 ) : (
                                   <div className="mt-4 text-center p-4 bg-green-50 text-green-700 font-bold rounded-xl border border-green-200 flex items-center justify-center gap-2">
@@ -1382,7 +1512,7 @@ export default function TeacherDashboard() {
                       })}
 
                       {/* Add New Section Form */}
-                      {exam.status === 'DRAFT' && globalMarksLeft > 0 && (
+                      {isEditable && globalMarksLeft > 0 && (
                         <div className="bg-slate-50 p-6 rounded-2xl border-2 border-dashed border-slate-300">
                           <h4 className="font-bold text-slate-800 text-lg mb-4 flex items-center gap-2">
                             <Plus size={20} className="text-primary-500" /> Create New Section
@@ -1398,6 +1528,7 @@ export default function TeacherDashboard() {
                                 <option value="MCQ">Multiple Choice</option>
                                 <option value="FITB">Fill in the Blanks</option>
                                 <option value="TF">True / False</option>
+                                <option value="MATCH">Left-Right Matching</option>
                               </select>
                             </div>
                             <div className="sm:w-32">
@@ -1458,6 +1589,12 @@ export default function TeacherDashboard() {
                 >
                   <Download size={16} /> Download PDF
                 </button>
+                <button 
+                  onClick={handleClearOldScores}
+                  className="bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors flex items-center gap-2 shadow-sm border border-red-100 ml-auto"
+                >
+                  <Trash2 size={16} /> Clear All Past Records
+                </button>
               </div>
             )}
           </div>
@@ -1496,9 +1633,13 @@ export default function TeacherDashboard() {
                     </thead>
                     <tbody className="divide-y divide-slate-200">
                       {resultsData.map((res, index) => {
-                        const isAbsent = !res.status || res.status === 'READY' || res.status === 'LOGGED_IN';
-                        const displayStatus = isAbsent ? 'Absent' : 'Completed';
-                        const rankDisplay = isAbsent ? '—' : `#${index + 1}`;
+                        const isAbsent = !res.status || res.status === 'READY';
+                        const displayStatus = isAbsent ? 'Absent' : 
+                                              res.status === 'LOGGED_IN' ? 'Waiting' :
+                                              res.status === 'EXAMINEE' ? 'Active' :
+                                              res.status === 'PAUSED' ? 'Paused' : 'Completed';
+                        const hasData = !isAbsent && res.status !== 'LOGGED_IN';
+                        const rankDisplay = !hasData ? '—' : `#${index + 1}`;
                         const percentage = res.full_marks > 0 ? Math.round((res.score / res.full_marks) * 100) : 0;
                         
                         return (
@@ -1507,21 +1648,21 @@ export default function TeacherDashboard() {
                             <td className="p-4 border-r border-slate-200 font-bold">{res.student_id}</td>
                             <td className="p-4 border-r border-slate-200">{res.name}</td>
                             <td className="p-4 border-r border-slate-200 text-center font-extrabold text-primary-700">
-                              {isAbsent ? <span className="text-slate-400 font-normal">—</span> : <>{res.score} <span className="text-slate-400 font-medium text-sm">/ {res.full_marks}</span></>}
+                              {!hasData ? <span className="text-slate-400 font-normal">—</span> : <>{res.score} <span className="text-slate-400 font-medium text-sm">/ {res.full_marks}</span></>}
                             </td>
                             <td className="p-4 border-r border-slate-200 text-center font-bold text-slate-700">
-                              {isAbsent ? <span className="text-slate-400 font-normal">—</span> : `${percentage}%`}
+                              {!hasData ? <span className="text-slate-400 font-normal">—</span> : `${percentage}%`}
                             </td>
                             <td className="p-4 border-r border-slate-200 text-center font-bold text-red-600">
-                              {isAbsent ? <span className="text-slate-400 font-normal">—</span> : (res.tab_violation_count > 0 ? res.tab_violation_count : '-')}
+                              {!hasData ? <span className="text-slate-400 font-normal">—</span> : (res.tab_violation_count > 0 ? res.tab_violation_count : '-')}
                             </td>
                             <td className="p-4 border-r border-slate-200 text-center font-bold text-sm">
-                              <span className={`px-3 py-1 rounded-full ${isAbsent ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                              <span className={`px-3 py-1 rounded-full ${isAbsent ? 'bg-red-100 text-red-700' : res.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
                                 {displayStatus}
                               </span>
                             </td>
                             <td className="p-4 border-l border-slate-200 text-center" data-html2canvas-ignore="true">
-                              {!isAbsent ? (
+                              {hasData ? (
                                 <button onClick={() => openAnswerSheet(res.student_id)} className="text-primary-600 hover:text-primary-800 transition-colors p-2 rounded-full hover:bg-primary-50 inline-flex items-center justify-center" title="View Answer Sheet">
                                   <Eye size={18} />
                                 </button>
@@ -1581,9 +1722,14 @@ export default function TeacherDashboard() {
                   <ChevronRight size={24} />
                 </button>
               </div>
-              <button onClick={closeAnswerSheet} className="p-2 bg-slate-700 hover:bg-red-500 rounded-full transition-colors shadow-sm">
-                <X size={24} />
-              </button>
+              <div className="flex items-center gap-3">
+                <button onClick={handleDownloadAnswerSheet} className="p-2 bg-slate-700 hover:bg-primary-600 rounded-full transition-colors shadow-sm flex items-center gap-2 px-4" title="Download PDF Answer Sheet">
+                  <Download size={20} /> <span className="font-bold text-sm hidden sm:inline">Export PDF</span>
+                </button>
+                <button onClick={closeAnswerSheet} className="p-2 bg-slate-700 hover:bg-red-500 rounded-full transition-colors shadow-sm">
+                  <X size={24} />
+                </button>
+              </div>
             </div>
 
             {/* Modal Body */}
@@ -1646,9 +1792,9 @@ export default function TeacherDashboard() {
                                   <div className="flex-grow">
                                     {q.question_type === 'FITB' ? (
                                       <h3 className="text-xl font-semibold text-slate-800 leading-relaxed">
-                                        {q.question_text_en.split('___').map((part: string, pIdx: number, partsArr: string[]) => {
+                                        {q.question_text_en.split(/_{2,}/).map((part: string, pIdx: number, partsArr: string[]) => {
                                           if (pIdx === partsArr.length - 1) return <span key={pIdx}>{part}</span>;
-                                          return <span key={pIdx}>{part}<span className="inline-block mx-1 w-16 border-b-2 border-slate-300"></span></span>;
+                                          return <span key={pIdx}>{part}<span style={{ borderColor: '#cbd5e1' }} className="inline-block mx-1 w-16 border-b-2"></span></span>;
                                         })}
                                       </h3>
                                     ) : (
@@ -1709,6 +1855,41 @@ export default function TeacherDashboard() {
                                         </div>
                                       </div>
                                     </div>
+                                  ) : q.question_type === 'MATCH' ? (
+                                    <div className="space-y-4">
+                                      {(() => {
+                                        try {
+                                          const correctMap = JSON.parse(q.correct_answer || '{}');
+                                          const studentMap = studentAns ? JSON.parse(studentAns) : {};
+                                          return Object.entries(correctMap).map(([left, corrRight], i) => {
+                                            const sRight = studentMap[left];
+                                            const isMatchCorrect = sRight === corrRight;
+                                            return (
+                                              <div key={i} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 pb-4 border-b border-slate-200 last:border-0 last:pb-0">
+                                                <div className="flex-1 font-bold text-slate-700 bg-slate-100 p-2 rounded text-center">{left}</div>
+                                                <div className="flex-1">
+                                                  <div className="flex items-center gap-2 mb-1">
+                                                    <span className="text-xs font-bold text-slate-500 w-16">Student:</span>
+                                                    <span className={`px-3 py-1 rounded-lg text-sm font-bold flex-1 text-center ${!sRight ? 'bg-slate-200 text-slate-500 italic' : isMatchCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                      {sRight ? String(sRight) : '(Left Blank)'}
+                                                    </span>
+                                                  </div>
+                                                  <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-bold text-slate-500 w-16">Correct:</span>
+                                                    <span className="px-3 py-1 rounded-lg text-sm font-bold bg-slate-200 text-slate-700 flex-1 text-center">
+                                                      {String(corrRight)}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                                <div className="flex items-center justify-end w-10">
+                                                  {isMatchCorrect ? <CheckCircle2 className="text-green-500" size={24} /> : <XCircle className="text-red-500" size={24} />}
+                                                </div>
+                                              </div>
+                                            );
+                                          });
+                                        } catch(e) { return <p className="text-red-500 font-bold">Error parsing MATCH answers.</p>; }
+                                      })()}
+                                    </div>
                                   ) : (
                                     <div className="space-y-4">
                                       <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
@@ -1730,15 +1911,23 @@ export default function TeacherDashboard() {
                                   )}
 
                                   {/* Marks Banner */}
-                                  <div className={`mt-5 flex items-center justify-between px-4 py-2 rounded-lg font-extrabold text-sm ${isCorrect ? 'bg-green-100 text-green-800' : 'bg-slate-200 text-slate-600'}`}>
-                                    <div className="flex items-center gap-2">
-                                      {isCorrect ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
-                                      <span>{isCorrect ? 'Correct' : 'Incorrect'}</span>
-                                    </div>
-                                    <div className="text-right">
-                                      {isCorrect ? q.marks : 0} <span className="opacity-60">/ {q.marks} Marks</span>
-                                    </div>
-                                  </div>
+                                  {(() => {
+                                    const awardedMarks = q.awarded_marks !== null && q.awarded_marks !== undefined ? Number(q.awarded_marks) : (isCorrect ? q.marks : 0);
+                                    const isPartial = awardedMarks > 0 && awardedMarks < q.marks;
+                                    const isFullyCorrect = awardedMarks === q.marks;
+                                    
+                                    return (
+                                      <div className={`mt-5 flex items-center justify-between px-4 py-2 rounded-lg font-extrabold text-sm ${isFullyCorrect ? 'bg-green-100 text-green-800' : isPartial ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-600'}`}>
+                                        <div className="flex items-center gap-2">
+                                          {isFullyCorrect ? <CheckCircle2 size={18} /> : isPartial ? <AlertTriangle size={18} /> : <XCircle size={18} />}
+                                          <span>{isFullyCorrect ? 'Correct' : isPartial ? 'Partially Correct' : 'Incorrect'}</span>
+                                        </div>
+                                        <div className="text-right">
+                                          {Number.isInteger(awardedMarks) ? awardedMarks : awardedMarks.toFixed(1)} <span className="opacity-60">/ {q.marks} Marks</span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                             );

@@ -208,7 +208,7 @@ app.get('/api/exams/:id/results/:student_id/answers', async (req, res) => {
         q.question_id, q.section_id, q.question_type, q.question_text_en, q.question_text_bn,
         q.options_json, q.correct_answer, q.marks,
         sec.title as section_title,
-        sr.selected_option as student_answer, sr.is_correct
+        sr.selected_option as student_answer, sr.is_correct, sr.awarded_marks
       FROM questions q
       LEFT JOIN exam_sections sec ON q.section_id = sec.section_id
       LEFT JOIN exam_sessions es ON es.exam_id = q.exam_id AND es.student_id = $2
@@ -383,10 +383,10 @@ async function forceSubmitExam(session_id: string) {
     }
 
     const scoreRes = await pool.query(`
-      SELECT COALESCE(SUM(q.marks), 0) as total_score
+      SELECT COALESCE(SUM(COALESCE(sr.awarded_marks, CASE WHEN sr.is_correct THEN q.marks ELSE 0 END)), 0) as total_score
       FROM student_responses sr
       JOIN questions q ON sr.question_id = q.question_id
-      WHERE sr.session_id = $1 AND sr.is_correct = true
+      WHERE sr.session_id = $1
     `, [session_id]);
     const final_score = scoreRes.rows[0].total_score;
 
@@ -528,15 +528,10 @@ io.on('connection', (socket: Socket) => {
         }
 
         if (examRes.rows[0].status === 'STARTED') {
-          if (session.status === 'PAUSED') {
-            socket.emit('exam_paused');
-            return;
-          }
-
           // Sync with global timer
           let currentSecondsLeft = examRes.rows[0].global_seconds_left;
           
-          if (session.status !== 'EXAMINEE') {
+          if (session.status !== 'EXAMINEE' && session.status !== 'PAUSED') {
             // Set status to EXAMINEE because they are actively taking the exam
             await pool.query("UPDATE exam_sessions SET status = 'EXAMINEE' WHERE session_id = $1", [data.session_id]);
             
@@ -561,6 +556,10 @@ io.on('connection', (socket: Socket) => {
           }, {});
 
           socket.emit('exam_started', { questions: questionsRes.rows, sections: sectionsRes.rows, seconds_left: currentSecondsLeft, previous_answers: previousAnswers });
+
+          if (session.status === 'PAUSED') {
+            socket.emit('exam_paused');
+          }
         }
       }
     } catch(e) { console.error(e); }
@@ -571,10 +570,13 @@ io.on('connection', (socket: Socket) => {
     try {
       const { session_id, question_id, selected_option } = data;
       // Fetch correct answer
-      const qRes = await pool.query("SELECT correct_answer, question_type FROM questions WHERE question_id = $1", [question_id]);
+      const qRes = await pool.query("SELECT correct_answer, question_type, marks FROM questions WHERE question_id = $1", [question_id]);
       
       let is_correct = false;
+      let awarded_marks: number | null = null;
       const correctStr = qRes.rows[0]?.correct_answer;
+      const qMarks = qRes.rows[0]?.marks || 0;
+
       if (qRes.rows[0]?.question_type === 'FITB') {
         try {
           const correctArr = JSON.parse(correctStr);
@@ -584,17 +586,42 @@ io.on('connection', (socket: Socket) => {
             is_correct = correctArr.every((val, index) => val === selectedArr[index]);
           }
         } catch(e) {}
+      } else if (qRes.rows[0]?.question_type === 'MATCH') {
+        try {
+          const correctMap = JSON.parse(correctStr);
+          const selectedMap = JSON.parse(selected_option);
+          
+          let correctCount = 0;
+          const totalPairs = Object.keys(correctMap).length;
+          
+          for (const key in selectedMap) {
+            if (correctMap[key] === selectedMap[key]) {
+              correctCount++;
+            }
+          }
+          
+          is_correct = correctCount === totalPairs && totalPairs > 0;
+          if (totalPairs > 0) {
+            awarded_marks = (correctCount / totalPairs) * qMarks;
+          } else {
+            awarded_marks = 0;
+          }
+        } catch(e) {}
       } else {
         is_correct = correctStr === selected_option;
       }
 
+      if (awarded_marks === null) {
+        awarded_marks = is_correct ? qMarks : 0;
+      }
+
       // Upsert into student_responses
       await pool.query(`
-        INSERT INTO student_responses (session_id, question_id, selected_option, is_correct)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO student_responses (session_id, question_id, selected_option, is_correct, awarded_marks)
+        VALUES ($1, $2, $3, $4, $5)
         ON CONFLICT (session_id, question_id) 
-        DO UPDATE SET selected_option = EXCLUDED.selected_option, is_correct = EXCLUDED.is_correct
-      `, [session_id, question_id, selected_option, is_correct]);
+        DO UPDATE SET selected_option = EXCLUDED.selected_option, is_correct = EXCLUDED.is_correct, awarded_marks = EXCLUDED.awarded_marks
+      `, [session_id, question_id, selected_option, is_correct, awarded_marks]);
     } catch(e) { console.error(e); }
   });
 
@@ -687,6 +714,16 @@ io.on('connection', (socket: Socket) => {
         io.to(row.session_id).emit('force_logout', { message: 'The entire exam has been fully reset by the teacher.' });
       }
 
+      await broadcastDashboardUpdate(exam_id);
+    } catch (e) { console.error(e); }
+  });
+
+  // Global Teacher Clear Old Scores
+  socket.on('teacher_clear_old_scores', async (data: { exam_id: string }) => {
+    try {
+      const { exam_id } = data;
+      // Complete removal of all sessions for this exam
+      await pool.query("DELETE FROM exam_sessions WHERE exam_id = $1", [exam_id]);
       await broadcastDashboardUpdate(exam_id);
     } catch (e) { console.error(e); }
   });

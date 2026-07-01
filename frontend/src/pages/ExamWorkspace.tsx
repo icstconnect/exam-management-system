@@ -8,14 +8,14 @@ import jsPDF from 'jspdf';
 interface Section {
   section_id: string;
   title: string;
-  section_type: 'MCQ' | 'FITB' | 'TF';
+  section_type: 'MCQ' | 'FITB' | 'TF' | 'MATCH';
   section_marks: number;
 }
 
 interface Question {
   question_id: string;
   section_id: string;
-  question_type: 'MCQ' | 'FITB' | 'TF';
+  question_type: 'MCQ' | 'FITB' | 'TF' | 'MATCH';
   question_text_en: string;
   question_text_bn: string;
   options_json: string[];
@@ -41,6 +41,7 @@ export default function ExamWorkspace() {
   // Interactive FITB mapping: qId -> blankIdx -> option
   const [fitbAnswers, setFitbAnswers] = useState<Record<string, Record<number, string>>>({});
   const [shuffledBanks, setShuffledBanks] = useState<Record<string, string[]>>({});
+  const [activeMatchLeft, setActiveMatchLeft] = useState<string | null>(null);
   const [activeBlank, setActiveBlank] = useState<{ qId: string; bIdx: number } | null>(null);
 
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
@@ -98,6 +99,13 @@ export default function ExamWorkspace() {
             return q;
          });
       }
+
+      const sectionOrder = fetchedSections.map(s => s.section_id);
+      fetchedQuestions.sort((a, b) => {
+        const idxA = sectionOrder.indexOf(a.section_id || a.section_id); // fallback
+        const idxB = sectionOrder.indexOf(b.section_id || b.section_id);
+        return idxA - idxB;
+      });
 
       setQuestions(fetchedQuestions);
       setSections(fetchedSections);
@@ -222,6 +230,84 @@ export default function ExamWorkspace() {
     socket.emit('submit_answer', { session_id, question_id, selected_option: option });
   };
 
+  const renderMatchQuestion = (q: Question) => {
+    let options: any = { left: [], right: [] };
+    try {
+      options = q.options_json || { left: [], right: [] };
+    } catch(e) {}
+    
+    const leftCol: string[] = options.left || [];
+    const rightCol: string[] = options.right || [];
+    
+    let mapping: Record<string, string> = {};
+    try {
+      mapping = answers[q.question_id] ? JSON.parse(answers[q.question_id]) : {};
+    } catch(e) {}
+    
+    const handleLeftClick = (leftText: string) => {
+      if (activeMatchLeft === leftText) {
+        const newMapping = { ...mapping };
+        delete newMapping[leftText];
+        handleAnswerSelect(q.question_id, JSON.stringify(newMapping));
+        setActiveMatchLeft(null);
+      } else {
+        setActiveMatchLeft(leftText);
+      }
+    };
+    
+    const handleRightClick = (rightText: string) => {
+      if (!activeMatchLeft) return;
+      const newMapping = { ...mapping };
+      for (const k in newMapping) {
+        if (newMapping[k] === rightText) delete newMapping[k];
+      }
+      newMapping[activeMatchLeft] = rightText;
+      handleAnswerSelect(q.question_id, JSON.stringify(newMapping));
+      setActiveMatchLeft(null);
+    };
+
+    return (
+      <div className="mt-8">
+        <h3 className="text-2xl font-semibold text-slate-800 mb-4 mt-2 leading-relaxed">
+          {getLocalizedText(q.question_text_en, q.question_text_bn, lang)}
+        </h3>
+        <p className="text-sm text-slate-500 mb-6 font-bold">{lang === 'bn' ? UI_TEXT.bn.clickLeftRight : UI_TEXT.en.clickLeftRight}</p>
+        <div className="grid grid-cols-2 gap-8">
+          <div className="flex flex-col gap-3">
+            {leftCol.map((item, idx) => {
+              const isMatched = mapping[item] !== undefined;
+              const isActive = activeMatchLeft === item;
+              return (
+                <button
+                  key={`l-${idx}`}
+                  onClick={() => handleLeftClick(item)}
+                  className={`p-4 text-left rounded-xl border-2 font-bold transition-colors ${isActive ? 'border-primary-500 bg-primary-50 text-primary-700' : isMatched ? 'border-green-500 bg-green-50 text-green-700' : 'border-slate-200 hover:border-primary-300 text-slate-700'}`}
+                >
+                  {item}
+                  {isMatched && <span className="block text-xs text-green-600 mt-1">{lang === 'bn' ? 'ম্যাচ করা হয়েছে: ' : 'Matched: '} {mapping[item]}</span>}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex flex-col gap-3">
+            {rightCol.map((item, idx) => {
+              const isMatched = Object.values(mapping).includes(item);
+              return (
+                <button
+                  key={`r-${idx}`}
+                  onClick={() => handleRightClick(item)}
+                  className={`p-4 text-left rounded-xl border-2 font-bold transition-colors ${activeMatchLeft ? 'border-dashed border-primary-400 hover:border-primary-500 hover:bg-primary-50 cursor-pointer text-slate-700' : isMatched ? 'border-green-500 bg-green-50 text-green-700' : 'border-slate-200 text-slate-700 cursor-default'}`}
+                >
+                  {item}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const getOptionUsage = (option: string) => {
     if (!currentSection) return null;
     const secQs = questionsBySection[currentSection.section_id] || [];
@@ -247,7 +333,7 @@ export default function ExamWorkspace() {
     const newAnswers = { ...answers };
     const q = questions.find(x => x.question_id === qId);
     if (q) {
-      const partsEn = q.question_text_en.split('___');
+      const partsEn = getLocalizedText(q.question_text_en, q.question_text_bn, lang).split(/_{2,}/);
       const numBlanks = partsEn.length - 1;
       const arr = [];
       for (let i = 0; i < numBlanks; i++) {
@@ -284,7 +370,7 @@ export default function ExamWorkspace() {
     updatedQs.forEach(id => {
       const q = questions.find(x => x.question_id === id);
       if (q) {
-        const partsEn = q.question_text_en.split('___');
+        const partsEn = getLocalizedText(q.question_text_en, q.question_text_bn, lang).split(/_{2,}/);
         const numBlanks = partsEn.length - 1;
         const arr = [];
         for (let i = 0; i < numBlanks; i++) {
@@ -301,8 +387,8 @@ export default function ExamWorkspace() {
   };
 
   const renderFitbQuestion = (q: Question) => {
-    const text = lang === 'en' ? q.question_text_en : q.question_text_bn;
-    const parts = text.split('___');
+    const text = getLocalizedText(q.question_text_en, q.question_text_bn, lang);
+    const parts = text.split(/_{2,}/);
     
     return (
       <div className="text-2xl font-semibold text-slate-800 mb-8 mt-2 leading-[3rem]">
@@ -362,9 +448,9 @@ export default function ExamWorkspace() {
         <div className="w-24 h-24 mb-6 rounded-full bg-blue-100 flex items-center justify-center animate-pulse">
           <Clock className="text-primary-500" size={40} />
         </div>
-        <h2 className="text-3xl font-extrabold text-slate-800 mb-2">Waiting for Teacher</h2>
+        <h2 className="text-3xl font-extrabold text-slate-800 mb-2">{lang === 'bn' ? UI_TEXT.bn.waitingForTeacher : UI_TEXT.en.waitingForTeacher}</h2>
         <p className="text-slate-500 font-medium max-w-sm">
-          Please wait quietly. The exam will start automatically when the teacher is ready.
+          {lang === 'bn' ? UI_TEXT.bn.waitQuietly : UI_TEXT.en.waitQuietly}
         </p>
       </div>
     );
@@ -376,7 +462,7 @@ export default function ExamWorkspace() {
         <div className="w-24 h-24 mb-6 rounded-full bg-red-100 flex items-center justify-center">
           <AlertTriangle className="text-red-500" size={40} />
         </div>
-        <h2 className="text-3xl font-extrabold text-red-600 mb-2">Screen Locked</h2>
+        <h2 className="text-3xl font-extrabold text-red-600 mb-2">{lang === 'bn' ? UI_TEXT.bn.screenLocked : UI_TEXT.en.screenLocked}</h2>
         <p className="text-slate-600 font-medium max-w-sm mb-6">
           You have changed tabs or minimized the window. Please raise your hand and wait for the teacher to unlock your screen.
         </p>
@@ -417,7 +503,7 @@ export default function ExamWorkspace() {
           pdf.setFontSize(60);
           pdf.setFont('helvetica', 'bold');
           pdf.saveGraphicsState();
-          pdf.setGState(new pdf.GState({opacity: 0.15}));
+          pdf.setGState(new (pdf as any).GState({opacity: 0.15}));
           pdf.text("STUDENT RESPONSE COPY", pdfWidth / 2, pdf.internal.pageSize.getHeight() / 2, { angle: 45, align: 'center' });
           pdf.restoreGraphicsState();
           
@@ -484,7 +570,7 @@ export default function ExamWorkspace() {
             <div ref={pdfRef} style={{ backgroundColor: '#ffffff', color: '#1e293b' }} className="p-10 w-[800px] text-left">
               <div style={{ borderColor: '#1e293b' }} className="text-center mb-8 border-b-2 pb-6">
                 <h1 style={{ color: '#0f172a' }} className="text-2xl font-black tracking-wider">INSTITUTE OF COMPUTER SCIENCE AND TECHNOLOGY CHOWBERIA</h1>
-                <h2 style={{ color: '#334155' }} className="text-xl font-bold mt-2">Student Response Sheet (Not Evaluated)</h2>
+                <h2 style={{ color: '#334155' }} className="text-xl font-bold mt-2">{lang === 'bn' ? UI_TEXT.bn.studentResponse : UI_TEXT.en.studentResponse}</h2>
               </div>
 
               <div style={{ backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }} className="grid grid-cols-2 gap-4 mb-8 text-sm font-bold p-4 rounded-xl border">
@@ -516,13 +602,13 @@ export default function ExamWorkspace() {
                                 <div style={{ color: '#1e293b' }} className="font-bold leading-relaxed whitespace-pre-wrap">{q.question_text_en}</div>
                               </div>
                               <div style={{ backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }} className="ml-7 mt-2 p-3 rounded-lg border">
-                                <p style={{ color: '#94a3b8' }} className="text-xs font-black uppercase mb-1">Your Submission:</p>
+                                <p style={{ color: '#94a3b8' }} className="text-xs font-black uppercase mb-1">{lang === 'bn' ? UI_TEXT.bn.yourSubmission : UI_TEXT.en.yourSubmission}</p>
                                 {q.question_type === 'FITB' ? (
                                   <div className="space-y-2">
                                     {(() => {
                                       try {
                                         const stdAns = JSON.parse(q.student_answer || '[]');
-                                        if (stdAns.length === 0) return <span style={{ color: '#64748b' }} className="italic font-bold">No Answer Submitted</span>;
+                                        if (stdAns.length === 0) return <span style={{ color: '#64748b' }} className="italic font-bold">{lang === 'bn' ? UI_TEXT.bn.noAnswer : UI_TEXT.en.noAnswer}</span>;
                                         return stdAns.map((ans: string, i: number) => (
                                           <div key={i} className="text-sm font-bold">Blank {i+1}: <span style={{ color: '#1e293b', backgroundColor: '#ffffff', borderColor: '#e2e8f0' }} className="px-2 py-1 rounded border">{ans || '(Left Blank)'}</span></div>
                                         ));
@@ -531,7 +617,7 @@ export default function ExamWorkspace() {
                                   </div>
                                 ) : (
                                   <p style={{ color: isBlank ? '#64748b' : '#1e293b' }} className={`font-bold ${isBlank ? 'italic' : ''}`}>
-                                    {isBlank ? 'No Answer Submitted' : q.student_answer}
+                                    {isBlank ? (lang === 'bn' ? UI_TEXT.bn.noAnswer : UI_TEXT.en.noAnswer) : q.student_answer}
                                   </p>
                                 )}
                               </div>
@@ -571,7 +657,7 @@ export default function ExamWorkspace() {
             onClick={handleSubmitExam}
             className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-5 py-2 rounded-xl font-bold transition-all shadow-md transform hover:scale-[1.02]"
           >
-            <CheckCircle2 size={20} /> Submit Exam
+            <CheckCircle2 size={20} /> {lang === 'bn' ? UI_TEXT.bn.submit : UI_TEXT.en.submit}
           </button>
           
           <button 
@@ -593,9 +679,9 @@ export default function ExamWorkspace() {
               
               {currentSection && (
                 <div className="bg-slate-50 border-b border-slate-100 px-8 py-4 flex items-center gap-2 text-slate-600 font-bold uppercase tracking-wider text-sm">
-                  <span>{currentSection.title}</span>
+                  <span>{getLocalizedSectionTitle(currentSection.title, lang)}</span>
                   <ChevronRight size={16} className="text-slate-400" />
-                  <span className="text-slate-400">Question {currentQuestionIndex + 1}</span>
+                  <span className="text-slate-400">{lang === 'bn' ? UI_TEXT.bn.question : UI_TEXT.en.question} {currentQuestionIndex + 1}</span>
                 </div>
               )}
 
@@ -608,10 +694,12 @@ export default function ExamWorkspace() {
                     
                     {currentQuestion.question_type === 'FITB' ? (
                       renderFitbQuestion(currentQuestion)
+                    ) : currentQuestion.question_type === 'MATCH' ? (
+                      renderMatchQuestion(currentQuestion)
                     ) : (
                       <>
                         <h3 className="text-2xl font-semibold text-slate-800 mb-8 mt-2 leading-relaxed">
-                          {lang === 'en' ? currentQuestion.question_text_en : currentQuestion.question_text_bn}
+                          {getLocalizedText(currentQuestion.question_text_en, currentQuestion.question_text_bn, lang)}
                         </h3>
                         
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -650,7 +738,7 @@ export default function ExamWorkspace() {
                       : 'bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 shadow-sm'
                   }`}
                 >
-                  Previous
+                  {lang === 'bn' ? UI_TEXT.bn.previous : UI_TEXT.en.previous}
                 </button>
                 <button
                   onClick={() => setCurrentQuestionIndex(prev => Math.min(questions.length - 1, prev + 1))}
@@ -661,7 +749,7 @@ export default function ExamWorkspace() {
                       : 'bg-primary-600 hover:bg-primary-700 text-white shadow-md'
                   }`}
                 >
-                  Next
+                  {lang === 'bn' ? UI_TEXT.bn.next : UI_TEXT.en.next}
                 </button>
               </div>
 
@@ -672,7 +760,7 @@ export default function ExamWorkspace() {
         {/* Section-wise Question Palette Sidebar */}
         <div className="w-full lg:w-1/4 bg-white p-6 rounded-3xl shadow-sm border border-slate-100 lg:sticky lg:top-48">
           <h3 className="font-extrabold text-slate-800 text-lg mb-6 flex items-center justify-between">
-            <span>Palette</span>
+            <span>{lang === 'bn' ? UI_TEXT.bn.palette : UI_TEXT.en.palette}</span>
             <span className="text-sm font-bold bg-slate-100 text-slate-500 px-3 py-1 rounded-full">
               {Object.keys(answers).length} / {questions.length}
             </span>
@@ -686,7 +774,7 @@ export default function ExamWorkspace() {
               return (
                 <div key={sec.section_id}>
                   <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3 pl-1">
-                    {sec.title}
+                    {getLocalizedSectionTitle(sec.title, lang)}
                   </h4>
                   <div className="grid grid-cols-4 gap-2">
                     {secQs.map((q) => {
@@ -727,11 +815,11 @@ export default function ExamWorkspace() {
           <div className="mt-6 space-y-3 border-t border-slate-100 pt-6">
             <div className="flex items-center gap-3 text-sm font-bold text-slate-600">
               <div className="w-4 h-4 rounded-md bg-green-500 shadow-sm"></div>
-              <span>Answered</span>
+              <span>{lang === 'bn' ? UI_TEXT.bn.answered : UI_TEXT.en.answered}</span>
             </div>
             <div className="flex items-center gap-3 text-sm font-bold text-slate-600">
               <div className="w-4 h-4 rounded-md bg-slate-100 border border-slate-200"></div>
-              <span>Not Visited / Left</span>
+              <span>{lang === 'bn' ? UI_TEXT.bn.notVisited : UI_TEXT.en.notVisited}</span>
             </div>
           </div>
         </div>
@@ -784,16 +872,16 @@ export default function ExamWorkspace() {
             <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <AlertTriangle className="text-amber-500" size={32} />
             </div>
-            <h3 className="text-2xl font-extrabold text-slate-800 text-center mb-2">Submit Exam?</h3>
+            <h3 className="text-2xl font-extrabold text-slate-800 text-center mb-2">{lang === 'bn' ? UI_TEXT.bn.submit : UI_TEXT.en.submit}?</h3>
             <p className="text-slate-600 text-center mb-8 font-medium">
-              Are you sure you want to submit your exam? You cannot change your answers after submitting.
+              {lang === 'bn' ? UI_TEXT.bn.submitDesc : UI_TEXT.en.submitDesc}
             </p>
             <div className="flex gap-3">
               <button onClick={() => setShowSubmitConfirm(false)} className="flex-1 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-colors">
-                Cancel
+                {lang === 'bn' ? UI_TEXT.bn.cancel : UI_TEXT.en.cancel}
               </button>
               <button onClick={() => { setShowSubmitConfirm(false); socket.emit('student_submit_exam', { session_id }); setStatus('COMPLETED'); }} className="flex-1 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold transition-colors shadow-sm">
-                Yes, Submit
+                {lang === 'bn' ? UI_TEXT.bn.yesSubmit : UI_TEXT.en.yesSubmit}
               </button>
             </div>
           </div>
@@ -802,3 +890,69 @@ export default function ExamWorkspace() {
     </div>
   );
 }
+const getLocalizedText = (textEn: string, textBn: string, currentLang: string) => {
+  if (currentLang === 'bn' && textBn && textBn.trim() !== '') return textBn;
+  if (currentLang === 'en' && textEn && textEn.trim() !== '') return textEn;
+  return textEn || textBn || '';
+};
+
+const getLocalizedSectionTitle = (title: string, lang: string) => {
+  if (lang === 'en') return title;
+  const t = title.toUpperCase();
+  if (t.includes('MULTIPLE CHOICE')) return 'বহুনির্বাচনী প্রশ্ন';
+  if (t.includes('FILL IN THE BLANKS')) return 'শূন্যস্থান পূরণ করো';
+  if (t.includes('TRUE/ FALSE') || t.includes('TRUE/FALSE') || t.includes('TRUE / FALSE')) return 'সত্য/মিথ্যা নির্বাচন করো';
+  if (t.includes('MATCH')) return 'বামদিকের সাথে ডানদিক মেলাও';
+  return title;
+};
+
+const UI_TEXT = {
+  en: {
+    next: "Next",
+    previous: "Previous",
+    submit: "Submit Exam",
+    submitConfirm: "Submit Exam?",
+    submitDesc: "Are you sure you want to submit your exam? You cannot change your answers after submitting.",
+    cancel: "Cancel",
+    yesSubmit: "Yes, Submit",
+    clear: "Clear Match",
+    noAnswer: "No Answer Submitted",
+    studentResponse: "Student Response Sheet (Not Evaluated)",
+    clickLeftRight: "Click a left item, then a right item to draw a line. Double-click a left item to remove its match.",
+    yourSubmission: "Your Submission:",
+    timeRemaining: "{lang === 'bn' ? UI_TEXT.bn.timeRemaining : UI_TEXT.en.timeRemaining}",
+    palette: "Palette",
+    answered: "Answered",
+    notVisited: "Not Visited / Left",
+    question: "QUESTION",
+    waitingForTeacher: "Waiting for Teacher",
+    waitQuietly: "Please wait quietly. The exam will start automatically when the teacher is ready.",
+    screenLocked: "Screen Locked",
+    pausedDesc: "{lang === 'bn' ? UI_TEXT.bn.pausedDesc : UI_TEXT.en.pausedDesc}"
+  },
+  bn: {
+    next: "পরবর্তী",
+    previous: "পূর্ববর্তী",
+    submit: "পরীক্ষা জমা দিন",
+    submitConfirm: "পরীক্ষা জমা দেবেন?",
+    submitDesc: "আপনি কি আপনার পরীক্ষা জমা দিতে নিশ্চিত? জমা দেওয়ার পরে আপনি আপনার উত্তর পরিবর্তন করতে পারবেন না।",
+    cancel: "বাতিল",
+    yesSubmit: "হ্যাঁ, জমা দিন",
+    clear: "ম্যাচ মুছুন",
+    noAnswer: "কোনো উত্তর জমা দেওয়া হয়নি",
+    studentResponse: "শিক্ষার্থীর উত্তরপত্র (মূল্যায়ন করা হয়নি)",
+    clickLeftRight: "একটি লাইন আঁকতে বাম দিকের আইটেম এবং তারপর ডান দিকের আইটেমে ক্লিক করুন। ম্যাচ মুছতে বাম আইটেমে ডাবল-ক্লিক করুন।",
+    yourSubmission: "আপনার জমা দেওয়া উত্তর:",
+    timeRemaining: "অবশিষ্ট সময়",
+    palette: "প্যালেট",
+    answered: "উত্তর দেওয়া হয়েছে",
+    notVisited: "দেখা হয়নি / বাকি আছে",
+    question: "প্রশ্ন",
+    waitingForTeacher: "শিক্ষকের জন্য অপেক্ষা করা হচ্ছে",
+    waitQuietly: "দয়া করে শান্ত হয়ে অপেক্ষা করুন। শিক্ষক প্রস্তুত হলে পরীক্ষা স্বয়ংক্রিয়ভাবে শুরু হবে।",
+    screenLocked: "স্ক্রিন লক করা হয়েছে",
+    pausedDesc: "আপনার পরীক্ষা বিরতিতে আছে। শিক্ষকের পুনরায় শুরু করার জন্য অপেক্ষা করুন।"
+  }
+};
+
+

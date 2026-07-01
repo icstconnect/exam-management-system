@@ -28,14 +28,14 @@ CREATE TABLE IF NOT EXISTS exam_sections (
   exam_id UUID NOT NULL REFERENCES exams(exam_id) ON DELETE CASCADE,
   title VARCHAR(255) NOT NULL,
   section_marks INTEGER NOT NULL,
-  section_type VARCHAR(20) NOT NULL CHECK (section_type IN ('MCQ', 'FITB', 'TF'))
+  section_type VARCHAR(20) NOT NULL CHECK (section_type IN ('MCQ', 'FITB', 'TF', 'MATCH'))
 );
 
 CREATE TABLE IF NOT EXISTS questions (
   question_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   exam_id UUID NOT NULL REFERENCES exams(exam_id) ON DELETE CASCADE,
   section_id UUID NOT NULL REFERENCES exam_sections(section_id) ON DELETE CASCADE,
-  question_type VARCHAR(20) NOT NULL CHECK (question_type IN ('MCQ', 'FITB', 'TF')),
+  question_type VARCHAR(20) NOT NULL CHECK (question_type IN ('MCQ', 'FITB', 'TF', 'MATCH')),
   question_text_en TEXT NOT NULL,
   question_text_bn TEXT NOT NULL,
   options_json JSONB NOT NULL,
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS exam_sessions (
   tab_violation_count INTEGER NOT NULL DEFAULT 0,
   seconds_left INTEGER,
   last_active_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  score INTEGER DEFAULT 0,
+  score DECIMAL(5,2) DEFAULT 0,
   UNIQUE(exam_id, student_id)
 );
 
@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS student_responses (
   question_id UUID NOT NULL REFERENCES questions(question_id) ON DELETE CASCADE,
   selected_option TEXT,
   is_correct BOOLEAN,
+  awarded_marks DECIMAL(5,2),
   PRIMARY KEY (session_id, question_id)
 );
 
