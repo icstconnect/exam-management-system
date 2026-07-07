@@ -154,15 +154,17 @@ export const MatchQuestionViewer: React.FC<MatchQuestionViewerProps> = ({
         
         {/* Left Column */}
         <div className="flex flex-col gap-6">
-          {leftCol.map((item, idx) => {
-            const isMatched = mapping[item] !== undefined;
-            const isActive = activeMatchLeft === item;
+          {leftCol.map((item: any, idx) => {
+            const itemId = typeof item === 'object' && item !== null ? item.id : item;
+            const itemText = typeof item === 'object' && item !== null ? item.text : item;
+            const isMatched = mapping[itemId] !== undefined;
+            const isActive = activeMatchLeft === itemId;
             
             return (
               <button
                 key={`l-${idx}`}
-                ref={el => { leftRefs.current[item] = el; }}
-                onClick={() => handleLeftClick(item)}
+                ref={el => { leftRefs.current[itemId] = el; }}
+                onClick={() => handleLeftClick(itemId)}
                 className={`p-5 text-left rounded-2xl border-2 font-bold transition-all transform hover:scale-[1.02] shadow-sm relative ${
                   isActive 
                     ? 'border-blue-500 bg-blue-50 text-blue-700 ring-4 ring-blue-500/20' 
@@ -171,7 +173,7 @@ export const MatchQuestionViewer: React.FC<MatchQuestionViewerProps> = ({
                       : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
                 }`}
               >
-                {item}
+                {itemText}
                 {/* Connecting point dot for kids */}
                 <div className={`absolute -right-[10px] top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-[3px] ${isActive ? 'border-blue-500 bg-white' : isMatched ? 'border-green-500 bg-green-500' : 'border-slate-300 bg-slate-100'}`} />
               </button>
@@ -181,14 +183,16 @@ export const MatchQuestionViewer: React.FC<MatchQuestionViewerProps> = ({
 
         {/* Right Column */}
         <div className="flex flex-col gap-6">
-          {rightCol.map((item, idx) => {
-            const isMatched = Object.values(mapping).includes(item);
+          {rightCol.map((item: any, idx) => {
+            const itemId = typeof item === 'object' && item !== null ? item.id : item;
+            const itemText = typeof item === 'object' && item !== null ? item.text : item;
+            const isMatched = Object.values(mapping).includes(itemId);
             
             return (
               <button
                 key={`r-${idx}`}
-                ref={el => { rightRefs.current[item] = el; }}
-                onClick={() => handleRightClick(item)}
+                ref={el => { rightRefs.current[itemId] = el; }}
+                onClick={() => handleRightClick(itemId)}
                 className={`p-5 text-left rounded-2xl border-2 font-bold transition-all transform hover:scale-[1.02] shadow-sm relative ${
                   activeMatchLeft 
                     ? 'border-dashed border-blue-400 hover:border-blue-500 hover:bg-blue-50 hover:ring-4 ring-blue-500/10 cursor-pointer text-slate-700 bg-white' 
@@ -199,7 +203,7 @@ export const MatchQuestionViewer: React.FC<MatchQuestionViewerProps> = ({
               >
                 {/* Connecting point dot for kids */}
                 <div className={`absolute -left-[10px] top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-[3px] ${isMatched ? 'border-green-500 bg-green-500' : activeMatchLeft ? 'border-blue-400 bg-white animate-pulse' : 'border-slate-300 bg-slate-100'}`} />
-                {item}
+                {itemText}
               </button>
             );
           })}

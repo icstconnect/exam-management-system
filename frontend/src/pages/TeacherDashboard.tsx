@@ -57,6 +57,40 @@ const BATCHES = [
   'JDX IX,X'
 ];
 
+const getOptionText = (q: any, optionId: string | null | undefined) => {
+  if (!optionId) return '';
+  if (q.question_type === 'TF') {
+    if (optionId === 'opt_true' || optionId === 'True') return 'True';
+    if (optionId === 'opt_false' || optionId === 'False') return 'False';
+  }
+  let options: any = [];
+  try {
+    options = typeof q.options_json === 'string' ? JSON.parse(q.options_json) : q.options_json;
+  } catch (e) {
+    options = q.options_json;
+  }
+  if (Array.isArray(options)) {
+    const found = options.find((opt: any) => opt && (opt.id === optionId || opt.text === optionId));
+    if (found) return found.text;
+  }
+  return optionId;
+};
+
+const getMatchOptionText = (q: any, side: 'left' | 'right', optionId: string | null | undefined) => {
+  if (!optionId) return '';
+  let options: any = { left: [], right: [] };
+  try {
+    options = typeof q.options_json === 'string' ? JSON.parse(q.options_json) : q.options_json;
+  } catch (e) {
+    options = q.options_json;
+  }
+  if (options && Array.isArray(options[side])) {
+    const found = options[side].find((opt: any) => opt && (opt.id === optionId || opt.text === optionId));
+    if (found) return found.text;
+  }
+  return optionId;
+};
+
 export default function TeacherDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authPassword, setAuthPassword] = useState('');
@@ -171,7 +205,9 @@ export default function TeacherDashboard() {
           } else {
             Object.entries(studentMap).forEach(([left, right]) => {
               if (y > 280) { pdf.addPage(); y = 20; }
-              const matchLine = pdf.splitTextToSize(`${left} --------> ${right}`, 175);
+              const leftText = getMatchOptionText(q, 'left', left);
+              const rightText = getMatchOptionText(q, 'right', right);
+              const matchLine = pdf.splitTextToSize(`${leftText} --------> ${rightText}`, 175);
               pdf.text(matchLine, 15, y);
               y += matchLine.length * 5 + 1;
             });
@@ -185,12 +221,14 @@ export default function TeacherDashboard() {
           } else {
             stdAns.forEach((ans, i) => {
               if (y > 280) { pdf.addPage(); y = 20; }
-              pdf.text(`Blank ${i+1}: ${ans || '(Left Blank)'}`, 15, y);
+              const ansText = getOptionText(q, ans);
+              pdf.text(`Blank ${i+1}: ${ansText || '(Left Blank)'}`, 15, y);
               y += 6;
             });
           }
         } else {
-          pdf.text(q.student_answer || 'No Answer Submitted', 15, y);
+          const ansText = getOptionText(q, q.student_answer);
+          pdf.text(ansText || 'No Answer Submitted', 15, y);
           y += 8;
         }
         pdf.setFont('helvetica', 'normal');
@@ -1821,13 +1859,13 @@ export default function TeacherDashboard() {
                                                   <div className="flex items-center gap-2 mb-1">
                                                     <span className="text-xs font-bold text-slate-500 w-16">Student:</span>
                                                     <span className={`px-3 py-1 rounded-lg text-sm font-bold ${!sOpt ? 'bg-slate-200 text-slate-500 italic' : isBlankCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                      {sOpt || '(Left Blank)'}
+                                                      {getOptionText(q, sOpt) || '(Left Blank)'}
                                                     </span>
                                                   </div>
                                                   <div className="flex items-center gap-2">
                                                     <span className="text-xs font-bold text-slate-500 w-16">Correct:</span>
                                                     <span className="px-3 py-1 rounded-lg text-sm font-bold bg-slate-200 text-slate-700">
-                                                      {corrOpt}
+                                                      {getOptionText(q, corrOpt)}
                                                     </span>
                                                   </div>
                                                 </div>
@@ -1845,13 +1883,13 @@ export default function TeacherDashboard() {
                                       <div className="flex-1">
                                         <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Student Answer</div>
                                         <div className={`p-3 rounded-xl border-2 font-bold ${!studentAns ? 'bg-slate-100 border-slate-200 text-slate-500 italic' : isCorrect ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
-                                          {studentAns || 'Not Answered'}
+                                          {getOptionText(q, studentAns) || 'Not Answered'}
                                         </div>
                                       </div>
                                       <div className="flex-1">
                                         <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Correct Answer</div>
                                         <div className="p-3 rounded-xl border-2 bg-slate-100 border-slate-200 text-slate-700 font-bold">
-                                          {q.correct_answer}
+                                          {getOptionText(q, q.correct_answer)}
                                         </div>
                                       </div>
                                     </div>
@@ -1866,18 +1904,18 @@ export default function TeacherDashboard() {
                                             const isMatchCorrect = sRight === corrRight;
                                             return (
                                               <div key={i} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 pb-4 border-b border-slate-200 last:border-0 last:pb-0">
-                                                <div className="flex-1 font-bold text-slate-700 bg-slate-100 p-2 rounded text-center">{left}</div>
+                                                <div className="flex-1 font-bold text-slate-700 bg-slate-100 p-2 rounded text-center">{getMatchOptionText(q, 'left', left)}</div>
                                                 <div className="flex-1">
                                                   <div className="flex items-center gap-2 mb-1">
                                                     <span className="text-xs font-bold text-slate-500 w-16">Student:</span>
                                                     <span className={`px-3 py-1 rounded-lg text-sm font-bold flex-1 text-center ${!sRight ? 'bg-slate-200 text-slate-500 italic' : isMatchCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                      {sRight ? String(sRight) : '(Left Blank)'}
+                                                      {sRight ? getMatchOptionText(q, 'right', String(sRight)) : '(Left Blank)'}
                                                     </span>
                                                   </div>
                                                   <div className="flex items-center gap-2">
                                                     <span className="text-xs font-bold text-slate-500 w-16">Correct:</span>
                                                     <span className="px-3 py-1 rounded-lg text-sm font-bold bg-slate-200 text-slate-700 flex-1 text-center">
-                                                      {String(corrRight)}
+                                                      {getMatchOptionText(q, 'right', String(corrRight))}
                                                     </span>
                                                   </div>
                                                 </div>

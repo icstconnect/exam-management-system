@@ -230,14 +230,31 @@ export default function ExamWorkspace() {
     socket.emit('submit_answer', { session_id, question_id, selected_option: option });
   };
 
-  const getOptionUsage = (option: string) => {
+  const getFitbOptionText = (optionId: string | null | undefined) => {
+    if (!optionId) return '';
+    for (const xq of questions) {
+      let options: any = [];
+      try {
+        options = typeof xq.options_json === 'string' ? JSON.parse(xq.options_json) : xq.options_json;
+      } catch (e) {
+        options = xq.options_json;
+      }
+      if (Array.isArray(options)) {
+        const found = options.find((opt: any) => opt && (opt.id === optionId || opt.text === optionId));
+        if (found) return found.text;
+      }
+    }
+    return optionId;
+  };
+
+  const getOptionUsage = (optionId: string) => {
     if (!currentSection) return null;
     const secQs = questionsBySection[currentSection.section_id] || [];
     for (const q of secQs) {
       const qId = q.question_id;
       const mapping = fitbAnswers[qId] || {};
       for (const [bIdxStr, assignedOpt] of Object.entries(mapping)) {
-        if (assignedOpt === option) {
+        if (assignedOpt === optionId) {
           const qIndex = questions.findIndex(xq => xq.question_id === qId);
           return { qId, bIdx: parseInt(bIdxStr), qIndex };
         }
@@ -334,7 +351,7 @@ export default function ExamWorkspace() {
                         : 'border-slate-300 bg-slate-50 text-slate-400 hover:bg-slate-200 hover:border-slate-400 border-dashed'
                   }`}
                 >
-                  {assignedOpt || 'Click to select'}
+                  {assignedOpt ? getFitbOptionText(assignedOpt) : 'Click to select'}
                 </button>
                 {assignedOpt && isActive && (
                   <button 
@@ -631,22 +648,36 @@ export default function ExamWorkspace() {
                         </h3>
                         
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          {(currentQuestion.question_type === 'TF' ? ['True', 'False'] : (currentQuestion.options_json || [])).map((option, optIdx) => {
-                            const isSelected = answers[currentQuestion.question_id] === option;
-                            return (
-                              <button
-                                key={optIdx}
-                                onClick={() => handleAnswerSelect(currentQuestion.question_id, option)}
-                                className={`text-left px-6 py-5 rounded-2xl border-2 font-bold transition-all transform hover:scale-[1.01] ${
-                                  isSelected 
-                                    ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm' 
-                                    : 'border-slate-200 hover:border-primary-300 hover:bg-slate-50 text-slate-600'
-                                }`}
-                              >
-                                {currentQuestion.question_type === 'TF' ? (lang === 'bn' ? (option === 'True' ? 'সত্য' : 'মিথ্যা') : option) : option}
-                              </button>
-                            )
-                          })}
+                          {(() => {
+                             const getQuestionOptions = (q: any) => {
+                               if (q.question_type === 'TF') {
+                                 const opts = q.options_json || [];
+                                 if (Array.isArray(opts) && opts.length > 0) {
+                                   return opts;
+                                 }
+                                 return ['True', 'False'];
+                               }
+                               return q.options_json || [];
+                             };
+                             return getQuestionOptions(currentQuestion).map((option: any, optIdx: number) => {
+                               const optionId = typeof option === 'object' && option !== null ? option.id : option;
+                               const optionText = typeof option === 'object' && option !== null ? option.text : option;
+                               const isSelected = answers[currentQuestion.question_id] === optionId;
+                               return (
+                                 <button
+                                   key={optIdx}
+                                   onClick={() => handleAnswerSelect(currentQuestion.question_id, optionId)}
+                                   className={`text-left px-6 py-5 rounded-2xl border-2 font-bold transition-all transform hover:scale-[1.01] ${
+                                     isSelected 
+                                       ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm' 
+                                       : 'border-slate-200 hover:border-primary-300 hover:bg-slate-50 text-slate-600'
+                                   }`}
+                                 >
+                                   {currentQuestion.question_type === 'TF' ? (lang === 'bn' ? (optionText === 'True' ? 'সত্য' : 'মিথ্যা') : optionText) : optionText}
+                                 </button>
+                               );
+                             });
+                           })()}
                         </div>
                       </>
                     )}
@@ -761,13 +792,15 @@ export default function ExamWorkspace() {
               {activeBlank ? <span className="text-primary-600 animate-pulse">Select an option below</span> : 'Answer Bank'}
             </h4>
             <div className="flex flex-wrap gap-3">
-              {(shuffledBanks[currentSection.section_id] || []).map((opt, idx) => {
-                const usage = getOptionUsage(opt);
+              {(shuffledBanks[currentSection.section_id] || []).map((opt: any, idx) => {
+                const optId = typeof opt === 'object' && opt !== null ? opt.id : opt;
+                const optText = typeof opt === 'object' && opt !== null ? opt.text : opt;
+                const usage = getOptionUsage(optId);
                 
                 return (
                   <button
                     key={idx}
-                    onClick={() => handleBankOptionClick(opt)}
+                    onClick={() => handleBankOptionClick(optId)}
                     disabled={!activeBlank && !usage}
                     className={`px-6 py-3 rounded-2xl font-bold transition-all border-2 flex items-center gap-3 ${
                       usage 
@@ -777,7 +810,7 @@ export default function ExamWorkspace() {
                           : 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed opacity-80'
                     }`}
                   >
-                    <span className="text-base">{opt}</span>
+                    <span className="text-base">{optText}</span>
                     {usage && (
                       <span className="text-[10px] font-black uppercase tracking-wider bg-slate-300 text-slate-600 px-2.5 py-1 rounded-full">
                         Q{usage.qIndex + 1}
