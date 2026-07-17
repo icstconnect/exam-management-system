@@ -148,7 +148,7 @@ app.delete('/api/exams/:id', async (req, res) => {
 app.put('/api/exams/:id', async (req, res) => {
   try {
     const exam_id = req.params.id;
-    const { title, duration_minutes, full_marks } = req.body;
+    const { title, duration_minutes, full_marks, target_batch } = req.body;
     await pool.query(
       "UPDATE exams SET title = $1, duration_minutes = $2, full_marks = $3 WHERE exam_id = $4",
       [title, duration_minutes, full_marks, exam_id]

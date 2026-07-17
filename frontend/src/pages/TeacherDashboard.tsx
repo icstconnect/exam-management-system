@@ -54,6 +54,7 @@ const BATCHES = [
   'V,VI,VII Batch -2',
   'VIII,IX Batch - 1',
   'VII,VIII,IX Batch 2',
+  'KIDS III, IV, V',
   'JDX IX,X'
 ];
 
@@ -114,7 +115,7 @@ export default function TeacherDashboard() {
   const [examForm, setExamForm] = useState({ title: '', duration_minutes: 30, target_batch: BATCHES[0], full_marks: 100 });
   const [selectedExamIdBuilder, setSelectedExamIdBuilder] = useState<string | null>(null);
   const [editingExamId, setEditingExamId] = useState<string | null>(null);
-  const [editExamForm, setEditExamForm] = useState({ title: '', duration_minutes: 30, full_marks: 100 });
+  const [editExamForm, setEditExamForm] = useState({ title: '', duration_minutes: 30, full_marks: 100, target_batch: '' });
   
   // Section & Question Builder State
   const [builderSections, setBuilderSections] = useState<Section[]>([]);
@@ -1143,6 +1144,10 @@ export default function TeacherDashboard() {
                         <td colSpan={5} className="p-4">
                           <div className="flex flex-col sm:flex-row gap-4 items-center">
                             <input value={editExamForm.title} onChange={e => setEditExamForm({...editExamForm, title: e.target.value})} className="flex-1 w-full sm:w-auto p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Exam Title" />
+                              <select value={editExamForm.target_batch} onChange={e => setEditExamForm({...editExamForm, target_batch: e.target.value})} className="w-full sm:w-auto p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none bg-white">
+                                <option value="" disabled>Select Batch</option>
+                                {BATCHES.map(b => <option key={b} value={b}>{b}</option>)}
+                              </select>
                             <input type="number" value={editExamForm.duration_minutes} onChange={e => setEditExamForm({...editExamForm, duration_minutes: parseInt(e.target.value)})} className="w-full sm:w-24 p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Mins" />
                             <input type="number" value={editExamForm.full_marks} onChange={e => setEditExamForm({...editExamForm, full_marks: parseInt(e.target.value)})} className="w-full sm:w-24 p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Marks" />
                             <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
@@ -1169,9 +1174,9 @@ export default function TeacherDashboard() {
                         </td>
                         <td className="p-4 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            {exam.status === 'DRAFT' && (
+                            {true && (
                               <button 
-                                onClick={() => { setEditingExamId(exam.exam_id); setEditExamForm({ title: exam.title, duration_minutes: exam.duration_minutes, full_marks: exam.full_marks }); }}
+                                onClick={() => { setEditingExamId(exam.exam_id); setEditExamForm({ title: exam.title, duration_minutes: exam.duration_minutes, full_marks: exam.full_marks, target_batch: exam.target_batch }); }}
                                 className="text-amber-500 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 p-2 rounded-lg transition-colors"
                                 title="Edit Exam"
                               >
@@ -1283,7 +1288,7 @@ export default function TeacherDashboard() {
                             <p className={`text-2xl font-black ${globalMarksLeft === 0 ? 'text-green-500' : 'text-orange-500'}`}>{globalMarksLeft}</p>
                           </div>
                         </div>
-                        {exam.status === 'DRAFT' && (
+                        {true && (
                           <button 
                             onClick={handlePublishExam}
                             disabled={!canPublish}
@@ -1349,11 +1354,15 @@ export default function TeacherDashboard() {
                                   <p className="text-slate-600 mb-3">{q.question_text_bn}</p>
                                   {q.question_type === 'MCQ' && (
                                     <div className="grid grid-cols-2 gap-2 mt-2">
-                                      {q.options_json.map((opt: string, i: number) => (
-                                        <div key={i} className={`p-2 rounded-lg text-sm font-medium border ${opt === q.correct_answer ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-slate-200 text-slate-600'}`}>
-                                          {opt} {opt === q.correct_answer && '✓'}
-                                        </div>
-                                      ))}
+                                      {q.options_json.map((opt: any, i: number) => {
+                                        const optId = typeof opt === 'object' ? opt.id : opt;
+                                        const optText = typeof opt === 'object' ? opt.text : opt;
+                                        return (
+                                          <div key={i} className={`p-2 rounded-lg text-sm font-medium border ${optId === q.correct_answer ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-slate-200 text-slate-600'}`}>
+                                            {optText} {optId === q.correct_answer && '✓'}
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   )}
                                   {q.question_type === 'TF' && (

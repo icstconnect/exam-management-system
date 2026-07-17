@@ -11,7 +11,7 @@ export const socket = io(API_BASE);
 function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-primary-500 selection:text-white">
+      <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 font-sans selection:bg-primary-500 selection:text-white">
         {/* Header */}
         <header className="bg-white shadow-sm sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -27,13 +27,20 @@ function App() {
         </header>
 
         {/* Main Content Route */}
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
           <Routes>
             <Route path="/" element={<Login />} />
             <Route path="/exam/:session_id" element={<ExamWorkspace />} />
             <Route path="/teacher" element={<TeacherDashboard />} />
           </Routes>
         </main>
+
+        {/* Footer */}
+        <footer className="bg-white border-t border-slate-200 py-4 mt-auto">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-slate-500 font-semibold text-sm">
+            ⚡ Developed by - ICST Chowberia
+          </div>
+        </footer>
       </div>
     </Router>
   );
