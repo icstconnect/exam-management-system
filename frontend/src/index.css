@@ -31,3 +31,79 @@ body {
 .bg-gradient-accent {
   background: linear-gradient(135deg, #f43f5e 0%, #f97316 100%);
 }
+
+/* VS Code Dark+ Theme Tokens for PrismJS Syntax Highlighting */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #6a9955;
+  font-style: italic;
+}
+
+.token.punctuation {
+  color: #d4d4d4;
+}
+
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: #b5cea8;
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: #ce9178;
+}
+
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+  color: #d4d4d4;
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: #569cd6;
+  font-weight: 600;
+}
+
+.token.function,
+.token.class-name {
+  color: #dcdcaa;
+}
+
+.token.annotation,
+.token.decorator {
+  color: #cc6633;
+}
+
+.token.type-annotation,
+.token.class-name {
+  color: #4ec9b0;
+}
+
+.token.regex,
+.token.important,
+.token.variable {
+  color: #9cdcfe;
+}
+
+.token.important,
+.token.bold {
+  font-weight: bold;
+}
+.token.italic {
+  font-style: italic;
+}

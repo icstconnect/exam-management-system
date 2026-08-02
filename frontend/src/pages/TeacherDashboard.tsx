@@ -3,6 +3,7 @@ import { socket, API_BASE } from '../App';
 import { Users, Play, Unlock, UserPlus, BookOpen, Plus, Save, AlertTriangle, ArrowLeft, Trash2, Square, Award, Download, Lock, Edit, Eye, X, ChevronLeft, ChevronRight, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
 import * as htmlToImage from 'html-to-image';
 import { jsPDF } from 'jspdf';
+import QuestionTextRenderer, { cleanMathDollars } from '../components/QuestionTextRenderer';
 
 interface StudentSession {
   session_id: string;
@@ -55,7 +56,23 @@ const BATCHES = [
   'VIII,IX Batch - 1',
   'VII,VIII,IX Batch 2',
   'KIDS III, IV, V',
-  'JDX IX,X'
+  'JDX IX,X',
+  'CJE (Java)'
+];
+
+const CLASSES = [
+  'Class 2',
+  'Class 3',
+  'Class 4',
+  'Class 5',
+  'Class 6',
+  'Class 7',
+  'Class 8',
+  'Class 9',
+  'Class 10',
+  'Class 11',
+  'Class 12',
+  'UG'
 ];
 
 const getOptionText = (q: any, optionId: string | null | undefined) => {
@@ -1022,7 +1039,7 @@ export default function TeacherDashboard() {
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Class</label>
                   <select value={newStudent.student_class} onChange={e => setNewStudent({...newStudent, student_class: e.target.value})} className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium">
-                    {[2,3,4,5,6,7,8,9,10,11,12].map(c => <option key={c} value={`Class ${c}`}>Class {c}</option>)}
+                    {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
@@ -1341,8 +1358,13 @@ export default function TeacherDashboard() {
                               {sec.questions.map((q, qidx) => (
                                 <div key={q.question_id} className={`p-4 rounded-xl border ${editingQuestionId === q.question_id ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}>
                                   <div className="flex justify-between items-start mb-2">
-                                    <h5 className="font-bold text-slate-700 text-lg">Q{qidx + 1}. {q.question_text_en}</h5>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-start gap-2 flex-grow pr-4">
+                                      <span className="font-bold text-slate-700 text-lg flex-shrink-0">Q{qidx + 1}.</span>
+                                      <div className="flex-grow">
+                                        <QuestionTextRenderer text={q.question_text_en} textSize="text-base font-bold text-slate-700" />
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-shrink-0">
                                       <span className="bg-primary-100 text-primary-700 font-bold px-3 py-1 rounded-lg text-sm">{q.marks} Marks</span>
                                       {isEditable && (
                                         <button onClick={() => handleEditQuestion(q, sec.section_id)} className="p-1 text-amber-500 hover:text-amber-700 hover:bg-amber-100 rounded-lg transition-colors">
@@ -1351,7 +1373,7 @@ export default function TeacherDashboard() {
                                       )}
                                     </div>
                                   </div>
-                                  <p className="text-slate-600 mb-3">{q.question_text_bn}</p>
+                                  {q.question_text_bn ? <p className="text-slate-600 mb-3">{q.question_text_bn}</p> : null}
                                   {q.question_type === 'MCQ' && (
                                     <div className="grid grid-cols-2 gap-2 mt-2">
                                       {q.options_json.map((opt: any, i: number) => {
@@ -1359,7 +1381,7 @@ export default function TeacherDashboard() {
                                         const optText = typeof opt === 'object' ? opt.text : opt;
                                         return (
                                           <div key={i} className={`p-2 rounded-lg text-sm font-medium border ${optId === q.correct_answer ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-slate-200 text-slate-600'}`}>
-                                            {optText} {optId === q.correct_answer && '✓'}
+                                            {cleanMathDollars(optText)} {optId === q.correct_answer && '✓'}
                                           </div>
                                         );
                                       })}
@@ -1845,7 +1867,7 @@ export default function TeacherDashboard() {
                                         })}
                                       </h3>
                                     ) : (
-                                      <h3 className="text-xl font-semibold text-slate-800 leading-relaxed">{q.question_text_en}</h3>
+                                      <QuestionTextRenderer text={q.question_text_en} textSize="text-xl" />
                                     )}
                                   </div>
                                 </div>

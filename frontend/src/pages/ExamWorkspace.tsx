@@ -5,6 +5,7 @@ import { Languages, AlertTriangle, Clock, CheckCircle2, ChevronRight, X, Downloa
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { MatchQuestionViewer } from '../components/MatchQuestionViewer';
+import QuestionTextRenderer, { cleanMathDollars } from '../components/QuestionTextRenderer';
 
 interface Section {
   section_id: string;
@@ -643,9 +644,9 @@ export default function ExamWorkspace() {
                       />
                     ) : (
                       <>
-                        <h3 className="text-2xl font-semibold text-slate-800 mb-8 mt-2 leading-relaxed">
-                          {getLocalizedText(currentQuestion.question_text_en, currentQuestion.question_text_bn, lang)}
-                        </h3>
+                        <div className="mb-8 mt-2">
+                          <QuestionTextRenderer text={getLocalizedText(currentQuestion.question_text_en, currentQuestion.question_text_bn, lang)} textSize="text-2xl" />
+                        </div>
                         
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           {(() => {
@@ -673,7 +674,7 @@ export default function ExamWorkspace() {
                                        : 'border-slate-200 hover:border-primary-300 hover:bg-slate-50 text-slate-600'
                                    }`}
                                  >
-                                   {currentQuestion.question_type === 'TF' ? (lang === 'bn' ? (optionText === 'True' ? 'সত্য' : 'মিথ্যা') : optionText) : optionText}
+                                   {currentQuestion.question_type === 'TF' ? (lang === 'bn' ? (optionText === 'True' ? 'সত্য' : 'মিথ্যা') : optionText) : cleanMathDollars(optionText)}
                                  </button>
                                );
                              });
