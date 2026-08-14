@@ -48,7 +48,8 @@ export default function ExamWorkspace() {
   const { session_id } = useParams();
   const navigate = useNavigate();
   
-  const [status, setStatus] = useState<'WAITING' | 'STARTED' | 'PAUSED' | 'COMPLETED'>('WAITING');
+  const [status, setStatus] = useState<'LOADING' | 'WAITING' | 'STARTED' | 'PAUSED' | 'COMPLETED' | 'ERROR'>('LOADING');
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const [lang, setLang] = useState<'en' | 'bn'>('en');
   const [waitingInfo, setWaitingInfo] = useState<WaitingInfo | null>(null);
 
@@ -90,6 +91,15 @@ export default function ExamWorkspace() {
     }
 
     socket.emit('workspace_ready', { session_id });
+
+    socket.on('exam_waiting', () => {
+      setStatus('WAITING');
+    });
+
+    socket.on('session_error', (data: { message: string }) => {
+      setErrorMessage(data.message || 'Session error');
+      setStatus('ERROR');
+    });
 
     socket.on('exam_started', (data: { questions: Question[], sections: Section[], seconds_left: number, previous_answers: Record<string, string> }) => {
       let fetchedQuestions = data.questions || [];
@@ -165,11 +175,13 @@ export default function ExamWorkspace() {
     socket.on('time_tick', (data: { seconds_left: number }) => setSecondsLeft(data.seconds_left));
 
     return () => {
+      socket.off('exam_waiting');
       socket.off('exam_started');
       socket.off('exam_paused');
       socket.off('exam_resumed');
       socket.off('exam_completed');
       socket.off('exam_ended');
+      socket.off('session_error');
       socket.off('time_tick');
     };
   }, [session_id, navigate]);
@@ -513,6 +525,40 @@ export default function ExamWorkspace() {
     const s = (totalSeconds % 60).toString().padStart(2, '0');
     return `${m}:${s}`;
   };
+
+  // ==========================================
+  // LOADING / CONNECTING SCREEN
+  // ==========================================
+  if (status === 'LOADING') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+        <div className="w-16 h-16 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mb-6"></div>
+        <h3 className="text-2xl font-black text-slate-800 mb-2">Connecting to Examination...</h3>
+        <p className="text-sm font-semibold text-slate-400 max-w-sm">Verifying your student session and exam configuration. Please wait a moment.</p>
+      </div>
+    );
+  }
+
+  // ==========================================
+  // ERROR SCREEN
+  // ==========================================
+  if (status === 'ERROR') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+        <div className="w-20 h-20 mb-6 rounded-3xl bg-red-100 flex items-center justify-center shadow-lg border border-red-200">
+          <AlertTriangle className="text-red-600" size={40} />
+        </div>
+        <h2 className="text-2xl font-black text-red-600 mb-2">Examination Notice</h2>
+        <p className="text-slate-600 font-bold max-w-md mb-6 text-sm leading-relaxed">{errorMessage || 'Invalid session or no active exam found.'}</p>
+        <button 
+          onClick={() => navigate('/')} 
+          className="bg-slate-800 hover:bg-black text-white px-6 py-3 rounded-xl font-bold text-sm transition-all shadow-md"
+        >
+          Back to Student Login
+        </button>
+      </div>
+    );
+  }
 
   // ==========================================
   // WAITING / INSTRUCTION SCREEN (INFOGRAPHIC)

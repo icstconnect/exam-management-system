@@ -174,6 +174,10 @@ export default function TeacherDashboard() {
   const [builderStatus, setBuilderStatus] = useState('');
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
   const [isDownloadingQuestionPaper, setIsDownloadingQuestionPaper] = useState(false);
+  const [confirmDeleteExam, setConfirmDeleteExam] = useState<Exam | null>(null);
+  const [isDeletingExam, setIsDeletingExam] = useState(false);
+  const [deleteExamError, setDeleteExamError] = useState('');
+  const [deleteSuccessToast, setDeleteSuccessToast] = useState('');
 
   // Monitor State
   const [selectedMonitorExamId, setSelectedMonitorExamId] = useState<string>('');
@@ -678,6 +682,34 @@ export default function TeacherDashboard() {
         setEditingExamId(null);
       }
     } catch (e) { console.error(e); }
+  };
+
+  const handleExecuteDeleteExam = async () => {
+    if (!confirmDeleteExam || isDeletingExam) return;
+    setIsDeletingExam(true);
+    setDeleteExamError('');
+
+    try {
+      const res = await fetch(`${API_BASE}/api/exams/${confirmDeleteExam.exam_id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        setExamsList(prev => prev.filter(e => e.exam_id !== confirmDeleteExam.exam_id));
+        setDeleteSuccessToast(`Examination '${confirmDeleteExam.title}' removed from active sets. Historical results and student responses remain safely preserved.`);
+        setTimeout(() => setDeleteSuccessToast(''), 6000);
+        setConfirmDeleteExam(null);
+        fetchData();
+      } else {
+        setDeleteExamError(data.error || 'Failed to delete examination.');
+      }
+    } catch (e) {
+      console.error('Error deleting exam:', e);
+      setDeleteExamError('Network error while deleting examination. Please try again.');
+    } finally {
+      setIsDeletingExam(false);
+    }
   };
 
   // Section Builder Handlers
@@ -1683,6 +1715,16 @@ export default function TeacherDashboard() {
                 </button>
               </div>
 
+              {deleteSuccessToast && (
+                <div className="mb-4 p-3.5 bg-green-50 border border-green-200 text-green-800 rounded-2xl text-xs font-bold flex items-center justify-between shadow-sm animate-fade-in">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                    <span>{deleteSuccessToast}</span>
+                  </div>
+                  <button onClick={() => setDeleteSuccessToast('')} className="text-green-600 hover:text-green-800 font-black"><X size={14}/></button>
+                </div>
+              )}
+
               {/* Exams Table */}
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
@@ -1724,7 +1766,7 @@ export default function TeacherDashboard() {
                           </span>
                         </td>
                         <td className="py-3.5 px-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-1.5">
                             <button
                               onClick={() => handleDownloadTeacherQuestionPaper(e.exam_id, e.title)}
                               title="Download Full Question Set with Answers (PDF)"
@@ -1741,9 +1783,20 @@ export default function TeacherDashboard() {
                             </button>
                             <button
                               onClick={() => handleOpenEditExam(e)}
+                              title="Edit Examination Configuration"
                               className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-slate-100 rounded-lg"
                             >
                               <Edit size={16} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setDeleteExamError('');
+                                setConfirmDeleteExam(e);
+                              }}
+                              title="Delete Examination"
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            >
+                              <Trash2 size={16} />
                             </button>
                           </div>
                         </td>
@@ -2228,6 +2281,59 @@ export default function TeacherDashboard() {
                     <button type="submit" className="flex-1 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-md">Save Changes</button>
                   </div>
                 </form>
+              </div>
+            </div>
+          )}
+
+          {/* Delete Exam Safe Confirmation Modal */}
+          {confirmDeleteExam && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-100 text-center animate-scale-up">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <AlertTriangle className="text-red-600" size={32} />
+                </div>
+                <h3 className="text-2xl font-black text-slate-800 mb-2">Delete Examination?</h3>
+                <p className="text-slate-600 text-sm font-semibold mb-3">
+                  Are you sure you want to delete <span className="font-bold text-slate-800">&quot;{confirmDeleteExam.title}&quot;</span>?
+                </p>
+                
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs text-slate-600 font-medium mb-6 text-left space-y-1.5">
+                  <p className="flex items-center gap-2 text-slate-800 font-extrabold">
+                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                    Previously recorded examination results will NOT be deleted.
+                  </p>
+                  <p className="text-slate-500 pl-4 leading-relaxed">
+                    This will remove the examination from the active Examination Sets list. All student scores, attempt histories, and submitted answer sheets will remain safely preserved in the Results tab.
+                  </p>
+                </div>
+
+                {deleteExamError && (
+                  <div className="bg-red-50 border border-red-200 text-red-600 rounded-xl p-3 text-xs font-bold mb-4">
+                    {deleteExamError}
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => { setConfirmDeleteExam(null); setDeleteExamError(''); }}
+                    disabled={isDeletingExam}
+                    className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={handleExecuteDeleteExam}
+                    disabled={isDeletingExam}
+                    className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2"
+                  >
+                    {isDeletingExam ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <Trash2 size={16} />
+                    )}
+                    {isDeletingExam ? 'Deleting...' : 'Delete Examination'}
+                  </button>
+                </div>
               </div>
             </div>
           )}

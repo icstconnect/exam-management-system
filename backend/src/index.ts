@@ -306,6 +306,7 @@ app.get('/api/exams', async (req, res) => {
         ) as assigned_batches
       FROM exams e
       LEFT JOIN exam_batches eb ON e.exam_id = eb.exam_id
+      WHERE COALESCE(e.is_deleted, false) = false
       GROUP BY e.exam_id
       ORDER BY e.scheduled_start DESC NULLS LAST, e.title ASC
     `);
@@ -401,21 +402,36 @@ app.put('/api/exams/:id', async (req, res) => {
   }
 });
 
+// Safe Soft Delete for Examination Sets (Preserves historical runs, sessions, scores, and answer sheets)
 app.delete('/api/exams/:id', async (req, res) => {
   try {
     const exam_id = req.params.id;
-    await pool.query("DELETE FROM student_responses WHERE session_id IN (SELECT session_id FROM exam_sessions WHERE exam_id = $1)", [exam_id]);
-    await pool.query("DELETE FROM exam_session_question_order WHERE session_id IN (SELECT session_id FROM exam_sessions WHERE exam_id = $1)", [exam_id]);
-    await pool.query("DELETE FROM exam_sessions WHERE exam_id = $1", [exam_id]);
-    await pool.query("DELETE FROM exam_runs WHERE exam_id = $1", [exam_id]);
-    await pool.query("DELETE FROM exam_batches WHERE exam_id = $1", [exam_id]);
-    await pool.query("DELETE FROM questions WHERE exam_id = $1", [exam_id]);
-    await pool.query("DELETE FROM exam_sections WHERE exam_id = $1", [exam_id]);
-    await pool.query("DELETE FROM exams WHERE exam_id = $1", [exam_id]);
-    res.json({ success: true });
+    const examRes = await pool.query("SELECT exam_id, title, status, is_deleted FROM exams WHERE exam_id = $1", [exam_id]);
+    if (examRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Examination not found' });
+    }
+    const exam = examRes.rows[0];
+
+    // Prevent accidental deletion of currently running / paused exam
+    if (exam.status === 'STARTED' || exam.status === 'PAUSED') {
+      return res.status(400).json({ 
+        error: `This examination is currently active (Status: ${exam.status}). Please stop/end the examination before deleting the examination set.` 
+      });
+    }
+
+    // Soft-delete examination definition: historical runs, sessions, responses, and questions remain intact
+    await pool.query(
+      "UPDATE exams SET is_deleted = TRUE, deleted_at = CURRENT_TIMESTAMP WHERE exam_id = $1",
+      [exam_id]
+    );
+
+    res.json({ 
+      success: true, 
+      message: `Examination '${exam.title}' deleted successfully. Previously recorded examination results have been preserved.` 
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to delete exam' });
+    console.error('Error soft-deleting exam:', err);
+    res.status(500).json({ error: 'Failed to delete examination' });
   }
 });
 
@@ -902,7 +918,7 @@ app.get('/api/exams/:id/results/:student_id/answers', async (req, res) => {
 
 app.get('/api/exams/active', async (req, res) => {
   try {
-    const result = await pool.query("SELECT exam_id, title, duration_minutes, status FROM exams WHERE status = 'STARTED' ORDER BY scheduled_start DESC LIMIT 1");
+    const result = await pool.query("SELECT exam_id, title, duration_minutes, status FROM exams WHERE status = 'STARTED' AND COALESCE(is_deleted, false) = false ORDER BY scheduled_start DESC LIMIT 1");
     if (result.rows.length > 0) {
       res.json({ active_exam: result.rows[0] });
     } else {
@@ -1079,29 +1095,89 @@ io.on('connection', (socket: Socket) => {
     try {
       const { student_id, password_provided } = data;
 
-      // Find the most relevant active session for the student
-      const result = await pool.query(`
-        SELECT es.*, e.status as exam_global_status, s.batch as student_batch
-        FROM exam_sessions es
-        JOIN exams e ON es.exam_id = e.exam_id
-        JOIN students s ON es.student_id = s.student_id
-        WHERE es.student_id = $1 AND e.status != 'ENDED'
+      // 1. Verify student exists and get details
+      const studentRes = await pool.query("SELECT student_id, name, batch, class FROM students WHERE student_id = $1", [student_id]);
+      if (studentRes.rows.length === 0) {
+        socket.emit('login_error', { message: 'Student ID not found in database.' });
+        return;
+      }
+      const student = studentRes.rows[0];
+
+      // 2. Identify the CURRENT active or scheduled examination for the student's batch
+      const examRes = await pool.query(`
+        SELECT e.exam_id, e.title, e.duration_minutes, e.status, e.scheduled_start, e.target_batch
+        FROM exams e
+        LEFT JOIN exam_batches eb ON eb.exam_id = e.exam_id
+        WHERE (eb.batch_name = $1 OR e.target_batch = $1)
+          AND e.status != 'ENDED'
         ORDER BY 
           CASE WHEN e.status = 'STARTED' THEN 1
                WHEN e.status = 'PAUSED' THEN 2
                WHEN e.status = 'CREATED' THEN 3
                ELSE 4 END,
-          e.scheduled_start DESC NULLS LAST
+          e.scheduled_start DESC NULLS LAST,
+          e.exam_id DESC
         LIMIT 1
-      `, [student_id]);
+      `, [student.batch]);
 
-      if (result.rows.length === 0) {
-        socket.emit('login_error', { message: 'No active exams found for your account.' });
+      if (examRes.rows.length === 0) {
+        socket.emit('login_error', { message: `No active or scheduled exam found for your batch (${student.batch || 'Unassigned'}). Please wait for your teacher.` });
         return;
       }
 
-      const session = result.rows[0];
-      if (session.password_provided !== password_provided) {
+      const activeExam = examRes.rows[0];
+      const exam_id = activeExam.exam_id;
+
+      // 3. Find if there is an active exam_run for this exam
+      const runRes = await pool.query("SELECT run_id FROM exam_runs WHERE exam_id = $1 AND status = 'ACTIVE' ORDER BY created_at DESC LIMIT 1", [exam_id]);
+      const activeRunId = runRes.rows[0]?.run_id || null;
+
+      const defaultPassword = `${student.name.split(' ')[0].toUpperCase()}@${student_id}`;
+      let session: any = null;
+
+      if (activeRunId) {
+        // Look for session belonging specifically to this active run
+        const runSessionRes = await pool.query(
+          "SELECT * FROM exam_sessions WHERE exam_id = $1 AND student_id = $2 AND run_id = $3",
+          [exam_id, student_id, activeRunId]
+        );
+        if (runSessionRes.rows.length > 0) {
+          session = runSessionRes.rows[0];
+        } else {
+          // Auto-create session for this active run
+          const newSessionId = require('crypto').randomUUID();
+          const createdSession = await pool.query(`
+            INSERT INTO exam_sessions (session_id, exam_id, student_id, run_id, status, password_provided)
+            VALUES ($1, $2, $3, $4, 'LOGGED_IN', $5)
+            RETURNING *
+          `, [newSessionId, exam_id, student_id, activeRunId, defaultPassword]);
+          session = createdSession.rows[0];
+        }
+      } else {
+        // Exam is in CREATED status (upcoming/retest). Look for non-completed session or create new
+        const createdSessionRes = await pool.query(`
+          SELECT * FROM exam_sessions 
+          WHERE exam_id = $1 AND student_id = $2 AND status != 'COMPLETED'
+          ORDER BY last_active_timestamp DESC NULLS LAST, session_id DESC
+          LIMIT 1
+        `, [exam_id, student_id]);
+
+        if (createdSessionRes.rows.length > 0) {
+          session = createdSessionRes.rows[0];
+        } else {
+          const newSessionId = require('crypto').randomUUID();
+          const createdSession = await pool.query(`
+            INSERT INTO exam_sessions (session_id, exam_id, student_id, status, password_provided)
+            VALUES ($1, $2, $3, 'READY', $4)
+            RETURNING *
+          `, [newSessionId, exam_id, student_id, defaultPassword]);
+          session = createdSession.rows[0];
+        }
+      }
+
+      // 4. Validate password
+      const expectedPassword = session.password_provided || defaultPassword;
+      if (password_provided !== expectedPassword && password_provided !== defaultPassword) {
         socket.emit('login_error', { message: 'Incorrect password.' });
         return;
       }
@@ -1111,24 +1187,31 @@ io.on('connection', (socket: Socket) => {
         await pool.query("UPDATE exam_sessions SET status = 'LOGGED_IN' WHERE session_id = $1", [session.session_id]);
         newStatus = 'LOGGED_IN';
       }
-      
-      // Ensure question order is generated and persisted
-      await ensureStudentQuestionOrder(session.session_id, session.exam_id, session.student_batch);
+
+      // Ensure deterministic question order is created
+      await ensureStudentQuestionOrder(session.session_id, exam_id, student.batch);
 
       // Join socket rooms
       socket.join(session.session_id);
-      socket.join(`exam_${session.exam_id}`);
-      
-      socket.emit('login_success', { session_id: session.session_id, student_id });
-      
-      // Notify Teacher dashboard
+      socket.join(`exam_${exam_id}`);
+
+      socket.emit('login_success', {
+        session_id: session.session_id,
+        student_id,
+        exam_id,
+        exam_title: activeExam.title,
+        exam_status: activeExam.status,
+        session_status: newStatus
+      });
+
+      // Notify teacher dashboard
       io.to('teacher_dashboard').emit('student_status_update', {
         student_id,
         status: newStatus
       });
-      
+
     } catch (err) {
-      console.error(err);
+      console.error('Error during student login:', err);
       socket.emit('login_error', { message: 'Server error during login.' });
     }
   });
@@ -1148,73 +1231,90 @@ io.on('connection', (socket: Socket) => {
 
   // Student workspace ready
   socket.on('workspace_ready', async (data: { session_id: string }) => {
-    socket.join(data.session_id);
     try {
+      if (!data.session_id) {
+        socket.emit('session_error', { message: 'Session ID is required.' });
+        return;
+      }
+      socket.join(data.session_id);
+
       const sessionRes = await pool.query(`
-        SELECT es.exam_id, es.status, es.seconds_left, s.batch as student_batch
+        SELECT es.session_id, es.exam_id, es.student_id, es.run_id, es.status as session_status, es.seconds_left, s.batch as student_batch, e.status as exam_status, e.global_seconds_left
         FROM exam_sessions es
         JOIN students s ON es.student_id = s.student_id
+        JOIN exams e ON es.exam_id = e.exam_id
         WHERE es.session_id = $1
       `, [data.session_id]);
 
-      if (sessionRes.rows.length > 0) {
-        const session = sessionRes.rows[0];
-        socket.join(`exam_${session.exam_id}`);
+      if (sessionRes.rows.length === 0) {
+        socket.emit('session_error', { message: 'Session not found. Please log in again.' });
+        return;
+      }
+
+      const session = sessionRes.rows[0];
+      socket.join(`exam_${session.exam_id}`);
+
+      // Ensure deterministic question order is ready
+      await ensureStudentQuestionOrder(data.session_id, session.exam_id, session.student_batch);
+
+      // Handle completed state
+      if (session.session_status === 'COMPLETED' || session.exam_status === 'ENDED') {
+        socket.emit('exam_completed');
+        return;
+      }
+
+      // Handle waiting state for unstarted exam
+      if (session.exam_status === 'CREATED' || session.session_status === 'READY' || session.session_status === 'LOGGED_IN') {
+        socket.emit('exam_waiting');
+        return;
+      }
+
+      // Handle active/started exam
+      if (session.exam_status === 'STARTED' || session.exam_status === 'PAUSED') {
+        let currentSecondsLeft = session.global_seconds_left;
         
-        const examRes = await pool.query("SELECT status, duration_minutes, global_seconds_left FROM exams WHERE exam_id = $1", [session.exam_id]);
-        
-        if (session.status === 'COMPLETED' || examRes.rows[0].status === 'ENDED') {
-          socket.emit('exam_completed');
-          return;
+        if (session.session_status !== 'EXAMINEE' && session.session_status !== 'PAUSED') {
+          await pool.query("UPDATE exam_sessions SET status = 'EXAMINEE' WHERE session_id = $1", [data.session_id]);
+          io.to('teacher_dashboard').emit('student_status_update', {
+            student_id: session.student_id,
+            status: 'EXAMINEE'
+          });
         }
 
-        // Ensure deterministic question order is ready
-        await ensureStudentQuestionOrder(data.session_id, session.exam_id, session.student_batch);
+        // Fetch sections
+        const sectionsRes = await pool.query("SELECT section_id, title, section_type, section_marks FROM exam_sections WHERE exam_id = $1 ORDER BY section_id", [session.exam_id]);
+        
+        // Fetch questions ordered strictly by persisted display_order
+        const questionsRes = await pool.query(`
+          SELECT q.question_id, q.section_id, q.question_type, q.question_text_en, q.question_text_bn, q.options_json, q.marks
+          FROM questions q
+          JOIN exam_session_question_order qo ON qo.question_id = q.question_id
+          WHERE qo.session_id = $1
+          ORDER BY qo.display_order ASC
+        `, [data.session_id]);
+        
+        // Fetch previously saved answers for this session
+        const answersRes = await pool.query("SELECT question_id, selected_option FROM student_responses WHERE session_id = $1", [data.session_id]);
+        const previousAnswers = answersRes.rows.reduce((acc: any, row: any) => {
+          acc[row.question_id] = row.selected_option;
+          return acc;
+        }, {});
 
-        if (examRes.rows[0].status === 'STARTED') {
-          let currentSecondsLeft = examRes.rows[0].global_seconds_left;
-          
-          if (session.status !== 'EXAMINEE' && session.status !== 'PAUSED') {
-            await pool.query("UPDATE exam_sessions SET status = 'EXAMINEE' WHERE session_id = $1", [data.session_id]);
-            const studentRes = await pool.query("SELECT student_id FROM exam_sessions WHERE session_id = $1", [data.session_id]);
-            io.to('teacher_dashboard').emit('student_status_update', {
-              student_id: studentRes.rows[0].student_id,
-              status: 'EXAMINEE'
-            });
-          }
+        socket.emit('exam_started', { 
+          questions: questionsRes.rows, 
+          sections: sectionsRes.rows, 
+          seconds_left: currentSecondsLeft, 
+          previous_answers: previousAnswers 
+        });
 
-          // Fetch sections
-          const sectionsRes = await pool.query("SELECT section_id, title, section_type, section_marks FROM exam_sections WHERE exam_id = $1 ORDER BY section_id", [session.exam_id]);
-          
-          // Fetch questions ordered strictly by persisted display_order
-          const questionsRes = await pool.query(`
-            SELECT q.question_id, q.section_id, q.question_type, q.question_text_en, q.question_text_bn, q.options_json, q.marks
-            FROM questions q
-            JOIN exam_session_question_order qo ON qo.question_id = q.question_id
-            WHERE qo.session_id = $1
-            ORDER BY qo.display_order ASC
-          `, [data.session_id]);
-          
-          // Fetch previously saved answers for this session
-          const answersRes = await pool.query("SELECT question_id, selected_option FROM student_responses WHERE session_id = $1", [data.session_id]);
-          const previousAnswers = answersRes.rows.reduce((acc: any, row: any) => {
-            acc[row.question_id] = row.selected_option;
-            return acc;
-          }, {});
-
-          socket.emit('exam_started', { 
-            questions: questionsRes.rows, 
-            sections: sectionsRes.rows, 
-            seconds_left: currentSecondsLeft, 
-            previous_answers: previousAnswers 
-          });
-
-          if (session.status === 'PAUSED') {
-            socket.emit('exam_paused');
-          }
+        if (session.session_status === 'PAUSED' || session.exam_status === 'PAUSED') {
+          socket.emit('exam_paused');
         }
       }
-    } catch(e) { console.error(e); }
+    } catch(e) { 
+      console.error('workspace_ready error:', e); 
+      socket.emit('session_error', { message: 'Failed to initialize examination workspace.' });
+    }
   });
 
   // Submit Answer

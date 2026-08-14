@@ -20,7 +20,9 @@ CREATE TABLE IF NOT EXISTS exams (
   scheduled_start TIMESTAMP,
   actual_start_time TIMESTAMP,
   actual_end_time TIMESTAMP,
-  global_seconds_left INTEGER
+  global_seconds_left INTEGER,
+  is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+  deleted_at TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS exam_sections (
