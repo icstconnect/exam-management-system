@@ -1,15 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { socket, API_BASE } from '../App';
-import { Users, Play, Unlock, UserPlus, BookOpen, Plus, Save, AlertTriangle, ArrowLeft, Trash2, Square, Award, Download, Lock, Edit, Eye, X, ChevronLeft, ChevronRight, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
-import * as htmlToImage from 'html-to-image';
+import { Users, Play, Unlock, UserPlus, BookOpen, Plus, AlertTriangle, ArrowLeft, Trash2, Square, Award, Download, Lock, Edit, Eye, X, ChevronLeft, ChevronRight, RotateCcw, Search, Shuffle, Layers, ArrowRightLeft, FileText } from 'lucide-react';
 import { jsPDF } from 'jspdf';
-import QuestionTextRenderer, { cleanMathDollars } from '../components/QuestionTextRenderer';
 
 interface StudentSession {
   session_id: string;
   student_id: string;
   name: string;
-  status: 'LOGGED_IN' | 'EXAMINEE' | 'PAUSED' | 'COMPLETED' | 'ABSENT';
+  batch?: string;
+  class?: string;
+  status: 'LOGGED_IN' | 'EXAMINEE' | 'PAUSED' | 'COMPLETED' | 'ABSENT' | 'READY';
   tab_violation_count: number;
   seconds_left: number | null;
   password_provided?: string;
@@ -23,6 +23,22 @@ interface Student {
   batch: string;
 }
 
+interface BatchItem {
+  batch_id: string;
+  name: string;
+  course_class: string;
+  session: string;
+  description: string;
+  status: string;
+  student_count: number;
+  created_at: string;
+}
+
+interface ExamBatchConfig {
+  batch_name: string;
+  shuffle_enabled: boolean;
+}
+
 interface Exam {
   exam_id: string;
   title: string;
@@ -30,6 +46,7 @@ interface Exam {
   target_batch: string;
   full_marks: number;
   status: 'DRAFT' | 'CREATED' | 'STARTED' | 'PAUSED' | 'ENDED';
+  assigned_batches?: ExamBatchConfig[];
 }
 
 interface Section {
@@ -48,9 +65,27 @@ interface ResultData {
   full_marks: number;
   status: string;
   tab_violation_count: number;
+  batch?: string;
+  class?: string;
+  session_id?: string;
 }
 
-const BATCHES = [
+interface ExamRun {
+  run_id: string;
+  exam_id: string;
+  exam_name: string;
+  created_at: string;
+  started_at: string | null;
+  ended_at: string | null;
+  status: string;
+  exam_title: string;
+  duration_minutes: number;
+  full_marks: number;
+  total_students: number;
+  completed_students: number;
+}
+
+const DEFAULT_BATCHES = [
   'V,VI Batch 1',
   'V,VI,VII Batch -2',
   'VIII,IX Batch - 1',
@@ -75,39 +110,7 @@ const CLASSES = [
   'UG'
 ];
 
-const getOptionText = (q: any, optionId: string | null | undefined) => {
-  if (!optionId) return '';
-  if (q.question_type === 'TF') {
-    if (optionId === 'opt_true' || optionId === 'True') return 'True';
-    if (optionId === 'opt_false' || optionId === 'False') return 'False';
-  }
-  let options: any = [];
-  try {
-    options = typeof q.options_json === 'string' ? JSON.parse(q.options_json) : q.options_json;
-  } catch (e) {
-    options = q.options_json;
-  }
-  if (Array.isArray(options)) {
-    const found = options.find((opt: any) => opt && (opt.id === optionId || opt.text === optionId));
-    if (found) return found.text;
-  }
-  return optionId;
-};
 
-const getMatchOptionText = (q: any, side: 'left' | 'right', optionId: string | null | undefined) => {
-  if (!optionId) return '';
-  let options: any = { left: [], right: [] };
-  try {
-    options = typeof q.options_json === 'string' ? JSON.parse(q.options_json) : q.options_json;
-  } catch (e) {
-    options = q.options_json;
-  }
-  if (options && Array.isArray(options[side])) {
-    const found = options[side].find((opt: any) => opt && (opt.id === optionId || opt.text === optionId));
-    if (found) return found.text;
-  }
-  return optionId;
-};
 
 export default function TeacherDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -115,56 +118,148 @@ export default function TeacherDashboard() {
   const [authError, setAuthError] = useState('');
 
   useEffect(() => {
-    document.title = "Teacher Panel";
+    document.title = "Teacher Panel - ICST";
   }, []);
 
-  const [activeTab, setActiveTab] = useState<'MONITOR' | 'REGISTRATION' | 'EXAMS' | 'RESULTS'>('MONITOR');
+  const [activeTab, setActiveTab] = useState<'MONITOR' | 'REGISTRATION' | 'BATCHES' | 'EXAMS' | 'RESULTS'>('MONITOR');
   
   // Registration State
   const [students, setStudents] = useState<Student[]>([]);
-  const [newStudent, setNewStudent] = useState({ student_id: '', name: '', phone_no: '', student_class: 'Class 5', batch: BATCHES[0] });
+  const [newStudent, setNewStudent] = useState({ student_id: '', name: '', phone_no: '', student_class: 'Class 5', batch: DEFAULT_BATCHES[0] });
   const [searchStudentQuery, setSearchStudentQuery] = useState('');
   const [isEditingStudent, setIsEditingStudent] = useState(false);
+
+  // Batches State
+  const [batchesList, setBatchesList] = useState<BatchItem[]>([]);
+  const [batchSearchQuery, setBatchSearchQuery] = useState('');
+  const [creatingBatch, setCreatingBatch] = useState(false);
+  const [newBatchForm, setNewBatchForm] = useState({ name: '', course_class: 'Class 5', session: '2026', description: '', status: 'ACTIVE' });
+  const [editingBatch, setEditingBatch] = useState<BatchItem | null>(null);
+  const [viewingBatchStudents, setViewingBatchStudents] = useState<BatchItem | null>(null);
+  const [batchStudents, setBatchStudents] = useState<Student[]>([]);
+  const [selectedStudentsToMove, setSelectedStudentsToMove] = useState<string[]>([]);
+  const [targetMoveBatch, setTargetMoveBatch] = useState<string>('');
 
   // Exams Management State
   const [examsList, setExamsList] = useState<Exam[]>([]);
   const [creatingExam, setCreatingExam] = useState(false);
-  const [examForm, setExamForm] = useState({ title: '', duration_minutes: 30, target_batch: BATCHES[0], full_marks: 100 });
+  const [examForm, setExamForm] = useState({ 
+    title: '', 
+    duration_minutes: 30, 
+    full_marks: 100, 
+    assigned_batches: [{ batch_name: DEFAULT_BATCHES[0], shuffle_enabled: false }] 
+  });
   const [selectedExamIdBuilder, setSelectedExamIdBuilder] = useState<string | null>(null);
   const [editingExamId, setEditingExamId] = useState<string | null>(null);
-  const [editExamForm, setEditExamForm] = useState({ title: '', duration_minutes: 30, full_marks: 100, target_batch: '' });
+  const [editExamForm, setEditExamForm] = useState({ 
+    title: '', 
+    duration_minutes: 30, 
+    full_marks: 100, 
+    assigned_batches: [] as ExamBatchConfig[] 
+  });
   
   // Section & Question Builder State
   const [builderSections, setBuilderSections] = useState<Section[]>([]);
   const [newSectionForm, setNewSectionForm] = useState({ title: '', section_marks: 20, section_type: 'MCQ' });
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
-  const [questionForm, setQuestionForm] = useState({ text_en: '', text_bn: '', options: ['', '', '', ''], correct_answer: '', marks: 1, fitb_blanks: [''], fitb_extras: [] as string[], match_pairs: [{ left: '', right: '' }, { left: '', right: '' }] });
+  const [questionForm, setQuestionForm] = useState({ 
+    text_en: '', text_bn: '', 
+    options: ['', '', '', ''], 
+    correct_answer: '', 
+    marks: 1, 
+    fitb_blanks: [''], 
+    fitb_extras: [] as string[], 
+    match_pairs: [{ left: '', right: '' }, { left: '', right: '' }] 
+  });
   const [builderStatus, setBuilderStatus] = useState('');
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
+  const [isDownloadingQuestionPaper, setIsDownloadingQuestionPaper] = useState(false);
 
   // Monitor State
   const [selectedMonitorExamId, setSelectedMonitorExamId] = useState<string>('');
   const [studentsSession, setStudentsSession] = useState<StudentSession[]>([]);
-  const [recoveryPrompt, setRecoveryPrompt] = useState<Exam | null>(null);
   const [examSecondsLeft, setExamSecondsLeft] = useState<number | null>(null);
-  const [isEnding, setIsEnding] = useState(false);
 
-  // Results State
-  const [selectedResultExamId, setSelectedResultExamId] = useState<string>('');
-  const [resultsData, setResultsData] = useState<ResultData[]>([]);
-  const resultsRef = useRef<HTMLDivElement>(null);
+  // Examination Name Initialization Modal
+  const [showInitModal, setShowInitModal] = useState(false);
+  const [initExamName, setInitExamName] = useState('');
+  const [initTargetStudentId, setInitTargetStudentId] = useState<string | null>(null);
+
+  // Results State (Paginated Runs)
+  const [examRuns, setExamRuns] = useState<ExamRun[]>([]);
+  const [examRunsSearch, setExamRunsSearch] = useState('');
+  const [examRunsOffset, setExamRunsOffset] = useState(0);
+  const [examRunsTotal, setExamRunsTotal] = useState(0);
+  const [isRunsLoading, setIsRunsLoading] = useState(false);
+  const [selectedRun, setSelectedRun] = useState<ExamRun | null>(null);
+  const [runResultsData, setRunResultsData] = useState<ResultData[]>([]);
 
   // Answer Sheet View State
   const [selectedStudentForAnswers, setSelectedStudentForAnswers] = useState<string | null>(null);
   const [answerSheetData, setAnswerSheetData] = useState<any>(null);
   const [isAnswerSheetLoading, setIsAnswerSheetLoading] = useState(false);
 
-  const openAnswerSheet = async (student_id: string) => {
+  const fetchBatches = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/batches`);
+      if (res.ok) setBatchesList(await res.json());
+    } catch (e) { console.error('Error fetching batches:', e); }
+  };
+
+  const fetchExamRuns = async (offset = 0, search = '') => {
+    setIsRunsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/exam-runs?limit=10&offset=${offset}&search=${encodeURIComponent(search)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setExamRuns(data.runs || []);
+        setExamRunsTotal(data.total_count || 0);
+        setExamRunsOffset(data.offset || 0);
+      }
+    } catch (e) {
+      console.error('Error fetching exam runs:', e);
+    } finally {
+      setIsRunsLoading(false);
+    }
+  };
+
+  const openRunResults = async (run: ExamRun) => {
+    setSelectedRun(run);
+    setRunResultsData([]);
+    try {
+      const res = await fetch(`${API_BASE}/api/exam-runs/${run.run_id}/results`);
+      if (res.ok) {
+        const data = await res.json();
+        setRunResultsData(data.results || []);
+      }
+    } catch (e) {
+      console.error('Error loading run results:', e);
+    }
+  };
+
+  const deleteExamRun = async (runId: string) => {
+    if (!window.confirm('Are you sure you want to permanently delete this examination run and its student results?')) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/exam-runs/${runId}`, { method: 'DELETE' });
+      if (res.ok) {
+        if (selectedRun?.run_id === runId) {
+          setSelectedRun(null);
+          setRunResultsData([]);
+        }
+        fetchExamRuns(examRunsOffset, examRunsSearch);
+      }
+    } catch (e) {
+      console.error('Error deleting exam run:', e);
+    }
+  };
+
+  const openAnswerSheet = async (student_id: string, exam_id?: string) => {
     setSelectedStudentForAnswers(student_id);
     setAnswerSheetData(null);
     setIsAnswerSheetLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/exams/${selectedResultExamId}/results/${student_id}/answers`);
+      const targetExamId = exam_id || selectedRun?.exam_id || selectedMonitorExamId;
+      const res = await fetch(`${API_BASE}/api/exams/${targetExamId}/results/${student_id}/answers`);
       if (res.ok) {
         setAnswerSheetData(await res.json());
       }
@@ -181,82 +276,129 @@ export default function TeacherDashboard() {
   };
   
   const navigateAnswerSheet = (direction: 'prev' | 'next') => {
-    if (!selectedStudentForAnswers || resultsData.length === 0) return;
-    const currentIndex = resultsData.findIndex(r => r.student_id === selectedStudentForAnswers);
+    if (!selectedStudentForAnswers || runResultsData.length === 0) return;
+    const currentIndex = runResultsData.findIndex(r => r.student_id === selectedStudentForAnswers);
     if (currentIndex === -1) return;
     
     let newIndex = currentIndex;
     if (direction === 'prev' && currentIndex > 0) newIndex = currentIndex - 1;
-    if (direction === 'next' && currentIndex < resultsData.length - 1) newIndex = currentIndex + 1;
+    if (direction === 'next' && currentIndex < runResultsData.length - 1) newIndex = currentIndex + 1;
     
     if (newIndex !== currentIndex) {
-      openAnswerSheet(resultsData[newIndex].student_id);
+      openAnswerSheet(runResultsData[newIndex].student_id);
     }
   };
 
-  const handleDownloadAnswerSheet = () => {
-    if (!answerSheetData) return;
+  const handleDownloadTeacherQuestionPaper = async (exam_id: string, exam_title: string) => {
+    setIsDownloadingQuestionPaper(true);
     try {
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      let y = 20;
-      pdf.setFontSize(16);
-      pdf.text(`Answer Sheet: ${answerSheetData.student.name}`, 10, y);
-      y += 10;
-      pdf.setFontSize(12);
-      pdf.text(`Student ID: ${answerSheetData.student.student_id} | Class: ${answerSheetData.student.class}`, 10, y);
-      y += 10;
+      const res = await fetch(`${API_BASE}/api/exams/${exam_id}/teacher-question-paper`);
+      if (!res.ok) throw new Error('Failed to fetch question paper data');
+      const data = await res.json();
       
-      const qData = answerSheetData.answers || [];
-      qData.forEach((q: any, idx: number) => {
-        if (y > 270) { pdf.addPage(); y = 20; }
-        const questionText = pdf.splitTextToSize(`${idx + 1}. ${q.question_text_en}`, 180);
-        pdf.text(questionText, 10, y);
-        y += questionText.length * 6 + 2;
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = doc.internal.pageSize.getWidth();
+      let y = 15;
 
-        pdf.setFont('helvetica', 'italic');
-        if (q.question_type === 'MATCH') {
-          let studentMap: Record<string, string> = {};
-          try { studentMap = q.student_answer ? JSON.parse(q.student_answer) : {}; } catch(e) {}
-          if (Object.keys(studentMap).length === 0) {
-            pdf.text('No Match Submitted', 15, y);
-            y += 8;
-          } else {
-            Object.entries(studentMap).forEach(([left, right]) => {
-              if (y > 280) { pdf.addPage(); y = 20; }
-              const leftText = getMatchOptionText(q, 'left', left);
-              const rightText = getMatchOptionText(q, 'right', right);
-              const matchLine = pdf.splitTextToSize(`${leftText} --------> ${rightText}`, 175);
-              pdf.text(matchLine, 15, y);
-              y += matchLine.length * 5 + 1;
-            });
+      // Header
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.text("INSTITUTE OF COMPUTER SCIENCE & TECHNOLOGY CHOWBERIA", pageWidth / 2, y, { align: 'center' });
+      y += 7;
+      doc.setFontSize(12);
+      doc.setTextColor(50, 50, 50);
+      doc.text(`TEACHER QUESTION PAPER WITH ANSWER KEY: ${data.exam.title}`, pageWidth / 2, y, { align: 'center' });
+      y += 6;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Duration: ${data.exam.duration_minutes} Mins | Full Marks: ${data.exam.full_marks}`, pageWidth / 2, y, { align: 'center' });
+      y += 4;
+      doc.line(14, y, pageWidth - 14, y);
+      y += 7;
+
+      let qCounter = 1;
+      (data.sections || []).forEach((sec: any) => {
+        if (y > 260) { doc.addPage(); y = 15; }
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.setFillColor(240, 243, 246);
+        doc.rect(14, y - 4, pageWidth - 28, 7, 'F');
+        doc.text(`${sec.title} (${sec.section_type}) - Section Marks: ${sec.section_marks}`, 16, y + 1);
+        y += 9;
+
+        (sec.questions || []).forEach((q: any) => {
+          if (y > 255) { doc.addPage(); y = 15; }
+          
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10);
+          const qEnLines = doc.splitTextToSize(`Q${qCounter}. ${q.question_text_en}`, pageWidth - 32);
+          doc.text(qEnLines, 16, y);
+          y += qEnLines.length * 5;
+
+          if (q.question_text_bn && q.question_text_bn.trim() !== '') {
+            doc.setFont('helvetica', 'italic');
+            const qBnLines = doc.splitTextToSize(`(Bengali): ${q.question_text_bn}`, pageWidth - 32);
+            doc.text(qBnLines, 20, y);
+            y += qBnLines.length * 4.5;
           }
-        } else if (q.question_type === 'FITB') {
-          let stdAns: string[] = [];
-          try { stdAns = q.student_answer ? JSON.parse(q.student_answer) : []; } catch(e) {}
-          if (stdAns.length === 0) {
-            pdf.text('No Answer Submitted', 15, y);
-            y += 8;
-          } else {
-            stdAns.forEach((ans, i) => {
-              if (y > 280) { pdf.addPage(); y = 20; }
-              const ansText = getOptionText(q, ans);
-              pdf.text(`Blank ${i+1}: ${ansText || '(Left Blank)'}`, 15, y);
-              y += 6;
+
+          doc.setFont('helvetica', 'normal');
+          let parsedOpts: any[] = [];
+          try {
+            parsedOpts = typeof q.options_json === 'string' ? JSON.parse(q.options_json) : q.options_json;
+          } catch(e) { parsedOpts = []; }
+
+          if (q.question_type === 'MCQ' || q.question_type === 'TF') {
+            const opts = Array.isArray(parsedOpts) ? parsedOpts : (q.question_type === 'TF' ? ['True', 'False'] : []);
+            opts.forEach((opt: any, optIdx: number) => {
+              const optText = typeof opt === 'object' && opt !== null ? opt.text : opt;
+              const optId = typeof opt === 'object' && opt !== null ? opt.id : opt;
+              const isCorrect = q.correct_answer === optId || q.correct_answer === optText;
+              
+              if (isCorrect) {
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(0, 130, 50);
+              } else {
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(60, 60, 60);
+              }
+
+              const optLabel = String.fromCharCode(65 + optIdx);
+              const optLine = `${optLabel}. ${optText} ${isCorrect ? ' [ CORRECT ANSWER ]' : ''}`;
+              doc.text(optLine, 22, y);
+              y += 4.5;
             });
+            doc.setTextColor(0, 0, 0);
+          } else if (q.question_type === 'FITB') {
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(0, 130, 50);
+            doc.text(`Correct Blanks: ${q.correct_answer}`, 22, y);
+            y += 5;
+            doc.setTextColor(0, 0, 0);
+          } else if (q.question_type === 'MATCH') {
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(0, 130, 50);
+            doc.text(`Correct Matching: ${q.correct_answer}`, 22, y);
+            y += 5;
+            doc.setTextColor(0, 0, 0);
           }
-        } else {
-          const ansText = getOptionText(q, q.student_answer);
-          pdf.text(ansText || 'No Answer Submitted', 15, y);
-          y += 8;
-        }
-        pdf.setFont('helvetica', 'normal');
-        y += 4;
+
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.setTextColor(120, 120, 120);
+          doc.text(`[ Marks: ${q.marks} ]`, pageWidth - 35, y);
+          doc.setTextColor(0, 0, 0);
+          y += 6;
+          qCounter++;
+        });
       });
 
-      pdf.save(`AnswerSheet_${answerSheetData.student.student_id}.pdf`);
+      doc.save(`${exam_title.replace(/\s+/g, '_')}_Question_Paper_With_Answers.pdf`);
     } catch (e) {
-      console.error("Error generating answer sheet PDF", e);
-      alert("Failed to generate PDF answer sheet.");
+      console.error('Error downloading question paper:', e);
+      alert('Failed to generate Teacher Question Paper.');
+    } finally {
+      setIsDownloadingQuestionPaper(false);
     }
   };
 
@@ -284,7 +426,7 @@ export default function TeacherDashboard() {
       if (res.ok) {
         const data = await res.json();
         if (data.active_exam) {
-          setRecoveryPrompt(data.active_exam);
+          setSelectedMonitorExamId(data.active_exam.exam_id);
         }
       }
     } catch (e) { console.error(e); }
@@ -293,6 +435,7 @@ export default function TeacherDashboard() {
   useEffect(() => {
     socket.emit('join_teacher_dashboard');
     fetchData();
+    fetchBatches();
     checkRecovery();
     
     socket.on('dashboard_update', (data: { students: StudentSession[], status: any, global_seconds_left?: number }) => {
@@ -300,18 +443,23 @@ export default function TeacherDashboard() {
       if (data.global_seconds_left !== undefined) {
         setExamSecondsLeft(data.global_seconds_left);
       }
-      // Status is now derived directly from examsList
     });
 
-    socket.on('student_status_update', (data: Partial<StudentSession>) => {
-      setStudentsSession(prev => prev.map(s => s.student_id === data.student_id ? { ...s, ...data } : s));
+    socket.on('student_status_update', (data: { student_id: string, status: any, tab_violation_count?: number }) => {
+      setStudentsSession(prev => prev.map(s => {
+        if (s.student_id === data.student_id) {
+          return {
+            ...s,
+            status: data.status,
+            tab_violation_count: data.tab_violation_count !== undefined ? data.tab_violation_count : s.tab_violation_count
+          };
+        }
+        return s;
+      }));
     });
 
-    socket.on('exam_status_update', (data: { exam_id: string, status: string }) => {
-      setExamsList(prev => prev.map(e => e.exam_id === data.exam_id ? { ...e, status: data.status as any } : e));
-      if (data.status === 'ENDED') {
-        setIsEnding(false);
-      }
+    socket.on('exam_status_update', (data: { exam_id: string, status: any }) => {
+      setExamsList(prev => prev.map(e => e.exam_id === data.exam_id ? { ...e, status: data.status } : e));
     });
 
     return () => {
@@ -321,181 +469,17 @@ export default function TeacherDashboard() {
     };
   }, []);
 
-  // Local timer for TeacherDashboard to tick down active sessions and main exam
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setStudentsSession(prev => prev.map(student => {
-        if (student.status === 'EXAMINEE' && student.seconds_left !== null && student.seconds_left > 0) {
-          return { ...student, seconds_left: student.seconds_left - 1 };
-        }
-        return student;
-      }));
-      setExamSecondsLeft(prev => (prev !== null && prev > 0) ? prev - 1 : prev);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Whenever the builder exam changes, fetch its sections
-  const fetchSections = async () => {
-    if (!selectedExamIdBuilder) return;
-    try {
-      const res = await fetch(`${API_BASE}/api/exams/${selectedExamIdBuilder}/sections`);
-      if (res.ok) setBuilderSections(await res.json());
-    } catch (e) { console.error(e); }
-  };
-
-  useEffect(() => {
-    fetchSections();
-    setActiveSectionId(null);
-  }, [selectedExamIdBuilder]);
-
-  // Whenever the monitor exam changes, fetch its students
   useEffect(() => {
     if (selectedMonitorExamId) {
-      setStudentsSession([]); // Clear immediately for visual feedback
       socket.emit('monitor_exam', { exam_id: selectedMonitorExamId });
     }
   }, [selectedMonitorExamId]);
 
-  // Whenever the results exam changes or exam ends, fetch its results
   useEffect(() => {
-    const fetchResults = async () => {
-      if (!selectedResultExamId) return;
-      try {
-        const res = await fetch(`${API_BASE}/api/exams/${selectedResultExamId}/results`);
-        if (res.ok) {
-          setResultsData(await res.json());
-        }
-      } catch (e) { console.error(e); }
-    };
-    fetchResults();
-  }, [selectedResultExamId, examsList.find(e => e.exam_id === selectedResultExamId)?.status]);
-
-  // Result Export Handlers
-  const handleDownloadPDF = async () => {
-    try {
-      if (!resultsRef.current) return;
-      const imgData = await htmlToImage.toJpeg(resultsRef.current, { quality: 1.0, backgroundColor: '#ffffff', pixelRatio: 2 });
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (resultsRef.current.offsetHeight * pdfWidth) / resultsRef.current.offsetWidth;
-      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Exam_Results_${selectedResultExamId}.pdf`);
-    } catch (e) {
-      console.error(e);
-      alert("Failed to generate PDF. Check console for details.");
+    if (activeTab === 'RESULTS') {
+      fetchExamRuns(0, examRunsSearch);
     }
-  };
-
-  const handleDownloadJPG = async () => {
-    try {
-      if (!resultsRef.current) return;
-      const imgData = await htmlToImage.toJpeg(resultsRef.current, { quality: 1.0, backgroundColor: '#ffffff', pixelRatio: 2 });
-      const link = document.createElement('a');
-      link.download = `Exam_Results_${selectedResultExamId}.jpg`;
-      link.href = imgData;
-      link.click();
-    } catch (e) {
-      console.error(e);
-      alert("Failed to generate JPG. Check console for details.");
-    }
-  };
-
-  // Handlers for Monitor
-  const handleStartExam = () => {
-    if (!selectedMonitorExamId) return;
-    const confirm = window.confirm("Are you sure you want to start this exam?");
-    if (confirm) {
-      socket.emit('teacher_start_exam', { exam_id: selectedMonitorExamId });
-      fetchData(); // Refresh list to update status
-    }
-  };
-
-  const handleEndExam = () => {
-    if (!selectedMonitorExamId) return;
-    const confirm = window.confirm("Are you sure you want to end this examination? All students will be submitted immediately.");
-    if (confirm) {
-      setIsEnding(true);
-      socket.emit('teacher_stop_exam', { exam_id: selectedMonitorExamId });
-      setTimeout(fetchData, 500);
-    }
-  };
-
-  const handlePauseExam = () => {
-    if (!selectedMonitorExamId) return;
-    const confirm = window.confirm("Are you sure you want to pause this exam for all students?");
-    if (confirm) {
-      socket.emit('teacher_pause_exam', { exam_id: selectedMonitorExamId });
-      setTimeout(fetchData, 500);
-    }
-  };
-
-  const handleResumeExam = () => {
-    if (!selectedMonitorExamId) return;
-    const confirm = window.confirm("Are you sure you want to resume this exam?");
-    if (confirm) {
-      socket.emit('teacher_resume_exam', { exam_id: selectedMonitorExamId });
-      setTimeout(fetchData, 500);
-    }
-  };
-
-  const handleRestartExam = () => {
-    if (!selectedMonitorExamId) return;
-    const confirm = window.confirm("Are you sure you want to restart this ended exam? Students will be able to log back in.");
-    if (confirm) {
-      socket.emit('teacher_restart_exam', { exam_id: selectedMonitorExamId });
-      setTimeout(fetchData, 500);
-    }
-  };
-
-  const handleUnpauseStudent = (session_id: string) => {
-    socket.emit('teacher_unpause_student', { session_id });
-  };
-
-  const handleInitializeAll = () => {
-    if (!selectedMonitorExamId) return;
-    const confirm = window.confirm("Are you sure you want to initialize all students? This will assign them passwords and get them ready for the exam.");
-    if (confirm) {
-      socket.emit('teacher_initialize_exam', { exam_id: selectedMonitorExamId });
-      setTimeout(fetchData, 500);
-    }
-  };
-
-  const handleInitializeStudent = (student_id: string) => {
-    if (!selectedMonitorExamId) return;
-    socket.emit('teacher_initialize_student', { exam_id: selectedMonitorExamId, student_id });
-  };
-
-  const handleHardResetStudent = (student_id: string) => {
-    if (!selectedMonitorExamId) return;
-    const confirm = window.confirm("Are you sure you want to HARD RESET this student? This will permanently delete their entire session, clear all answers, and revoke their password. They will need to be initialized again.");
-    if (confirm) {
-      socket.emit('teacher_hard_reset_student', { exam_id: selectedMonitorExamId, student_id });
-    }
-  };
-
-  const handleHardResetExam = () => {
-    if (!selectedMonitorExamId) return;
-    const confirm = window.confirm("WARNING: Are you sure you want to HARD RESET THE ENTIRE EXAM? This will permanently delete ALL student sessions, passwords, results, and progress for this exam. It cannot be undone.");
-    if (confirm) {
-      socket.emit('teacher_hard_reset_exam', { exam_id: selectedMonitorExamId });
-      setTimeout(fetchData, 500);
-    }
-  };
-
-  const handleClearOldScores = () => {
-    if (!selectedResultExamId) return;
-    const pwd = window.prompt("WARNING: This will completely wipe all past records and results for this exam. To confirm, type 'ICST'");
-    if (pwd === 'ICST') {
-      socket.emit('teacher_clear_old_scores', { exam_id: selectedResultExamId });
-      setTimeout(() => {
-        setSelectedResultExamId('');
-        fetchData();
-      }, 500);
-    } else if (pwd !== null) {
-      alert("Incorrect password. Aborting.");
-    }
-  };
+  }, [activeTab]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -503,38 +487,452 @@ export default function TeacherDashboard() {
       setIsAuthenticated(true);
       setAuthError('');
     } else {
-      setAuthError('Incorrect Password');
+      setAuthError('Incorrect teacher password');
     }
+  };
+
+  const handleCreateStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${API_BASE}/api/students`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newStudent)
+      });
+      if (res.ok) {
+        fetchData();
+        fetchBatches();
+        setNewStudent({ student_id: '', name: '', phone_no: '', student_class: 'Class 5', batch: batchesList[0]?.name || DEFAULT_BATCHES[0] });
+        setIsEditingStudent(false);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleDeleteStudent = async (id: string) => {
+    if (!window.confirm(`Are you sure you want to delete student ${id}?`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/students/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        fetchData();
+        fetchBatches();
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  // Batch Management Handlers
+  const handleCreateBatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${API_BASE}/api/batches`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newBatchForm)
+      });
+      if (res.ok) {
+        fetchBatches();
+        setCreatingBatch(false);
+        setNewBatchForm({ name: '', course_class: 'Class 5', session: '2026', description: '', status: 'ACTIVE' });
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to create batch');
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleUpdateBatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBatch) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/batches/${editingBatch.batch_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingBatch)
+      });
+      if (res.ok) {
+        fetchBatches();
+        fetchData();
+        setEditingBatch(null);
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to update batch');
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleDeleteBatch = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this batch?')) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/batches/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        fetchBatches();
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to delete batch');
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const openViewBatchStudents = async (batch: BatchItem) => {
+    setViewingBatchStudents(batch);
+    setSelectedStudentsToMove([]);
+    try {
+      const res = await fetch(`${API_BASE}/api/batches/${batch.batch_id}/students`);
+      if (res.ok) {
+        const data = await res.json();
+        setBatchStudents(data.students || []);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleMoveStudents = async () => {
+    if (!targetMoveBatch || selectedStudentsToMove.length === 0) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/batches/move-students`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          student_ids: selectedStudentsToMove,
+          target_batch: targetMoveBatch
+        })
+      });
+      if (res.ok) {
+        alert(`Successfully moved ${selectedStudentsToMove.length} student(s) to ${targetMoveBatch}!`);
+        if (viewingBatchStudents) {
+          openViewBatchStudents(viewingBatchStudents);
+        }
+        fetchBatches();
+        fetchData();
+        setSelectedStudentsToMove([]);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  // Exam Builder Handlers
+  const handleCreateExam = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${API_BASE}/api/exams`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: examForm.title,
+          duration_minutes: examForm.duration_minutes,
+          full_marks: examForm.full_marks,
+          batches: examForm.assigned_batches
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        fetchData();
+        setCreatingExam(false);
+        setSelectedExamIdBuilder(data.exam.exam_id);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleOpenEditExam = async (exam: Exam) => {
+    setEditingExamId(exam.exam_id);
+    let assigned = exam.assigned_batches || [];
+    if (!assigned || assigned.length === 0) {
+      try {
+        const res = await fetch(`${API_BASE}/api/exams/${exam.exam_id}/batches`);
+        if (res.ok) assigned = await res.json();
+      } catch (e) {}
+    }
+    setEditExamForm({
+      title: exam.title,
+      duration_minutes: exam.duration_minutes,
+      full_marks: exam.full_marks,
+      assigned_batches: assigned.length > 0 ? assigned : [{ batch_name: exam.target_batch, shuffle_enabled: false }]
+    });
+  };
+
+  const handleSaveEditExam = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingExamId) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/exams/${editingExamId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editExamForm.title,
+          duration_minutes: editExamForm.duration_minutes,
+          full_marks: editExamForm.full_marks,
+          batches: editExamForm.assigned_batches
+        })
+      });
+      if (res.ok) {
+        fetchData();
+        setEditingExamId(null);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  // Section Builder Handlers
+  const fetchSections = async (exam_id: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/exams/${exam_id}/sections`);
+      if (res.ok) {
+        const data = await res.json();
+        setBuilderSections(data);
+        if (!activeSectionId && data.length > 0) {
+          setActiveSectionId(data[0].section_id);
+        }
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  useEffect(() => {
+    if (selectedExamIdBuilder) {
+      fetchSections(selectedExamIdBuilder);
+    }
+  }, [selectedExamIdBuilder]);
+
+  const handleAddSection = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedExamIdBuilder) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/sections`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          exam_id: selectedExamIdBuilder,
+          title: newSectionForm.title,
+          section_marks: newSectionForm.section_marks,
+          section_type: newSectionForm.section_type
+        })
+      });
+      if (res.ok) {
+        setNewSectionForm({ title: '', section_marks: 20, section_type: 'MCQ' });
+        fetchSections(selectedExamIdBuilder);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleSaveQuestion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedExamIdBuilder || !activeSectionId) return;
+
+    const currentSection = builderSections.find(s => s.section_id === activeSectionId);
+    if (!currentSection) return;
+
+    let payloadOptions: any = questionForm.options;
+    let payloadAnswer = questionForm.correct_answer;
+
+    if (currentSection.section_type === 'TF') {
+      payloadOptions = ['True', 'False'];
+    } else if (currentSection.section_type === 'FITB') {
+      const allBlanks = questionForm.fitb_blanks.filter(b => b.trim() !== '');
+      const allExtras = questionForm.fitb_extras.filter(b => b.trim() !== '');
+      payloadOptions = [...allBlanks, ...allExtras];
+      payloadAnswer = JSON.stringify(allBlanks);
+    } else if (currentSection.section_type === 'MATCH') {
+      const leftItems = questionForm.match_pairs.map((p, idx) => ({ id: `L${idx + 1}`, text: p.left }));
+      const rightItems = questionForm.match_pairs.map((p, idx) => ({ id: `R${idx + 1}`, text: p.right }));
+      payloadOptions = { left: leftItems, right: rightItems };
+      const correctMap: Record<string, string> = {};
+      questionForm.match_pairs.forEach((_, idx) => {
+        correctMap[`L${idx + 1}`] = `R${idx + 1}`;
+      });
+      payloadAnswer = JSON.stringify(correctMap);
+    }
+
+    try {
+      let res;
+      if (editingQuestionId) {
+        res = await fetch(`${API_BASE}/api/questions/${editingQuestionId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            question_text_en: questionForm.text_en,
+            question_text_bn: questionForm.text_bn,
+            options_json: payloadOptions,
+            correct_answer: payloadAnswer,
+            marks: questionForm.marks
+          })
+        });
+      } else {
+        res = await fetch(`${API_BASE}/api/questions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            exam_id: selectedExamIdBuilder,
+            section_id: activeSectionId,
+            question_type: currentSection.section_type,
+            question_text_en: questionForm.text_en,
+            question_text_bn: questionForm.text_bn,
+            options_json: payloadOptions,
+            correct_answer: payloadAnswer,
+            marks: questionForm.marks
+          })
+        });
+      }
+
+      if (res.ok) {
+        fetchSections(selectedExamIdBuilder);
+        setEditingQuestionId(null);
+        setQuestionForm({
+          text_en: '',
+          text_bn: '',
+          options: ['', '', '', ''],
+          correct_answer: '',
+          marks: 1,
+          fitb_blanks: [''],
+          fitb_extras: [],
+          match_pairs: [{ left: '', right: '' }, { left: '', right: '' }]
+        });
+        setBuilderStatus('Question saved successfully!');
+        setTimeout(() => setBuilderStatus(''), 3000);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleEditQuestion = (q: any) => {
+    setEditingQuestionId(q.question_id);
+    let opts = ['', '', '', ''];
+    let blanks = [''];
+    let extras: string[] = [];
+    let pairs = [{ left: '', right: '' }, { left: '', right: '' }];
+
+    if (q.question_type === 'FITB') {
+      try {
+        const correctArr = JSON.parse(q.correct_answer);
+        blanks = Array.isArray(correctArr) ? correctArr : [''];
+        let allOpts: string[] = [];
+        try { allOpts = typeof q.options_json === 'string' ? JSON.parse(q.options_json) : q.options_json; } catch(e) {}
+        extras = allOpts.filter(o => !blanks.includes(o));
+      } catch(e) {}
+    } else if (q.question_type === 'MATCH') {
+      let optObj: any = { left: [], right: [] };
+      try { optObj = typeof q.options_json === 'string' ? JSON.parse(q.options_json) : q.options_json; } catch(e) {}
+      if (optObj.left && optObj.right) {
+        pairs = optObj.left.map((l: any, i: number) => ({
+          left: l.text,
+          right: optObj.right[i] ? optObj.right[i].text : ''
+        }));
+      }
+    } else {
+      try {
+        const parsed = typeof q.options_json === 'string' ? JSON.parse(q.options_json) : q.options_json;
+        if (Array.isArray(parsed)) opts = parsed;
+      } catch(e) {}
+    }
+
+    setQuestionForm({
+      text_en: q.question_text_en,
+      text_bn: q.question_text_bn,
+      options: opts,
+      correct_answer: q.correct_answer,
+      marks: q.marks,
+      fitb_blanks: blanks,
+      fitb_extras: extras,
+      match_pairs: pairs
+    });
+  };
+
+  // Monitor Exam Controls
+  const triggerInitializeExam = () => {
+    const activeExam = examsList.find(e => e.exam_id === selectedMonitorExamId);
+    const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    setInitExamName(activeExam ? `${activeExam.title} - ${dateStr}` : `Exam Attempt - ${dateStr}`);
+    setInitTargetStudentId(null);
+    setShowInitModal(true);
+  };
+
+  const triggerInitializeStudent = (student_id: string) => {
+    const activeExam = examsList.find(e => e.exam_id === selectedMonitorExamId);
+    const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+    setInitExamName(activeExam ? `${activeExam.title} - ${dateStr}` : `Exam Run - ${dateStr}`);
+    setInitTargetStudentId(student_id);
+    setShowInitModal(true);
+  };
+
+  const handleConfirmInitialize = () => {
+    if (initTargetStudentId) {
+      socket.emit('teacher_initialize_student', {
+        exam_id: selectedMonitorExamId,
+        student_id: initTargetStudentId,
+        exam_name: initExamName
+      });
+    } else {
+      socket.emit('teacher_initialize_exam', {
+        exam_id: selectedMonitorExamId,
+        exam_name: initExamName
+      });
+    }
+    setShowInitModal(false);
+  };
+
+  const handleStartExam = () => {
+    socket.emit('teacher_start_exam', { exam_id: selectedMonitorExamId });
+  };
+
+  const handlePauseExam = () => {
+    socket.emit('teacher_pause_exam', { exam_id: selectedMonitorExamId });
+  };
+
+  const handleResumeExam = () => {
+    socket.emit('teacher_resume_exam', { exam_id: selectedMonitorExamId });
+  };
+
+  const handleStopExam = () => {
+    if (window.confirm('Are you sure you want to stop the exam? All active student sessions will be automatically submitted.')) {
+      socket.emit('teacher_stop_exam', { exam_id: selectedMonitorExamId });
+    }
+  };
+
+  const handleSafeResetExam = () => {
+    if (window.confirm('Reset this examination for a new run/attempt? Note: All previous completed scores and answer sheets will be safely preserved in Results.')) {
+      socket.emit('teacher_reset_exam', { exam_id: selectedMonitorExamId });
+    }
+  };
+
+  const handleUnpauseStudent = (session_id: string) => {
+    socket.emit('teacher_unpause_student', { session_id });
+  };
+
+  const formatTimer = (totalSeconds: number | null) => {
+    if (totalSeconds === null || totalSeconds === undefined) return '--:--';
+    const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+    const s = (totalSeconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
   };
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-[80vh] flex items-center justify-center">
-        <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 max-w-md w-full animate-in zoom-in-95 duration-300">
+      <div className="flex flex-col items-center justify-center min-h-[70vh]">
+        <div className="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100 p-8">
           <div className="text-center mb-8">
-            <div className="bg-primary-50 p-4 rounded-full inline-flex mb-4 text-primary-500 ring-8 ring-primary-50/50">
+            <div className="w-16 h-16 bg-primary-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-primary-600">
               <Lock size={32} />
             </div>
-            <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">Teacher Access</h2>
-            <p className="text-slate-500 font-medium mt-2">Enter the master password to access the panel.</p>
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight">Teacher Control Panel</h2>
+            <p className="text-slate-500 text-sm font-medium mt-1">Please enter the teacher master password to proceed</p>
           </div>
-          
+
+          {authError && (
+            <div className="bg-red-50 text-red-600 p-3.5 rounded-xl text-sm font-bold mb-6 text-center border border-red-100 flex items-center justify-center gap-2">
+              <AlertTriangle size={18} /> {authError}
+            </div>
+          )}
+
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <input 
-                type="password" 
+              <label className="block text-sm font-bold text-slate-700 mb-2">Master Password</label>
+              <input
+                type="password"
+                required
                 value={authPassword}
                 onChange={(e) => setAuthPassword(e.target.value)}
-                placeholder="Password" 
-                className={`w-full p-4 border rounded-xl focus:ring-2 outline-none font-bold text-center text-xl tracking-widest ${
-                  authError ? 'border-red-300 bg-red-50 focus:ring-red-500 text-red-800' : 'border-slate-200 focus:ring-primary-500'
-                }`}
-                autoFocus
+                placeholder="Enter password (e.g. ICST)"
+                className="block w-full px-4 py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-medium"
               />
-              {authError && <p className="text-red-500 text-sm font-bold text-center mt-2">{authError}</p>}
             </div>
-            <button type="submit" className="w-full bg-gradient-accent hover:opacity-90 text-white font-bold py-4 rounded-xl shadow-lg transform hover:-translate-y-0.5 transition-all text-lg">
-              Unlock Dashboard
+            <button
+              type="submit"
+              className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-md mt-4"
+            >
+              Access Dashboard
             </button>
           </form>
         </div>
@@ -542,582 +940,420 @@ export default function TeacherDashboard() {
     );
   }
 
-  // Handlers for Registration
-  const handleRegisterStudent = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isEditingStudent && students.some(s => s.student_id === newStudent.student_id)) {
-      return; // Block submission if ID exists and we aren't editing
-    }
-    
-    try {
-      await fetch(API_BASE + '/api/students', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newStudent)
-      });
-      fetchData();
-      setNewStudent({ ...newStudent, student_id: '', name: '', phone_no: '' });
-      setIsEditingStudent(false);
-    } catch (e) { console.error(e); }
-  };
-
-  const handleEditStudentClick = (student: Student) => {
-    setNewStudent({
-      student_id: student.student_id,
-      name: student.name,
-      phone_no: student.phone_no,
-      student_class: student.class,
-      batch: student.batch
-    });
-    setIsEditingStudent(true);
-  };
-
-  const handleDeleteStudent = async (student_id: string) => {
-    const confirm = window.confirm("Are you sure you want to permanently delete this student and all their exam data?");
-    if (confirm) {
-      try {
-        await fetch(`${API_BASE}/api/students/${student_id}`, { method: 'DELETE' });
-        fetchData();
-        // If we are currently editing the deleted student, reset the form
-        if (isEditingStudent && newStudent.student_id === student_id) {
-          setIsEditingStudent(false);
-          setNewStudent({ student_id: '', name: '', phone_no: '', student_class: 'Class 5', batch: BATCHES[0] });
-        }
-      } catch (e) { console.error(e); }
-    }
-  };
-
-  const filteredStudents = students.filter(s => 
-    s.name.toLowerCase().includes(searchStudentQuery.toLowerCase()) || 
-    s.student_id.includes(searchStudentQuery)
-  );
-
-  // Handlers for Exams Management
-  const handleCreateExam = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const res = await fetch(API_BASE + '/api/exams', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(examForm)
-      });
-      const data = await res.json();
-      if (data.success && data.exam) {
-        setCreatingExam(false);
-        setExamForm({ title: '', duration_minutes: 30, target_batch: BATCHES[0], full_marks: 100 });
-        fetchData();
-        setSelectedExamIdBuilder(data.exam.exam_id);
-      }
-    } catch (e) { console.error(e); }
-  };
-
-  const handleDeleteExam = async (exam_id: string) => {
-    const password = window.prompt("WARNING: This will permanently delete this exam and all its questions/sessions.\n\nEnter password to confirm deletion:");
-    if (password === 'ICST') {
-      try {
-        await fetch(`${API_BASE}/api/exams/${exam_id}`, { method: 'DELETE' });
-        if (selectedMonitorExamId === exam_id) setSelectedMonitorExamId('');
-        fetchData();
-      } catch (e) { console.error(e); }
-    } else if (password !== null) {
-      alert("Incorrect password!");
-    }
-  };
-
-  const handleUpdateExam = async () => {
-    if (!editingExamId) return;
-    try {
-      const res = await fetch(`${API_BASE}/api/exams/${editingExamId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editExamForm)
-      });
-      if (res.ok) {
-        setEditingExamId(null);
-        fetchData();
-      }
-    } catch (e) { console.error(e); }
-  };
-
-  // Handlers for Exam Builder
-
-  const handleCreateSection = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedExamIdBuilder) return;
-    try {
-      await fetch(API_BASE + '/api/sections', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ exam_id: selectedExamIdBuilder, ...newSectionForm })
-      });
-      fetchSections();
-      setNewSectionForm({ title: '', section_marks: 20, section_type: 'MCQ' });
-    } catch (e) { console.error(e); }
-  };
-
-  const handleEditQuestion = (q: any, sectionId: string) => {
-    setActiveSectionId(sectionId);
-    setEditingQuestionId(q.question_id);
-    
-    let fitb_blanks = [''];
-    let fitb_extras: string[] = [];
-    let match_pairs = [{ left: '', right: '' }, { left: '', right: '' }];
-    
-    if (q.question_type === 'FITB') {
-      try {
-        fitb_blanks = JSON.parse(q.correct_answer);
-        const allOptions = q.options_json || [];
-        fitb_extras = allOptions.filter((opt: string) => !fitb_blanks.includes(opt));
-      } catch(e) {}
-    } else if (q.question_type === 'MATCH') {
-      try {
-        const correctMap = JSON.parse(q.correct_answer);
-        match_pairs = Object.keys(correctMap).map(k => ({ left: k, right: correctMap[k] }));
-      } catch(e) {}
-      const sectionMarks = builderSections.find(s => s.section_id === sectionId)?.section_marks || 2;
-      while (match_pairs.length < sectionMarks) match_pairs.push({ left: '', right: '' });
-      if (match_pairs.length > sectionMarks) match_pairs = match_pairs.slice(0, sectionMarks);
-    }
-    
-    setQuestionForm({
-      text_en: q.question_text_en,
-      text_bn: q.question_text_bn,
-      options: q.question_type === 'MCQ' ? [...(q.options_json || []), '', '', '', ''].slice(0, 4) : ['', '', '', ''],
-      correct_answer: q.question_type === 'MCQ' || q.question_type === 'TF' ? q.correct_answer : '',
-      marks: q.marks,
-      fitb_blanks: fitb_blanks.length ? fitb_blanks : [''],
-      fitb_extras,
-      match_pairs
-    });
-  };
-
-  const handleDeleteSection = async (section_id: string) => {
-    if (!window.confirm("Delete this section and all its questions?")) return;
-    try {
-      await fetch(`${API_BASE}/api/sections/${section_id}`, { method: 'DELETE' });
-      fetchSections();
-    } catch (e) { console.error(e); }
-  };
-
-  const handlePublishExam = async () => {
-    if (!selectedExamIdBuilder) return;
-    try {
-      const res = await fetch(`${API_BASE}/api/exams/${selectedExamIdBuilder}/publish`, { method: 'POST' });
-      const data = await res.json();
-      if (data.success) {
-        setSelectedExamIdBuilder(null);
-        fetchData();
-      } else {
-        alert(data.error);
-      }
-    } catch (e) { console.error(e); }
-  };
-
-  const handleAddQuestion = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedExamIdBuilder || !activeSectionId) return;
-
-    const currentSection = builderSections.find(s => s.section_id === activeSectionId);
-    const qType = currentSection ? currentSection.section_type : 'MCQ';
-
-    let finalOptions = questionForm.options;
-    let finalCorrect = questionForm.correct_answer;
-
-    if (qType === 'MCQ') {
-      finalOptions = questionForm.options.filter(o => o.trim() !== '');
-    } else if (qType === 'TF') {
-      finalOptions = ['True', 'False'];
-      if (!finalCorrect) finalCorrect = 'True';
-    } else if (qType === 'FITB') {
-      const validBlanks = questionForm.fitb_blanks.map(b => b.trim()).filter(b => b !== '');
-      const validExtras = questionForm.fitb_extras.map(e => e.trim()).filter(e => e !== '');
-      finalCorrect = JSON.stringify(validBlanks);
-      finalOptions = [...validBlanks, ...validExtras];
-    } else if (qType === 'MATCH') {
-      const validPairs = questionForm.match_pairs.filter(p => p.left.trim() !== '' && p.right.trim() !== '');
-      const leftArr = validPairs.map(p => p.left.trim());
-      const rightArr = validPairs.map(p => p.right.trim());
-      const correctMap: Record<string, string> = {};
-      validPairs.forEach(p => { correctMap[p.left.trim()] = p.right.trim(); });
-      finalCorrect = JSON.stringify(correctMap);
-      finalOptions = { 
-        left: [...leftArr].sort(() => Math.random() - 0.5), 
-        right: [...rightArr].sort(() => Math.random() - 0.5) 
-      } as any;
-    }
-    
-    try {
-      const url = editingQuestionId 
-        ? `${API_BASE}/api/questions/${editingQuestionId}`
-        : `${API_BASE}/api/questions`;
-      const method = editingQuestionId ? 'PUT' : 'POST';
-
-      await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          exam_id: selectedExamIdBuilder,
-          section_id: activeSectionId,
-          question_type: qType,
-          question_text_en: questionForm.text_en,
-          question_text_bn: questionForm.text_bn,
-          options_json: finalOptions,
-          correct_answer: finalCorrect.trim(),
-          marks: qType === 'MATCH' ? (questionForm.match_pairs || []).length : questionForm.marks
-        })
-      });
-      fetchSections();
-      setBuilderStatus(editingQuestionId ? 'Question updated successfully!' : 'Question added successfully!');
-      setTimeout(() => setBuilderStatus(''), 3000);
-      setEditingQuestionId(null);
-      setQuestionForm({ ...questionForm, text_en: '', text_bn: '', options: ['', '', '', ''], correct_answer: '', fitb_blanks: [''], fitb_extras: [], match_pairs: [{ left: '', right: '' }, { left: '', right: '' }] });
-    } catch (e) { console.error(e); }
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch(status) {
-      case 'LOGGED_IN': return <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700">Ready</span>;
-      case 'EXAMINEE': return <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">Active</span>;
-      case 'PAUSED': return <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 animate-pulse">Locked Out</span>;
-      case 'COMPLETED': return <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700">Finished</span>;
-      default: return <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-500">Absent</span>;
-    }
-  };
+  const selectedMonitorExam = examsList.find(e => e.exam_id === selectedMonitorExamId);
 
   return (
-    <div className="space-y-6">
-      {/* Recovery Prompt */}
-      {recoveryPrompt && (
-        <div className="bg-red-50 border-2 border-red-500 p-6 rounded-2xl shadow-lg relative z-50">
-          <div className="flex items-start gap-4">
-            <div className="bg-red-100 p-3 rounded-xl text-red-600">
-              <AlertTriangle size={32} />
+    <div className="space-y-6 pb-20">
+      {/* Top Navbar */}
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+        <div className="flex items-center gap-2 overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('MONITOR')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-sm transition-all ${
+              activeTab === 'MONITOR' ? 'bg-primary-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Play size={18} /> Monitor
+          </button>
+          <button
+            onClick={() => setActiveTab('REGISTRATION')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-sm transition-all ${
+              activeTab === 'REGISTRATION' ? 'bg-primary-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <UserPlus size={18} /> Registration
+          </button>
+          <button
+            onClick={() => setActiveTab('BATCHES')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-sm transition-all ${
+              activeTab === 'BATCHES' ? 'bg-primary-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Layers size={18} /> Batches
+          </button>
+          <button
+            onClick={() => setActiveTab('EXAMS')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-sm transition-all ${
+              activeTab === 'EXAMS' ? 'bg-primary-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <BookOpen size={18} /> Exams
+          </button>
+          <button
+            onClick={() => setActiveTab('RESULTS')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-sm transition-all ${
+              activeTab === 'RESULTS' ? 'bg-primary-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Award size={18} /> Results
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-700 text-xs font-bold rounded-full border border-green-200">
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-ping"></span> LAN Online
+          </span>
+          <button
+            onClick={() => setIsAuthenticated(false)}
+            className="text-xs font-bold text-slate-500 hover:text-red-600 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-red-50"
+          >
+            Lock Panel
+          </button>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 1. MONITOR TAB */}
+      {/* ========================================================================= */}
+      {activeTab === 'MONITOR' && (
+        <div className="space-y-6">
+          {/* Exam Selector & Controls */}
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-wrap items-center justify-between gap-6">
+            <div className="flex-1 min-w-[280px]">
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Select Active Exam to Monitor</label>
+              <select
+                value={selectedMonitorExamId}
+                onChange={(e) => setSelectedMonitorExamId(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 text-base focus:ring-2 focus:ring-primary-500"
+              >
+                {examsList.map(e => (
+                  <option key={e.exam_id} value={e.exam_id}>
+                    {e.title} ({e.target_batch}) — [{e.status}]
+                  </option>
+                ))}
+              </select>
             </div>
-            <div>
-              <h3 className="text-xl font-extrabold text-red-800 tracking-tight">Power Cut / Interruption Detected</h3>
-              <p className="text-red-700 font-medium mt-1">
-                The exam <strong>"{recoveryPrompt.title}"</strong> was marked as STARTED but the server was restarted. 
-                Do you want to resume this session?
-              </p>
-              <div className="mt-4 flex gap-3">
-                <button 
-                  onClick={() => { 
-                    setSelectedMonitorExamId(recoveryPrompt.exam_id);
-                    setRecoveryPrompt(null);
-                  }}
-                  className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-xl font-bold transition-colors shadow-sm"
-                >
-                  Yes, Resume Session
-                </button>
-                <button 
-                  onClick={() => setRecoveryPrompt(null)}
-                  className="bg-white hover:bg-red-100 text-red-700 px-6 py-2 rounded-xl font-bold transition-colors border border-red-200"
-                >
-                  Dismiss
-                </button>
+
+            {selectedMonitorExam && (
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200 text-center">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Remaining Time</p>
+                  <p className="text-xl font-black text-slate-800">{formatTimer(examSecondsLeft)}</p>
+                </div>
+
+                {selectedMonitorExam.status === 'CREATED' && (
+                  <>
+                    <button
+                      onClick={triggerInitializeExam}
+                      className="bg-primary-600 hover:bg-primary-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition-all"
+                    >
+                      <RotateCcw size={16} /> Initialize Exam
+                    </button>
+                    <button
+                      onClick={handleStartExam}
+                      className="bg-green-600 hover:bg-green-700 text-white font-bold px-5 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-md transition-all transform hover:scale-105"
+                    >
+                      <Play size={16} /> Start Exam
+                    </button>
+                  </>
+                )}
+
+                {selectedMonitorExam.status === 'STARTED' && (
+                  <>
+                    <button
+                      onClick={handlePauseExam}
+                      className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition-all"
+                    >
+                      <Lock size={16} /> Pause Exam
+                    </button>
+                    <button
+                      onClick={handleStopExam}
+                      className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition-all"
+                    >
+                      <Square size={16} /> Stop Exam
+                    </button>
+                  </>
+                )}
+
+                {selectedMonitorExam.status === 'PAUSED' && (
+                  <>
+                    <button
+                      onClick={handleResumeExam}
+                      className="bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition-all"
+                    >
+                      <Play size={16} /> Resume Exam
+                    </button>
+                    <button
+                      onClick={handleStopExam}
+                      className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition-all"
+                    >
+                      <Square size={16} /> Stop Exam
+                    </button>
+                  </>
+                )}
+
+                {selectedMonitorExam.status === 'ENDED' && (
+                  <button
+                    onClick={handleSafeResetExam}
+                    className="bg-slate-800 hover:bg-black text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition-all"
+                  >
+                    <RotateCcw size={16} /> New Attempt / Retest
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Student Live Monitor Grid */}
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-xl font-black text-slate-800">Student Live Monitor</h3>
+                <p className="text-xs font-semibold text-slate-400 mt-0.5">Real-time examinee connection and status</p>
+              </div>
+              <div className="flex items-center gap-4 text-xs font-bold">
+                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-slate-300"></span> Ready</span>
+                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-blue-500"></span> Logged In</span>
+                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-green-500"></span> Examinee</span>
+                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-amber-500"></span> Paused</span>
+                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-purple-500"></span> Completed</span>
               </div>
             </div>
+
+            {studentsSession.length === 0 ? (
+              <div className="p-12 text-center text-slate-400 font-bold bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                No examinees initialized for this exam yet. Click &quot;Initialize Exam&quot; to assign passwords and prepare sessions.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {studentsSession.map((st) => {
+                  let statusBg = 'bg-slate-50 border-slate-200 text-slate-600';
+                  let statusBadge = 'bg-slate-200 text-slate-700';
+                  if (st.status === 'LOGGED_IN') {
+                    statusBg = 'bg-blue-50/50 border-blue-200';
+                    statusBadge = 'bg-blue-500 text-white';
+                  } else if (st.status === 'EXAMINEE') {
+                    statusBg = 'bg-green-50/50 border-green-200';
+                    statusBadge = 'bg-green-500 text-white';
+                  } else if (st.status === 'PAUSED') {
+                    statusBg = 'bg-amber-50/50 border-amber-300';
+                    statusBadge = 'bg-amber-500 text-white animate-pulse';
+                  } else if (st.status === 'COMPLETED') {
+                    statusBg = 'bg-purple-50/50 border-purple-200';
+                    statusBadge = 'bg-purple-500 text-white';
+                  }
+
+                  return (
+                    <div key={st.student_id} className={`p-4 rounded-2xl border transition-all ${statusBg}`}>
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <span className="text-xs font-black text-slate-400">ID: {st.student_id}</span>
+                          <h4 className="font-extrabold text-slate-800 text-base leading-snug">{st.name}</h4>
+                          {st.batch && <span className="text-[10px] font-bold bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full">{st.batch}</span>}
+                        </div>
+                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${statusBadge}`}>
+                          {st.status || 'READY'}
+                        </span>
+                      </div>
+
+                      {st.password_provided && (
+                        <div className="bg-white/80 p-2 rounded-xl border border-slate-200/60 my-2 text-xs">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase block">Password</span>
+                          <span className="font-mono font-black text-slate-700">{st.password_provided}</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-200/50 text-xs">
+                        <span className="font-bold text-slate-500">Violations: <b className="text-red-500">{st.tab_violation_count || 0}</b></span>
+                        
+                        <div className="flex items-center gap-1.5">
+                          {st.status === 'PAUSED' && st.session_id && (
+                            <button
+                              onClick={() => handleUnpauseStudent(st.session_id)}
+                              className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white font-bold text-[11px] rounded-lg flex items-center gap-1 shadow-sm"
+                            >
+                              <Unlock size={12} /> Unlock
+                            </button>
+                          )}
+                          {!st.session_id && (
+                            <button
+                              onClick={() => triggerInitializeStudent(st.student_id)}
+                              className="px-2.5 py-1 bg-primary-600 hover:bg-primary-700 text-white font-bold text-[11px] rounded-lg shadow-sm"
+                            >
+                              Init
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex flex-wrap gap-2 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
-        {[
-          { id: 'MONITOR', label: 'Live Monitor', icon: <Users size={18} /> },
-          { id: 'REGISTRATION', label: 'Student Registration', icon: <UserPlus size={18} /> },
-          { id: 'EXAMS', label: 'Exams Management', icon: <BookOpen size={18} /> },
-          { id: 'RESULTS', label: 'Results & Export', icon: <Award size={18} /> }
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => { setActiveTab(tab.id as any); setSelectedExamIdBuilder(null); setCreatingExam(false); }}
-            className={`flex-1 min-w-[150px] flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-sm transition-all ${
-              activeTab === tab.id 
-                ? 'bg-primary-500 text-white shadow-md' 
-                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
-            }`}
-          >
-            {tab.icon}
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* MONITOR TAB */}
-      {activeTab === 'MONITOR' && (() => {
-        const currentMonitorExam = examsList.find(e => e.exam_id === selectedMonitorExamId);
-        const derivedStatus = currentMonitorExam ? currentMonitorExam.status : 'CREATED';
-        
-        return (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <div className="flex flex-col md:flex-row md:items-center justify-between bg-white p-6 rounded-2xl shadow-sm border border-slate-100 gap-4">
-              <div>
-                <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight">Master Control Panel</h2>
-                <div className="flex items-center gap-3 mt-2">
-                  <span className="text-slate-500 font-bold text-sm">Select Target Exam:</span>
-                  <select 
-                    value={selectedMonitorExamId} 
-                    onChange={(e) => setSelectedMonitorExamId(e.target.value)}
-                    className="bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 block p-2 font-bold"
-                  >
-                    {examsList.map(ex => (
-                      <option key={ex.exam_id} value={ex.exam_id}>
-                        {ex.title} ({ex.target_batch}) - {ex.status}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3">
-                {derivedStatus === 'STARTED' && (
-                  <>
-                    <button onClick={handlePauseExam} className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white shadow-md">
-                      Pause Exam
-                    </button>
-                    <button onClick={handleEndExam} className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white shadow-md transform hover:scale-[1.02]">
-                      <Square size={16} fill="currentColor" /> End Exam
-                    </button>
-                  </>
-                )}
-                {derivedStatus === 'PAUSED' && (
-                  <>
-                    <button onClick={handleResumeExam} className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white shadow-md">
-                      <Play size={16} /> Resume Exam
-                    </button>
-                    <button onClick={handleEndExam} className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white shadow-md transform hover:scale-[1.02]">
-                      <Square size={16} fill="currentColor" /> End Exam
-                    </button>
-                  </>
-                )}
-                {derivedStatus === 'ENDED' && (
-                  <button onClick={handleRestartExam} className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 bg-indigo-500 hover:bg-indigo-600 text-white shadow-md transform hover:scale-[1.02]">
-                    <Play size={16} /> Restart Exam
-                  </button>
-                )}
-                {derivedStatus === 'CREATED' && (
-                  <button onClick={handleStartExam} className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 bg-gradient-accent hover:opacity-90 text-white shadow-md transform hover:scale-[1.02]">
-                    <Play size={16} /> Start Exam
-                  </button>
-                )}
-                {/* Global Hard Reset Exam */}
-                <button onClick={handleHardResetExam} className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 bg-red-100 hover:bg-red-200 text-red-700 shadow-md transform hover:scale-[1.02]">
-                  <RotateCcw size={16} /> Hard Reset Exam
-                </button>
-              </div>
-            </div>
-
-
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-3">
-                  <div className="bg-primary-50 p-2 rounded-lg text-primary-600">
-                    <Users size={20} />
-                  </div>
-                  <h3 className="font-bold text-slate-800 text-lg">Active Sessions Tracker</h3>
-                </div>
-                {/* Global Timer added here */}
-                {(derivedStatus === 'STARTED' || derivedStatus === 'PAUSED' || isEnding) && (
-                  <div className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200">
-                    <div className="text-sm font-bold text-slate-500">Live Exam Time:</div>
-                    <div className={`text-xl font-black font-mono tracking-wider ${isEnding ? 'text-amber-500' : examSecondsLeft && examSecondsLeft < 60 ? 'text-red-500 animate-pulse' : 'text-slate-800'}`}>
-                      {isEnding ? 'ENDING...' : examSecondsLeft !== null ? `${Math.floor(examSecondsLeft / 60).toString().padStart(2, '0')}:${(examSecondsLeft % 60).toString().padStart(2, '0')}` : '--:--'}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-4">
-                <button onClick={handleInitializeAll} className="px-4 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-sm font-bold rounded-lg shadow-sm transition-colors">
-                  Initialize All
-                </button>
-                <span className="text-sm font-bold text-slate-400 border border-slate-200 bg-white px-3 py-1 rounded-lg">Total Assigned: {studentsSession.length}</span>
-              </div>
-            </div>
-            
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider font-bold">
-                    <th className="p-4 border-b border-slate-100">Roll No</th>
-                    <th className="p-4 border-b border-slate-100">Name</th>
-                    <th className="p-4 border-b border-slate-100">Password</th>
-                    <th className="p-4 border-b border-slate-100">Status</th>
-                    <th className="p-4 border-b border-slate-100 text-center">Time Left</th>
-                    <th className="p-4 border-b border-slate-100 text-center">Warnings</th>
-                    <th className="p-4 border-b border-slate-100 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {studentsSession.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="p-8 text-center text-slate-400 font-medium">
-                        No students found for this exam. Ensure the batch has registered students.
-                      </td>
-                    </tr>
-                  ) : (
-                    studentsSession.map((student) => (
-                      <tr key={student.student_id} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-4 font-bold text-slate-700">{student.student_id}</td>
-                        <td className="p-4 font-medium text-slate-700">{student.name}</td>
-                        <td className="p-4 font-mono text-sm text-slate-600 font-bold bg-slate-100 rounded px-2">{student.password_provided || 'N/A'}</td>
-                        <td className="p-4">{getStatusBadge(student.status)}</td>
-                        <td className="p-4 text-center font-mono font-bold text-slate-700">
-                          {student.seconds_left !== null ? `${Math.floor(student.seconds_left / 60).toString().padStart(2, '0')}:${(student.seconds_left % 60).toString().padStart(2, '0')}` : '--:--'}
-                        </td>
-                        <td className="p-4 text-center">
-                          <span className={`font-bold ${student.tab_violation_count > 0 ? 'text-red-600' : 'text-slate-400'}`}>
-                            {student.tab_violation_count}
-                          </span>
-                        </td>
-                        <td className="p-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {student.status === 'PAUSED' && (
-                              <button 
-                                onClick={() => handleUnpauseStudent(student.session_id)}
-                                className="inline-flex items-center gap-1.5 text-xs font-bold bg-green-50 hover:bg-green-100 text-green-700 px-3 py-1.5 rounded-lg transition-colors"
-                              >
-                                <Unlock size={14} />
-                                Unpause
-                              </button>
-                            )}
-                            {(!student.password_provided || student.password_provided === '') && (
-                              <button 
-                                onClick={() => handleInitializeStudent(student.student_id)}
-                                className="inline-flex items-center gap-1.5 text-xs font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg transition-colors"
-                              >
-                                Initialize
-                              </button>
-                            )}
-                            {student.password_provided && (
-                              <button 
-                                onClick={() => handleHardResetStudent(student.student_id)}
-                                className="inline-flex items-center gap-1.5 text-xs font-bold bg-red-50 hover:bg-red-100 text-red-700 px-3 py-1.5 rounded-lg transition-colors"
-                              >
-                                Hard Reset
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      );
-      })()}
-
-      {/* REGISTRATION TAB */}
+      {/* ========================================================================= */}
+      {/* 2. REGISTRATION TAB */}
+      {/* ========================================================================= */}
       {activeTab === 'REGISTRATION' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <div className="lg:col-span-1 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 self-start">
-            <h3 className="font-bold text-slate-800 text-lg mb-4 flex items-center gap-2">
-              <UserPlus size={20} className="text-primary-500" /> {isEditingStudent ? 'Edit Student' : 'Register Student'}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Add / Edit Student Form */}
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 h-fit">
+            <h3 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">
+              <UserPlus className="text-primary-600" size={20} />
+              {isEditingStudent ? 'Edit Student Details' : 'Register New Student'}
             </h3>
-            <form onSubmit={handleRegisterStudent} className="space-y-4">
+
+            <form onSubmit={handleCreateStudent} className="space-y-4">
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Student ID (3-digit)</label>
-                <input required type="text" maxLength={3} disabled={isEditingStudent} value={newStudent.student_id} onChange={e => setNewStudent({...newStudent, student_id: e.target.value})} className={`w-full p-2.5 border rounded-xl focus:ring-2 outline-none ${isEditingStudent ? 'bg-slate-100 text-slate-500 border-slate-200' : (!isEditingStudent && students.some(s => s.student_id === newStudent.student_id) ? 'border-red-300 focus:ring-red-500 bg-red-50' : 'border-slate-200 focus:ring-primary-500')}`} placeholder="001" />
-                {isEditingStudent && <p className="text-xs text-slate-400 mt-1">ID cannot be changed while editing.</p>}
-                {!isEditingStudent && newStudent.student_id && students.some(s => s.student_id === newStudent.student_id) && (
-                  <p className="text-xs text-red-500 font-bold mt-1">Warning: ID already exists!</p>
-                )}
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Student ID (3-Digit)</label>
+                <input
+                  type="text"
+                  required
+                  value={newStudent.student_id}
+                  onChange={(e) => setNewStudent({ ...newStudent, student_id: e.target.value })}
+                  placeholder="e.g. 001, 067"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500"
+                />
               </div>
+
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Full Name</label>
-                <input required type="text" value={newStudent.name} onChange={e => setNewStudent({...newStudent, name: e.target.value})} className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Rahul Kumar" />
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Student Full Name</label>
+                <input
+                  type="text"
+                  required
+                  value={newStudent.name}
+                  onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
+                  placeholder="e.g. Rahul Sharma"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500"
+                />
               </div>
+
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Phone No</label>
-                <input required type="text" value={newStudent.phone_no} onChange={e => setNewStudent({...newStudent, phone_no: e.target.value})} className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none" placeholder="9876543210" />
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Phone Number</label>
+                <input
+                  type="text"
+                  required
+                  value={newStudent.phone_no}
+                  onChange={(e) => setNewStudent({ ...newStudent, phone_no: e.target.value })}
+                  placeholder="e.g. 9876543210"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500"
+                />
               </div>
-              <div className="grid grid-cols-1 gap-3">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Class</label>
-                  <select value={newStudent.student_class} onChange={e => setNewStudent({...newStudent, student_class: e.target.value})} className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium">
-                    {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Assigned Batch</label>
-                  <select value={newStudent.batch} onChange={e => setNewStudent({...newStudent, batch: e.target.value})} className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium">
-                    {BATCHES.map(b => <option key={b} value={b}>{b}</option>)}
-                  </select>
-                </div>
+
+              <div>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Class / Standard</label>
+                <select
+                  value={newStudent.student_class}
+                  onChange={(e) => setNewStudent({ ...newStudent, student_class: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500 bg-white"
+                >
+                  {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
               </div>
-              <div className="flex gap-2 mt-4">
-                <button type="submit" disabled={!isEditingStudent && students.some(s => s.student_id === newStudent.student_id)} className="flex-1 bg-primary-600 hover:bg-primary-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-colors">
-                  {isEditingStudent ? 'Update Student' : 'Save Student'}
-                </button>
+
+              <div>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Assigned Batch</label>
+                <select
+                  value={newStudent.batch}
+                  onChange={(e) => setNewStudent({ ...newStudent, batch: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500 bg-white"
+                >
+                  {batchesList.map(b => <option key={b.batch_id} value={b.name}>{b.name}</option>)}
+                </select>
+              </div>
+
+              <div className="flex gap-2 pt-2">
                 {isEditingStudent && (
-                  <button type="button" onClick={() => { setIsEditingStudent(false); setNewStudent({ ...newStudent, student_id: '', name: '', phone_no: '', student_class: 'Class 5', batch: BATCHES[0] }); }} className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 px-4 rounded-xl transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingStudent(false);
+                      setNewStudent({ student_id: '', name: '', phone_no: '', student_class: 'Class 5', batch: batchesList[0]?.name || DEFAULT_BATCHES[0] });
+                    }}
+                    className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm"
+                  >
                     Cancel
                   </button>
                 )}
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl text-sm shadow-sm"
+                >
+                  {isEditingStudent ? 'Update Student' : 'Save Student'}
+                </button>
               </div>
             </form>
           </div>
 
-          <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h3 className="font-bold text-slate-800 text-lg">Registered Students ({filteredStudents.length})</h3>
-              <input 
-                type="text" 
-                value={searchStudentQuery}
-                onChange={e => setSearchStudentQuery(e.target.value)}
-                placeholder="Search by ID or Name..." 
-                className="p-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500 w-full sm:w-64"
-              />
+          {/* Student List */}
+          <div className="lg:col-span-2 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+              <div>
+                <h3 className="text-lg font-black text-slate-800">All Registered Students</h3>
+                <p className="text-xs font-bold text-slate-400">Total: {students.length} students</p>
+              </div>
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                <input
+                  type="text"
+                  placeholder="Search name, ID or batch..."
+                  value={searchStudentQuery}
+                  onChange={(e) => setSearchStudentQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
             </div>
-            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-              <table className="w-full text-left border-collapse">
-                <thead className="sticky top-0 bg-slate-50">
-                  <tr className="text-slate-500 text-xs uppercase tracking-wider font-bold">
-                    <th className="p-4 border-b border-slate-100">ID</th>
-                    <th className="p-4 border-b border-slate-100">Name</th>
-                    <th className="p-4 border-b border-slate-100">Phone</th>
-                    <th className="p-4 border-b border-slate-100">Class</th>
-                    <th className="p-4 border-b border-slate-100">Batch</th>
-                    <th className="p-4 border-b border-slate-100 text-right">Actions</th>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 text-[11px] font-black text-slate-400 uppercase tracking-wider">
+                    <th className="pb-3 px-3">Roll ID</th>
+                    <th className="pb-3 px-3">Name</th>
+                    <th className="pb-3 px-3">Batch</th>
+                    <th className="pb-3 px-3">Class</th>
+                    <th className="pb-3 px-3">Phone</th>
+                    <th className="pb-3 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredStudents.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="p-8 text-center text-slate-400 font-medium">No students found.</td>
-                    </tr>
-                  ) : (
-                    filteredStudents.map(student => (
-                      <tr key={student.student_id} className="hover:bg-slate-50">
-                        <td className="p-4 font-bold text-slate-700">{student.student_id}</td>
-                        <td className="p-4 font-medium text-slate-800">{student.name}</td>
-                        <td className="p-4 text-slate-600">{student.phone_no}</td>
-                        <td className="p-4 text-slate-600">{student.class}</td>
-                        <td className="p-4 font-bold text-primary-700">{student.batch}</td>
-                        <td className="p-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button 
-                              onClick={() => handleEditStudentClick(student)}
-                              className="text-primary-600 hover:text-primary-800 font-bold text-xs bg-primary-50 hover:bg-primary-100 px-3 py-1.5 rounded-lg transition-colors"
+                  {students
+                    .filter(s => 
+                      s.name.toLowerCase().includes(searchStudentQuery.toLowerCase()) ||
+                      s.student_id.includes(searchStudentQuery) ||
+                      (s.batch && s.batch.toLowerCase().includes(searchStudentQuery.toLowerCase()))
+                    )
+                    .map(s => (
+                      <tr key={s.student_id} className="hover:bg-slate-50/80">
+                        <td className="py-3 px-3 font-mono font-black text-slate-800">{s.student_id}</td>
+                        <td className="py-3 px-3 font-bold text-slate-800">{s.name}</td>
+                        <td className="py-3 px-3">
+                          <span className="px-2.5 py-0.5 bg-slate-100 text-slate-700 text-xs font-bold rounded-md">
+                            {s.batch}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-slate-600 font-medium">{s.class}</td>
+                        <td className="py-3 px-3 text-slate-500 font-mono text-xs">{s.phone_no}</td>
+                        <td className="py-3 px-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => {
+                                setNewStudent({
+                                  student_id: s.student_id,
+                                  name: s.name,
+                                  phone_no: s.phone_no,
+                                  student_class: s.class,
+                                  batch: s.batch
+                                });
+                                setIsEditingStudent(true);
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
                             >
-                              Edit
+                              <Edit size={16} />
                             </button>
-                            <button 
-                              onClick={() => handleDeleteStudent(student.student_id)}
-                              className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-1.5 rounded-lg transition-colors"
-                              title="Delete Student"
+                            <button
+                              onClick={() => handleDeleteStudent(s.student_id)}
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                             >
                               <Trash2 size={16} />
                             </button>
                           </div>
                         </td>
                       </tr>
-                    ))
-                  )}
+                    ))}
                 </tbody>
               </table>
             </div>
@@ -1125,95 +1361,377 @@ export default function TeacherDashboard() {
         </div>
       )}
 
-      {/* EXAMS MANAGEMENT TAB */}
+      {/* ========================================================================= */}
+      {/* 3. BATCHES MANAGEMENT TAB */}
+      {/* ========================================================================= */}
+      {activeTab === 'BATCHES' && (
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+            <div>
+              <h3 className="text-xl font-black text-slate-800">Batch Management</h3>
+              <p className="text-xs font-semibold text-slate-400 mt-0.5">Create, edit, rename batches and organize students</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                <input
+                  type="text"
+                  placeholder="Search batch..."
+                  value={batchSearchQuery}
+                  onChange={(e) => setBatchSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              <button
+                onClick={() => setCreatingBatch(true)}
+                className="bg-primary-600 hover:bg-primary-700 text-white font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2 shadow-sm"
+              >
+                <Plus size={18} /> New Batch
+              </button>
+            </div>
+          </div>
+
+          {/* Batches Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {batchesList
+              .filter(b => b.name.toLowerCase().includes(batchSearchQuery.toLowerCase()))
+              .map(batch => (
+                <div key={batch.batch_id} className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between hover:shadow-md transition-all">
+                  <div>
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <h4 className="text-lg font-black text-slate-800">{batch.name}</h4>
+                        <span className="text-xs font-bold text-slate-400">{batch.course_class || 'Class Standard'} • Session {batch.session || '2026'}</span>
+                      </div>
+                      <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full ${
+                        batch.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {batch.status}
+                      </span>
+                    </div>
+
+                    {batch.description && (
+                      <p className="text-xs text-slate-500 font-medium line-clamp-2 mb-4">{batch.description}</p>
+                    )}
+
+                    <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-2xl mb-4 border border-slate-100">
+                      <Users size={18} className="text-primary-600" />
+                      <span className="text-sm font-extrabold text-slate-700">{batch.student_count || 0} Students Assigned</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                    <button
+                      onClick={() => openViewBatchStudents(batch)}
+                      className="text-xs font-bold text-primary-600 hover:text-primary-700 flex items-center gap-1"
+                    >
+                      <Eye size={14} /> View Students
+                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setEditingBatch(batch)}
+                        className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteBatch(batch.batch_id)}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
+
+          {/* Create Batch Modal */}
+          {creatingBatch && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-100">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-black text-slate-800">Create New Batch</h3>
+                  <button onClick={() => setCreatingBatch(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+                </div>
+                <form onSubmit={handleCreateBatch} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Batch Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={newBatchForm.name}
+                      onChange={(e) => setNewBatchForm({ ...newBatchForm, name: e.target.value })}
+                      placeholder="e.g. IX,X Batch 3"
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Class / Course</label>
+                    <input
+                      type="text"
+                      value={newBatchForm.course_class}
+                      onChange={(e) => setNewBatchForm({ ...newBatchForm, course_class: e.target.value })}
+                      placeholder="e.g. Class 9, 10"
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Academic Session</label>
+                    <input
+                      type="text"
+                      value={newBatchForm.session}
+                      onChange={(e) => setNewBatchForm({ ...newBatchForm, session: e.target.value })}
+                      placeholder="e.g. 2026-2027"
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Description</label>
+                    <textarea
+                      value={newBatchForm.description}
+                      onChange={(e) => setNewBatchForm({ ...newBatchForm, description: e.target.value })}
+                      rows={2}
+                      placeholder="Optional notes or schedule..."
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                  <div className="flex gap-3 pt-4">
+                    <button type="button" onClick={() => setCreatingBatch(false)} className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl">Cancel</button>
+                    <button type="submit" className="flex-1 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-md">Create Batch</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Edit Batch Modal */}
+          {editingBatch && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-100">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-black text-slate-800">Edit / Rename Batch</h3>
+                  <button onClick={() => setEditingBatch(null)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+                </div>
+                <form onSubmit={handleUpdateBatch} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Batch Name (Rename)</label>
+                    <input
+                      type="text"
+                      required
+                      value={editingBatch.name}
+                      onChange={(e) => setEditingBatch({ ...editingBatch, name: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Class / Course</label>
+                    <input
+                      type="text"
+                      value={editingBatch.course_class || ''}
+                      onChange={(e) => setEditingBatch({ ...editingBatch, course_class: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Status</label>
+                    <select
+                      value={editingBatch.status}
+                      onChange={(e) => setEditingBatch({ ...editingBatch, status: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500 bg-white"
+                    >
+                      <option value="ACTIVE">ACTIVE</option>
+                      <option value="INACTIVE">INACTIVE</option>
+                    </select>
+                  </div>
+                  <div className="flex gap-3 pt-4">
+                    <button type="button" onClick={() => setEditingBatch(null)} className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl">Cancel</button>
+                    <button type="submit" className="flex-1 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-md">Save Changes</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* View Batch Students & Transfer Modal */}
+          {viewingBatchStudents && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-3xl p-8 max-w-3xl w-full shadow-2xl border border-slate-100 max-h-[85vh] flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-xl font-black text-slate-800">Students in {viewingBatchStudents.name}</h3>
+                    <p className="text-xs font-bold text-slate-400">{batchStudents.length} total enrolled student(s)</p>
+                  </div>
+                  <button onClick={() => setViewingBatchStudents(null)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+                </div>
+
+                {/* Transfer Bar */}
+                <div className="bg-slate-50 p-4 rounded-2xl mb-4 border border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-xs font-bold text-slate-600">
+                    Selected: <b className="text-primary-600 font-black">{selectedStudentsToMove.length}</b> student(s)
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={targetMoveBatch}
+                      onChange={(e) => setTargetMoveBatch(e.target.value)}
+                      className="px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-bold bg-white"
+                    >
+                      <option value="">Select Destination Batch...</option>
+                      {batchesList
+                        .filter(b => b.name !== viewingBatchStudents.name)
+                        .map(b => <option key={b.batch_id} value={b.name}>{b.name}</option>)}
+                    </select>
+                    <button
+                      onClick={handleMoveStudents}
+                      disabled={!targetMoveBatch || selectedStudentsToMove.length === 0}
+                      className="px-4 py-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-1"
+                    >
+                      <ArrowRightLeft size={14} /> Move Selected
+                    </button>
+                  </div>
+                </div>
+
+                {/* Student Table */}
+                <div className="overflow-y-auto flex-1 border border-slate-100 rounded-2xl">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 sticky top-0">
+                      <tr className="border-b border-slate-200 text-[11px] font-black text-slate-400 uppercase tracking-wider">
+                        <th className="p-3 w-10">
+                          <input
+                            type="checkbox"
+                            checked={selectedStudentsToMove.length === batchStudents.length && batchStudents.length > 0}
+                            onChange={(e) => {
+                              if (e.target.checked) setSelectedStudentsToMove(batchStudents.map(s => s.student_id));
+                              else setSelectedStudentsToMove([]);
+                            }}
+                            className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                          />
+                        </th>
+                        <th className="p-3">Roll ID</th>
+                        <th className="p-3">Name</th>
+                        <th className="p-3">Class</th>
+                        <th className="p-3">Phone</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {batchStudents.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="p-8 text-center text-slate-400 font-bold">No students in this batch yet.</td>
+                        </tr>
+                      ) : (
+                        batchStudents.map(s => {
+                          const isSelected = selectedStudentsToMove.includes(s.student_id);
+                          return (
+                            <tr key={s.student_id} className={`hover:bg-slate-50 ${isSelected ? 'bg-primary-50/50' : ''}`}>
+                              <td className="p-3">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    if (e.target.checked) setSelectedStudentsToMove(prev => [...prev, s.student_id]);
+                                    else setSelectedStudentsToMove(prev => prev.filter(id => id !== s.student_id));
+                                  }}
+                                  className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                                />
+                              </td>
+                              <td className="p-3 font-mono font-black text-slate-800">{s.student_id}</td>
+                              <td className="p-3 font-bold text-slate-800">{s.name}</td>
+                              <td className="p-3 text-slate-600">{s.class}</td>
+                              <td className="p-3 text-slate-500 font-mono text-xs">{s.phone_no}</td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 4. EXAMS & QUESTION BUILDER TAB */}
+      {/* ========================================================================= */}
       {activeTab === 'EXAMS' && (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-          
-          {!selectedExamIdBuilder && !creatingExam && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                <h3 className="font-bold text-slate-800 text-xl flex items-center gap-2">
-                  <BookOpen className="text-primary-500" /> Exams Master List
-                </h3>
-                <button 
+        <div className="space-y-6">
+          {!selectedExamIdBuilder ? (
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+              <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+                <div>
+                  <h3 className="text-xl font-black text-slate-800">Examination Sets</h3>
+                  <p className="text-xs font-semibold text-slate-400 mt-0.5">Manage question sets and multi-batch assignments</p>
+                </div>
+                <button
                   onClick={() => setCreatingExam(true)}
-                  className="bg-primary-600 hover:bg-primary-700 text-white font-bold py-2.5 px-5 rounded-xl transition-colors flex items-center gap-2"
+                  className="bg-primary-600 hover:bg-primary-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm"
                 >
-                  <Plus size={18} /> Create New Exam
+                  <Plus size={18} /> Create Examination
                 </button>
               </div>
+
+              {/* Exams Table */}
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-white">
-                    <tr className="text-slate-500 text-xs uppercase tracking-wider font-bold">
-                      <th className="p-4 border-b border-slate-100">Title</th>
-                      <th className="p-4 border-b border-slate-100">Target Batch</th>
-                      <th className="p-4 border-b border-slate-100">Duration</th>
-                      <th className="p-4 border-b border-slate-100">Status</th>
-                      <th className="p-4 border-b border-slate-100 text-right">Actions</th>
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-[11px] font-black text-slate-400 uppercase tracking-wider">
+                      <th className="pb-3 px-3">Title</th>
+                      <th className="pb-3 px-3">Assigned Batches</th>
+                      <th className="pb-3 px-3">Duration</th>
+                      <th className="pb-3 px-3">Full Marks</th>
+                      <th className="pb-3 px-3">Status</th>
+                      <th className="pb-3 px-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {examsList.length === 0 ? (
-                      <tr><td colSpan={5} className="p-8 text-center text-slate-400 font-bold">No exams created yet.</td></tr>
-                    ) : examsList.map(exam => editingExamId === exam.exam_id ? (
-                      <tr key={exam.exam_id} className="bg-slate-50 border-b border-slate-100">
-                        <td colSpan={5} className="p-4">
-                          <div className="flex flex-col sm:flex-row gap-4 items-center">
-                            <input value={editExamForm.title} onChange={e => setEditExamForm({...editExamForm, title: e.target.value})} className="flex-1 w-full sm:w-auto p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Exam Title" />
-                              <select value={editExamForm.target_batch} onChange={e => setEditExamForm({...editExamForm, target_batch: e.target.value})} className="w-full sm:w-auto p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none bg-white">
-                                <option value="" disabled>Select Batch</option>
-                                {BATCHES.map(b => <option key={b} value={b}>{b}</option>)}
-                              </select>
-                            <input type="number" value={editExamForm.duration_minutes} onChange={e => setEditExamForm({...editExamForm, duration_minutes: parseInt(e.target.value)})} className="w-full sm:w-24 p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Mins" />
-                            <input type="number" value={editExamForm.full_marks} onChange={e => setEditExamForm({...editExamForm, full_marks: parseInt(e.target.value)})} className="w-full sm:w-24 p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Marks" />
-                            <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-                              <button onClick={handleUpdateExam} className="flex-1 sm:flex-none bg-primary-600 hover:bg-primary-700 text-white px-6 py-2.5 rounded-xl font-bold transition-colors shadow-sm">Save</button>
-                              <button onClick={() => setEditingExamId(null)} className="flex-1 sm:flex-none bg-slate-200 hover:bg-slate-300 text-slate-700 px-6 py-2.5 rounded-xl font-bold transition-colors">Cancel</button>
-                            </div>
+                    {examsList.map(e => (
+                      <tr key={e.exam_id} className="hover:bg-slate-50/80">
+                        <td className="py-3.5 px-3 font-bold text-slate-800">{e.title}</td>
+                        <td className="py-3.5 px-3">
+                          <div className="flex flex-wrap gap-1">
+                            {e.assigned_batches && e.assigned_batches.length > 0 ? (
+                              e.assigned_batches.map(b => (
+                                <span key={b.batch_name} className="px-2 py-0.5 bg-slate-100 text-slate-700 text-xs font-bold rounded flex items-center gap-1">
+                                  {b.batch_name}
+                                  {b.shuffle_enabled && <Shuffle size={10} className="text-primary-600" />}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="px-2 py-0.5 bg-slate-100 text-slate-700 text-xs font-bold rounded">
+                                {e.target_batch}
+                              </span>
+                            )}
                           </div>
                         </td>
-                      </tr>
-                    ) : (
-                      <tr key={exam.exam_id} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-4 font-bold text-slate-800 text-base">{exam.title}</td>
-                        <td className="p-4 font-bold text-primary-700">{exam.target_batch}</td>
-                        <td className="p-4 font-medium text-slate-600">{exam.duration_minutes} mins</td>
-                        <td className="p-4">
-                          <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                            exam.status === 'CREATED' ? 'bg-blue-100 text-blue-700' :
-                            exam.status === 'STARTED' ? 'bg-green-100 text-green-700' :
-                            exam.status === 'DRAFT' ? 'bg-slate-200 text-slate-600' :
-                            'bg-slate-100 text-slate-600'
-                          }`}>
-                            {exam.status}
+                        <td className="py-3.5 px-3 text-slate-600 font-medium">{e.duration_minutes} Mins</td>
+                        <td className="py-3.5 px-3 font-bold text-slate-700">{e.full_marks}</td>
+                        <td className="py-3.5 px-3">
+                          <span className="px-2.5 py-0.5 bg-primary-50 text-primary-700 text-xs font-black rounded-full">
+                            {e.status}
                           </span>
                         </td>
-                        <td className="p-4 text-right">
+                        <td className="py-3.5 px-3 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            {true && (
-                              <button 
-                                onClick={() => { setEditingExamId(exam.exam_id); setEditExamForm({ title: exam.title, duration_minutes: exam.duration_minutes, full_marks: exam.full_marks, target_batch: exam.target_batch }); }}
-                                className="text-amber-500 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 p-2 rounded-lg transition-colors"
-                                title="Edit Exam"
-                              >
-                                <Edit size={18} />
-                              </button>
-                            )}
-                            {!['STARTED', 'PAUSED', 'RUNNING'].includes(exam.status) && (
-                              <button 
-                                onClick={() => setSelectedExamIdBuilder(exam.exam_id)}
-                                className="text-primary-600 hover:text-primary-800 font-bold text-sm bg-primary-50 hover:bg-primary-100 px-4 py-2 rounded-lg transition-colors flex items-center gap-1"
-                              >
-                                {exam.status === 'DRAFT' ? 'Resume Draft' : 'Edit Questions'}
-                              </button>
-                            )}
-                            <button 
-                              onClick={() => handleDeleteExam(exam.exam_id)}
-                              className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 rounded-lg transition-colors"
-                              title="Delete Exam"
+                            <button
+                              onClick={() => handleDownloadTeacherQuestionPaper(e.exam_id, e.title)}
+                              title="Download Full Question Set with Answers (PDF)"
+                              disabled={isDownloadingQuestionPaper}
+                              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors"
                             >
-                              <Trash2 size={18} />
+                              <Download size={14} /> Download Set
+                            </button>
+                            <button
+                              onClick={() => setSelectedExamIdBuilder(e.exam_id)}
+                              className="px-3 py-1.5 bg-primary-50 hover:bg-primary-100 text-primary-700 text-xs font-bold rounded-lg transition-colors"
+                            >
+                              Edit Questions
+                            </button>
+                            <button
+                              onClick={() => handleOpenEditExam(e)}
+                              className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-slate-100 rounded-lg"
+                            >
+                              <Edit size={16} />
                             </button>
                           </div>
                         </td>
@@ -1223,788 +1741,655 @@ export default function TeacherDashboard() {
                 </table>
               </div>
             </div>
-          )}
+          ) : (
+            /* Question & Section Builder Screen */
+            <div className="space-y-6">
+              <div className="flex items-center justify-between bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                <button
+                  onClick={() => setSelectedExamIdBuilder(null)}
+                  className="flex items-center gap-2 text-slate-600 hover:text-slate-900 font-bold text-sm"
+                >
+                  <ArrowLeft size={18} /> Back to Exam Sets
+                </button>
+                
+                {builderStatus && (
+                  <span className="text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-200">
+                    {builderStatus}
+                  </span>
+                )}
 
-          {/* CREATE EXAM VIEW */}
-          {creatingExam && (
-            <div className="bg-white p-6 rounded-2xl shadow border border-slate-100 mb-8 animate-in fade-in slide-in-from-top-4">
-              <h3 className="font-bold text-slate-800 text-lg mb-4 flex items-center gap-2">
-                <Plus size={20} className="text-primary-500" /> New Exam Details
-              </h3>
-              <form onSubmit={handleCreateExam} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Exam Title</label>
-                    <input required type="text" value={examForm.title} onChange={e => setExamForm({...examForm, title: e.target.value})} className="w-full p-2.5 border rounded-xl focus:ring-2 outline-none border-slate-200 focus:ring-primary-500" placeholder="e.g. Mid Term Mathematics" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Target Batch</label>
-                    <select value={examForm.target_batch} onChange={e => setExamForm({...examForm, target_batch: e.target.value})} className="w-full p-2.5 border rounded-xl focus:ring-2 outline-none border-slate-200 focus:ring-primary-500 bg-white">
-                      {BATCHES.map(b => <option key={b} value={b}>{b}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Duration (Minutes)</label>
-                    <input required type="number" min="1" value={examForm.duration_minutes} onChange={e => setExamForm({...examForm, duration_minutes: parseInt(e.target.value)})} className="w-full p-2.5 border rounded-xl focus:ring-2 outline-none border-slate-200 focus:ring-primary-500" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Full Marks</label>
-                    <input required type="number" min="1" value={examForm.full_marks} onChange={e => setExamForm({...examForm, full_marks: parseInt(e.target.value)})} className="w-full p-2.5 border rounded-xl focus:ring-2 outline-none border-slate-200 focus:ring-primary-500" />
-                  </div>
+                <button
+                  onClick={() => {
+                    const exam = examsList.find(e => e.exam_id === selectedExamIdBuilder);
+                    if (exam) handleDownloadTeacherQuestionPaper(exam.exam_id, exam.title);
+                  }}
+                  className="bg-primary-600 hover:bg-primary-700 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-sm"
+                >
+                  <Download size={14} /> Download Question Set (PDF)
+                </button>
+              </div>
+
+              {/* Sections Bar */}
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                  <h4 className="text-sm font-black text-slate-400 uppercase tracking-wider">Examination Sections</h4>
                 </div>
-                <div className="flex gap-2 pt-2">
-                  <button type="submit" className="bg-primary-600 hover:bg-primary-700 text-white font-bold py-2.5 px-6 rounded-xl transition-colors">Start Building Draft</button>
-                  <button type="button" onClick={() => setCreatingExam(false)} className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 px-6 rounded-xl transition-colors">Cancel</button>
+
+                <div className="flex flex-wrap gap-3 mb-6">
+                  {builderSections.map(sec => (
+                    <button
+                      key={sec.section_id}
+                      onClick={() => setActiveSectionId(sec.section_id)}
+                      className={`px-4 py-2.5 rounded-2xl font-bold text-sm transition-all flex items-center gap-2 ${
+                        activeSectionId === sec.section_id
+                          ? 'bg-primary-600 text-white shadow-md'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      <span>{sec.title}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-black/10">
+                        {sec.questions ? sec.questions.length : 0} Qs
+                      </span>
+                    </button>
+                  ))}
                 </div>
-              </form>
-            </div>
-          )}
 
-          {/* QUESTION BUILDER VIEW */}
-          {selectedExamIdBuilder && (
-            <div className="animate-in fade-in slide-in-from-right-8 pb-12">
-              {(() => {
-                const exam = examsList.find(e => e.exam_id === selectedExamIdBuilder);
-                if (!exam) return null;
-                const distributedMarks = builderSections.reduce((sum, sec) => sum + sec.section_marks, 0);
-                const globalMarksLeft = exam.full_marks - distributedMarks;
+                {/* Add Section Form */}
+                <form onSubmit={handleAddSection} className="flex flex-wrap items-center gap-3 pt-4 border-t border-slate-100">
+                  <input
+                    type="text"
+                    required
+                    placeholder="New Section Title (e.g. Section A - Multiple Choice)"
+                    value={newSectionForm.title}
+                    onChange={(e) => setNewSectionForm({ ...newSectionForm, title: e.target.value })}
+                    className="flex-1 min-w-[200px] px-3.5 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary-500"
+                  />
+                  <select
+                    value={newSectionForm.section_type}
+                    onChange={(e) => setNewSectionForm({ ...newSectionForm, section_type: e.target.value })}
+                    className="px-3.5 py-2 border border-slate-200 rounded-xl text-sm font-bold bg-white"
+                  >
+                    <option value="MCQ">Multiple Choice (MCQ)</option>
+                    <option value="FITB">Fill in the Blanks (FITB)</option>
+                    <option value="TF">True / False</option>
+                    <option value="MATCH">Match the Following</option>
+                  </select>
+                  <input
+                    type="number"
+                    value={newSectionForm.section_marks}
+                    onChange={(e) => setNewSectionForm({ ...newSectionForm, section_marks: parseInt(e.target.value) || 0 })}
+                    placeholder="Marks"
+                    className="w-24 px-3.5 py-2 border border-slate-200 rounded-xl text-sm font-bold"
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-slate-800 hover:bg-black text-white font-bold text-sm rounded-xl shadow-sm"
+                  >
+                    Add Section
+                  </button>
+                </form>
+              </div>
 
-                // Validate if all sections are fully filled
-                const allSectionsFilled = builderSections.every(sec => {
-                  const secQuestionsMarks = sec.questions.reduce((sum, q) => sum + q.marks, 0);
-                  return sec.section_marks - secQuestionsMarks === 0;
-                });
-                const isEditable = !['STARTED', 'PAUSED', 'RUNNING'].includes(exam.status);
-                const canPublish = exam.status === 'DRAFT' && globalMarksLeft === 0 && allSectionsFilled && builderSections.length > 0;
+              {/* Question Editor */}
+              {activeSectionId && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Create / Edit Question Form */}
+                  <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                    <h4 className="text-base font-black text-slate-800 mb-4">
+                      {editingQuestionId ? 'Edit Question' : 'Add Question to Section'}
+                    </h4>
 
-                return (
-                  <>
-                    <div className="flex justify-between items-center mb-8 sticky top-0 bg-slate-50/95 backdrop-blur-sm z-20 py-4 shadow-sm border-b border-slate-200 px-4 -mx-4">
+                    <form onSubmit={handleSaveQuestion} className="space-y-4">
                       <div>
-                        <button onClick={() => setSelectedExamIdBuilder(null)} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 font-bold mb-2">
-                          <ArrowLeft size={16} /> Back to Master List
-                        </button>
-                        <div className="flex items-center gap-3">
-                          {exam.status === 'DRAFT' && <span className="bg-slate-200 text-slate-600 font-bold px-2 py-0.5 rounded text-xs uppercase tracking-wider">DRAFT</span>}
-                          <h3 className="text-2xl font-extrabold text-slate-800">{exam.title}</h3>
-                        </div>
-                        <p className="text-slate-500 font-medium">{exam.target_batch} • {exam.duration_minutes} mins</p>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Question Text (English)</label>
+                        <textarea
+                          required
+                          rows={2}
+                          value={questionForm.text_en}
+                          onChange={(e) => setQuestionForm({ ...questionForm, text_en: e.target.value })}
+                          placeholder="e.g. Which keyword is used to inherit a class in Java?"
+                          className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary-500"
+                        />
                       </div>
-                      <div className="flex items-center gap-6">
-                        <div className="flex gap-4 items-center bg-white p-3 rounded-xl shadow-sm border border-slate-200">
-                          <div className="text-center px-4 border-r border-slate-100">
-                            <p className="text-xs text-slate-500 font-bold tracking-wider">FULL MARKS</p>
-                            <p className="text-xl font-black text-slate-800">{exam.full_marks}</p>
-                          </div>
-                          <div className="text-center px-4">
-                            <p className="text-xs text-slate-500 font-bold tracking-wider">SECTION TOTAL</p>
-                            <p className="text-xl font-black text-primary-600">{distributedMarks}</p>
-                          </div>
-                          <div className="text-center px-4 border-l border-slate-100 bg-slate-50 rounded-lg">
-                            <p className="text-xs text-slate-500 font-bold tracking-wider">LEFT TO DISTRIBUTE</p>
-                            <p className={`text-2xl font-black ${globalMarksLeft === 0 ? 'text-green-500' : 'text-orange-500'}`}>{globalMarksLeft}</p>
-                          </div>
-                        </div>
-                        {true && (
-                          <button 
-                            onClick={handlePublishExam}
-                            disabled={!canPublish}
-                            className="bg-green-500 hover:bg-green-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-4 px-6 rounded-xl flex items-center gap-2 shadow-lg transition-all"
-                          >
-                            <Save size={20} /> Publish Exam
-                          </button>
-                        )}
-                      </div>
-                    </div>
 
-                    {builderStatus && (
-                      <div className="mb-6 p-4 bg-green-50 border border-green-200 text-green-700 rounded-xl font-bold flex items-center gap-2 animate-in fade-in">
-                        <Save size={18} /> {builderStatus}
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Question Text (Bengali Optional)</label>
+                        <textarea
+                          rows={2}
+                          value={questionForm.text_bn}
+                          onChange={(e) => setQuestionForm({ ...questionForm, text_bn: e.target.value })}
+                          placeholder="বাংলা প্রশ্ন লিখুন (ঐচ্ছিক)..."
+                          className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary-500"
+                        />
                       </div>
-                    )}
 
-                    {/* Builder Main Area */}
-                    <div className="space-y-6">
-                      
-                      {/* Sections List */}
-                      {builderSections.map((sec, idx) => {
-                        const secQuestionsMarks = sec.questions.reduce((sum, q) => sum + q.marks, 0);
-                        const secMarksLeft = sec.section_marks - secQuestionsMarks;
-                        const currentQuestionMarks = (activeSectionId === sec.section_id && editingQuestionId) ? (sec.questions.find(q => q.question_id === editingQuestionId)?.marks || 0) : 0;
-                        const effectiveMaxMarks = secMarksLeft + currentQuestionMarks;
-                        return (
-                          <div key={sec.section_id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                            <div className="bg-slate-100 p-4 border-b border-slate-200 flex justify-between items-center">
-                              <h4 className="font-extrabold text-lg text-slate-800">Section {idx + 1}: {sec.title}</h4>
-                              <div className="flex items-center gap-4">
-                                <div className="text-right">
-                                  <span className="text-sm font-bold text-slate-500 mr-2">Allocated:</span>
-                                  <span className="font-black text-lg text-slate-700">{sec.section_marks}</span>
-                                </div>
-                                <div className="text-right pl-4 border-l border-slate-300">
-                                  <span className="text-sm font-bold text-slate-500 mr-2">Left to Fill:</span>
-                                  <span className={`font-black text-lg ${secMarksLeft === 0 ? 'text-green-500' : 'text-orange-500'}`}>{secMarksLeft}</span>
-                                </div>
-                                {isEditable && (
-                                  <button onClick={() => handleDeleteSection(sec.section_id)} className="ml-4 p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                                    <Trash2 size={18} />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                            
-                            <div className="p-6 space-y-4">
-                              {/* Questions inside section */}
-                              {sec.questions.map((q, qidx) => (
-                                <div key={q.question_id} className={`p-4 rounded-xl border ${editingQuestionId === q.question_id ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}>
-                                  <div className="flex justify-between items-start mb-2">
-                                    <div className="flex items-start gap-2 flex-grow pr-4">
-                                      <span className="font-bold text-slate-700 text-lg flex-shrink-0">Q{qidx + 1}.</span>
-                                      <div className="flex-grow">
-                                        <QuestionTextRenderer text={q.question_text_en} textSize="text-base font-bold text-slate-700" />
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center gap-2 flex-shrink-0">
-                                      <span className="bg-primary-100 text-primary-700 font-bold px-3 py-1 rounded-lg text-sm">{q.marks} Marks</span>
-                                      {isEditable && (
-                                        <button onClick={() => handleEditQuestion(q, sec.section_id)} className="p-1 text-amber-500 hover:text-amber-700 hover:bg-amber-100 rounded-lg transition-colors">
-                                          <Edit size={16} />
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                  {q.question_text_bn ? <p className="text-slate-600 mb-3">{q.question_text_bn}</p> : null}
-                                  {q.question_type === 'MCQ' && (
-                                    <div className="grid grid-cols-2 gap-2 mt-2">
-                                      {q.options_json.map((opt: any, i: number) => {
-                                        const optId = typeof opt === 'object' ? opt.id : opt;
-                                        const optText = typeof opt === 'object' ? opt.text : opt;
-                                        return (
-                                          <div key={i} className={`p-2 rounded-lg text-sm font-medium border ${optId === q.correct_answer ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-slate-200 text-slate-600'}`}>
-                                            {cleanMathDollars(optText)} {optId === q.correct_answer && '✓'}
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-                                  {q.question_type === 'TF' && (
-                                    <div className="grid grid-cols-2 gap-2 mt-2">
-                                      <div className={`p-2 rounded-lg text-sm font-medium border ${'True' === q.correct_answer ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-slate-200 text-slate-600'}`}>True {'True' === q.correct_answer && '✓'}</div>
-                                      <div className={`p-2 rounded-lg text-sm font-medium border ${'False' === q.correct_answer ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-slate-200 text-slate-600'}`}>False {'False' === q.correct_answer && '✓'}</div>
-                                    </div>
-                                  )}
-                                  {q.question_type === 'FITB' && (
-                                    <div className="mt-2 text-sm text-slate-600 bg-white p-2 rounded border border-slate-200 inline-block font-bold">
-                                      Answer: {q.correct_answer}
-                                    </div>
-                                  )}
+                      {/* Options rendering by section type */}
+                      {(() => {
+                        const sec = builderSections.find(s => s.section_id === activeSectionId);
+                        if (sec?.section_type === 'MCQ') {
+                          return (
+                            <div className="space-y-2">
+                              <label className="block text-xs font-black text-slate-400 uppercase tracking-wider">Options & Correct Answer</label>
+                              {questionForm.options.map((opt, optIdx) => (
+                                <div key={optIdx} className="flex items-center gap-2">
+                                  <input
+                                    type="radio"
+                                    name="correctOption"
+                                    checked={questionForm.correct_answer === opt && opt.trim() !== ''}
+                                    onChange={() => setQuestionForm({ ...questionForm, correct_answer: opt })}
+                                    className="text-primary-600 focus:ring-primary-500"
+                                  />
+                                  <input
+                                    type="text"
+                                    required
+                                    placeholder={`Option ${String.fromCharCode(65 + optIdx)}`}
+                                    value={opt}
+                                    onChange={(e) => {
+                                      const newOpts = [...questionForm.options];
+                                      newOpts[optIdx] = e.target.value;
+                                      setQuestionForm({ ...questionForm, options: newOpts });
+                                    }}
+                                    className="flex-1 px-3 py-1.5 border border-slate-200 rounded-xl text-sm font-medium"
+                                  />
                                 </div>
                               ))}
-
-                              {/* Add Question Form for this section */}
-                              {isEditable && (
-                                (effectiveMaxMarks > 0 || (activeSectionId === sec.section_id && editingQuestionId)) ? (
-                                  activeSectionId === sec.section_id ? (
-                                    <div className="bg-primary-50 p-6 rounded-xl border border-primary-100 mt-4 animate-in fade-in slide-in-from-top-2">
-                                      <h5 className="font-bold text-primary-800 mb-4 flex items-center gap-2"><Plus size={18} /> {editingQuestionId ? 'Edit' : 'Add'} {sec.section_type} Question for {sec.title}</h5>
-                                      <form onSubmit={handleAddQuestion} className="space-y-4">
-                                        <div>
-                                          <label className="block text-sm font-bold text-slate-700 mb-1">Marks (Max {effectiveMaxMarks})</label>
-                                          {sec.section_type === 'MATCH' ? (
-                                            <>
-                                              <input disabled type="number" value={(questionForm.match_pairs || []).length} className="w-full p-2.5 border rounded-xl outline-none bg-slate-100 text-slate-500 cursor-not-allowed" />
-                                              <p className="text-xs text-primary-600 mt-1 font-bold">Marks for Matching questions are automatically set to 1 per pair.</p>
-                                            </>
-                                          ) : (
-                                            <input required type="number" min="1" max={effectiveMaxMarks} value={questionForm.marks} onChange={e => setQuestionForm({...questionForm, marks: parseInt(e.target.value)})} className="w-full p-2.5 border rounded-xl outline-none" />
-                                          )}
-                                        </div>
-                                        
-                                        <div>
-                                          <label className="block text-sm font-bold text-slate-700 mb-1">Question (English)</label>
-                                          <textarea required value={questionForm.text_en} onChange={e => setQuestionForm({...questionForm, text_en: e.target.value})} className="w-full p-3 border rounded-xl outline-none" rows={2}></textarea>
-                                          {sec.section_type === 'FITB' && <p className="text-xs text-primary-600 mt-1 font-bold">Use `___` for the blank space.</p>}
-                                        </div>
-                                        
-                                        <div>
-                                          <label className="block text-sm font-bold text-slate-700 mb-1">Question (Bengali)</label>
-                                          <textarea required value={questionForm.text_bn} onChange={e => setQuestionForm({...questionForm, text_bn: e.target.value})} className="w-full p-3 border rounded-xl outline-none" rows={2}></textarea>
-                                        </div>
-
-                                        {sec.section_type === 'MCQ' && (
-                                          <div className="space-y-3 bg-white p-4 rounded-xl border border-slate-200">
-                                            <label className="block text-sm font-bold text-slate-700">Options</label>
-                                            <div className="grid grid-cols-2 gap-3">
-                                              {[0, 1, 2, 3].map(i => (
-                                                <input key={i} required={i < 2} type="text" placeholder={`Option ${i+1}`} value={questionForm.options[i]} onChange={e => {
-                                                  const newOpts = [...questionForm.options];
-                                                  newOpts[i] = e.target.value;
-                                                  setQuestionForm({...questionForm, options: newOpts});
-                                                }} className="w-full p-2.5 border rounded-lg text-sm outline-none" />
-                                              ))}
-                                            </div>
-                                            <div>
-                                              <label className="block text-sm font-bold text-slate-700 mb-1 mt-2">Correct Answer (Must match one option exactly)</label>
-                                              <select required value={questionForm.correct_answer} onChange={e => setQuestionForm({...questionForm, correct_answer: e.target.value})} className="w-full p-2.5 border rounded-lg text-sm bg-white outline-none">
-                                                <option value="" disabled>Select Correct Option...</option>
-                                                {questionForm.options.filter(o => o.trim() !== '').map((opt, i) => (
-                                                  <option key={i} value={opt}>{opt}</option>
-                                                ))}
-                                              </select>
-                                            </div>
-                                          </div>
-                                        )}
-
-                                        {sec.section_type === 'TF' && (
-                                          <div className="space-y-3 bg-white p-4 rounded-xl border border-slate-200">
-                                            <label className="block text-sm font-bold text-slate-700">Correct Answer</label>
-                                            <select required value={questionForm.correct_answer} onChange={e => setQuestionForm({...questionForm, correct_answer: e.target.value})} className="w-full p-2.5 border rounded-lg text-sm bg-white outline-none">
-                                              <option value="" disabled>Select Correct Answer...</option>
-                                              <option value="True">True</option>
-                                              <option value="False">False</option>
-                                            </select>
-                                          </div>
-                                        )}
-
-                                        {sec.section_type === 'FITB' && (
-                                          <div className="space-y-4 bg-white p-4 rounded-xl border border-slate-200">
-                                            <div>
-                                              <label className="block text-sm font-bold text-slate-700 mb-2">Blank Answers</label>
-                                              <p className="text-xs text-slate-500 mb-3">Add the correct answers for each blank in order. Use `___` in the question text above to indicate where these blanks appear.</p>
-                                              <div className="space-y-2">
-                                                {questionForm.fitb_blanks.map((blank, i) => (
-                                                  <div key={`blank-${i}`} className="flex gap-2 items-center">
-                                                    <span className="font-bold text-slate-400 text-sm w-16">Blank {i+1}</span>
-                                                    <input required type="text" value={blank} onChange={e => {
-                                                      const newBlanks = [...questionForm.fitb_blanks];
-                                                      newBlanks[i] = e.target.value;
-                                                      setQuestionForm({...questionForm, fitb_blanks: newBlanks});
-                                                    }} className="flex-1 p-2 border rounded-lg text-sm outline-none" placeholder="Correct word..." />
-                                                    {questionForm.fitb_blanks.length > 1 && (
-                                                      <button type="button" onClick={() => {
-                                                        const newBlanks = questionForm.fitb_blanks.filter((_, idx) => idx !== i);
-                                                        setQuestionForm({...questionForm, fitb_blanks: newBlanks});
-                                                      }} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={16}/></button>
-                                                    )}
-                                                  </div>
-                                                ))}
-                                              </div>
-                                              <button type="button" onClick={() => setQuestionForm({...questionForm, fitb_blanks: [...questionForm.fitb_blanks, '']})} className="mt-3 text-sm font-bold text-primary-600 hover:text-primary-700 flex items-center gap-1">
-                                                <Plus size={16} /> Add Another Blank
-                                              </button>
-                                            </div>
-
-                                            <div className="pt-4 border-t border-slate-100">
-                                              <label className="block text-sm font-bold text-slate-700 mb-2">Extra Distractor Options (Optional)</label>
-                                              <p className="text-xs text-slate-500 mb-3">Add incorrect words to the word bank to make the question harder.</p>
-                                              <div className="space-y-2">
-                                                {questionForm.fitb_extras.map((extra, i) => (
-                                                  <div key={`extra-${i}`} className="flex gap-2 items-center">
-                                                    <input type="text" value={extra} onChange={e => {
-                                                      const newExtras = [...questionForm.fitb_extras];
-                                                      newExtras[i] = e.target.value;
-                                                      setQuestionForm({...questionForm, fitb_extras: newExtras});
-                                                    }} className="flex-1 p-2 border rounded-lg text-sm outline-none" placeholder="Distractor word..." />
-                                                    <button type="button" onClick={() => {
-                                                      const newExtras = questionForm.fitb_extras.filter((_, idx) => idx !== i);
-                                                      setQuestionForm({...questionForm, fitb_extras: newExtras});
-                                                    }} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={16}/></button>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                              <button type="button" onClick={() => setQuestionForm({...questionForm, fitb_extras: [...questionForm.fitb_extras, '']})} className="mt-3 text-sm font-bold text-slate-500 hover:text-slate-700 flex items-center gap-1">
-                                                <Plus size={16} /> Add Distractor Option
-                                              </button>
-                                            </div>
-                                          </div>
-                                        )}
-
-                                        {sec.section_type === 'MATCH' && (
-                                          <div className="space-y-4 bg-white p-4 rounded-xl border border-slate-200">
-                                            <div>
-                                              <label className="block text-sm font-bold text-slate-700 mb-2">Matching Pairs</label>
-                                              <p className="text-xs text-slate-500 mb-3">Add left and right pairs. These will be automatically shuffled when presented to students.</p>
-                                              <div className="space-y-3">
-                                                {(questionForm.match_pairs || []).map((pair, i) => (
-                                                  <div key={`match-${i}`} className="flex gap-3 items-center">
-                                                    <span className="font-bold text-slate-400 text-sm w-12">Pair {i+1}</span>
-                                                    <input required type="text" value={pair.left} onChange={e => {
-                                                      const newPairs = [...(questionForm.match_pairs || [])];
-                                                      newPairs[i].left = e.target.value;
-                                                      setQuestionForm({...questionForm, match_pairs: newPairs});
-                                                    }} className="flex-1 p-2 border rounded-lg text-sm outline-none" placeholder="Left item..." />
-                                                    <span className="text-slate-400 font-bold px-2">→</span>
-                                                    <input required type="text" value={pair.right} onChange={e => {
-                                                      const newPairs = [...(questionForm.match_pairs || [])];
-                                                      newPairs[i].right = e.target.value;
-                                                      setQuestionForm({...questionForm, match_pairs: newPairs});
-                                                    }} className="flex-1 p-2 border rounded-lg text-sm outline-none" placeholder="Right match..." />
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            </div>
-                                          </div>
-                                        )}
-
-                                        <div className="flex justify-between items-center pt-4">
-                                          <button type="submit" className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-xl font-bold transition-colors shadow-sm w-full md:w-auto">
-                                            {editingQuestionId ? 'Update Question' : 'Add Question'}
-                                          </button>
-                                          {editingQuestionId && (
-                                            <button type="button" onClick={() => { setEditingQuestionId(null); setActiveSectionId(null); setQuestionForm({ text_en: '', text_bn: '', options: ['', '', '', ''], correct_answer: '', marks: 1, fitb_blanks: [''], fitb_extras: [], match_pairs: [{ left: '', right: '' }, { left: '', right: '' }] }); }} className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-8 py-3 rounded-xl font-bold transition-colors w-full md:w-auto ml-2">
-                                              Cancel
-                                            </button>
-                                          )}
-                                        </div>
-                                      </form>
-                                    </div>
-                                  ) : (
-                                    (sec.section_type !== 'MATCH' || sec.questions.length === 0) && (
-                                      <button onClick={() => {
-                                        setActiveSectionId(sec.section_id);
-                                        const initialPairs = sec.section_type === 'MATCH' ? Array(sec.section_marks).fill(0).map(() => ({left: '', right: ''})) : [{ left: '', right: '' }, { left: '', right: '' }];
-                                        setQuestionForm({ text_en: '', text_bn: '', options: ['', '', '', ''], correct_answer: '', marks: sec.section_type === 'MATCH' ? sec.section_marks : Math.min(1, effectiveMaxMarks), fitb_blanks: [''], fitb_extras: [], match_pairs: initialPairs });
-                                      }} className="mt-4 w-full border-2 border-dashed border-slate-300 hover:border-primary-400 text-slate-500 hover:text-primary-600 font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors">
-                                        <Plus size={20} /> Add Question
-                                      </button>
-                                    )
-                                  )
-                                ) : (
-                                  <div className="mt-4 text-center p-4 bg-green-50 text-green-700 font-bold rounded-xl border border-green-200 flex items-center justify-center gap-2">
-                                    <Award size={20} /> Section marks fully allocated.
-                                  </div>
-                                )
-                              )}
                             </div>
+                          );
+                        } else if (sec?.section_type === 'TF') {
+                          return (
+                            <div>
+                              <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Select Correct Answer</label>
+                              <div className="flex gap-4">
+                                <label className="flex items-center gap-2 font-bold text-sm">
+                                  <input
+                                    type="radio"
+                                    name="tfAns"
+                                    value="True"
+                                    checked={questionForm.correct_answer === 'True'}
+                                    onChange={() => setQuestionForm({ ...questionForm, correct_answer: 'True' })}
+                                    className="text-primary-600 focus:ring-primary-500"
+                                  />
+                                  True (সত্য)
+                                </label>
+                                <label className="flex items-center gap-2 font-bold text-sm">
+                                  <input
+                                    type="radio"
+                                    name="tfAns"
+                                    value="False"
+                                    checked={questionForm.correct_answer === 'False'}
+                                    onChange={() => setQuestionForm({ ...questionForm, correct_answer: 'False' })}
+                                    className="text-primary-600 focus:ring-primary-500"
+                                  />
+                                  False (মিথ্যা)
+                                </label>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Marks</label>
+                        <input
+                          type="number"
+                          value={questionForm.marks}
+                          onChange={(e) => setQuestionForm({ ...questionForm, marks: parseInt(e.target.value) || 1 })}
+                          className="w-24 px-3 py-1.5 border border-slate-200 rounded-xl text-sm font-bold"
+                        />
+                      </div>
+
+                      <div className="flex gap-2 pt-2">
+                        {editingQuestionId && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingQuestionId(null);
+                              setQuestionForm({
+                                text_en: '', text_bn: '', options: ['', '', '', ''], correct_answer: '', marks: 1, fitb_blanks: [''], fitb_extras: [], match_pairs: [{ left: '', right: '' }, { left: '', right: '' }]
+                              });
+                            }}
+                            className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl text-sm"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                        <button
+                          type="submit"
+                          className="flex-1 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl text-sm shadow-md"
+                        >
+                          {editingQuestionId ? 'Update Question' : 'Save Question'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* Section Questions List */}
+                  <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                    <h4 className="text-base font-black text-slate-800 mb-4">Questions in Section</h4>
+                    <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
+                      {builderSections
+                        .find(s => s.section_id === activeSectionId)
+                        ?.questions?.map((q, qIdx) => (
+                          <div key={q.question_id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50">
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <span className="font-extrabold text-slate-800 text-sm">
+                                {qIdx + 1}. {q.question_text_en}
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleEditQuestion(q)}
+                                  className="p-1 text-slate-400 hover:text-primary-600"
+                                >
+                                  <Edit size={14} />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="text-xs text-green-700 font-bold">
+                              Correct: {q.correct_answer}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Create Exam Modal with Multi-Batch Checkboxes & Per-Batch Shuffle */}
+          {creatingExam && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl border border-slate-100">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-black text-slate-800">Create Examination</h3>
+                  <button onClick={() => setCreatingExam(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+                </div>
+                <form onSubmit={handleCreateExam} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Exam Title</label>
+                    <input
+                      type="text"
+                      required
+                      value={examForm.title}
+                      onChange={(e) => setExamForm({ ...examForm, title: e.target.value })}
+                      placeholder="e.g. Mid Term Mathematics 2026"
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Duration (Minutes)</label>
+                      <input
+                        type="number"
+                        required
+                        value={examForm.duration_minutes}
+                        onChange={(e) => setExamForm({ ...examForm, duration_minutes: parseInt(e.target.value) || 30 })}
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Full Marks</label>
+                      <input
+                        type="number"
+                        required
+                        value={examForm.full_marks}
+                        onChange={(e) => setExamForm({ ...examForm, full_marks: parseInt(e.target.value) || 100 })}
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Multi-Batch Selection & Shuffle Toggle */}
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
+                      Assign Batches & Question Shuffle
+                    </label>
+                    <div className="space-y-2 max-h-48 overflow-y-auto border border-slate-200 rounded-2xl p-3">
+                      {batchesList.map(batch => {
+                        const isAssigned = examForm.assigned_batches.some(b => b.batch_name === batch.name);
+                        const assignedObj = examForm.assigned_batches.find(b => b.batch_name === batch.name);
+                        const shuffle = assignedObj ? assignedObj.shuffle_enabled : false;
+
+                        return (
+                          <div key={batch.batch_id} className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50">
+                            <label className="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={isAssigned}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setExamForm({
+                                      ...examForm,
+                                      assigned_batches: [...examForm.assigned_batches, { batch_name: batch.name, shuffle_enabled: false }]
+                                    });
+                                  } else {
+                                    setExamForm({
+                                      ...examForm,
+                                      assigned_batches: examForm.assigned_batches.filter(b => b.batch_name !== batch.name)
+                                    });
+                                  }
+                                }}
+                                className="rounded text-primary-600 focus:ring-primary-500"
+                              />
+                              {batch.name}
+                            </label>
+
+                            {isAssigned && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setExamForm({
+                                    ...examForm,
+                                    assigned_batches: examForm.assigned_batches.map(b => 
+                                      b.batch_name === batch.name ? { ...b, shuffle_enabled: !b.shuffle_enabled } : b
+                                    )
+                                  });
+                                }}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1 transition-all ${
+                                  shuffle ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-500'
+                                }`}
+                              >
+                                <Shuffle size={12} /> Shuffle: {shuffle ? 'ON' : 'OFF'}
+                              </button>
+                            )}
                           </div>
                         );
                       })}
-
-                      {/* Add New Section Form */}
-                      {isEditable && globalMarksLeft > 0 && (
-                        <div className="bg-slate-50 p-6 rounded-2xl border-2 border-dashed border-slate-300">
-                          <h4 className="font-bold text-slate-800 text-lg mb-4 flex items-center gap-2">
-                            <Plus size={20} className="text-primary-500" /> Create New Section
-                          </h4>
-                          <form onSubmit={handleCreateSection} className="flex flex-col sm:flex-row gap-4 sm:items-end">
-                            <div className="flex-1">
-                              <label className="block text-sm font-bold text-slate-700 mb-1">Section Title</label>
-                              <input required type="text" value={newSectionForm.title} onChange={e => setNewSectionForm({...newSectionForm, title: e.target.value})} className="w-full p-2.5 border rounded-xl outline-none" placeholder="e.g. Multiple Choice" />
-                            </div>
-                            <div className="sm:w-48">
-                              <label className="block text-sm font-bold text-slate-700 mb-1">Section Type</label>
-                              <select value={newSectionForm.section_type} onChange={e => setNewSectionForm({...newSectionForm, section_type: e.target.value})} className="w-full p-2.5 border rounded-xl outline-none bg-white">
-                                <option value="MCQ">Multiple Choice</option>
-                                <option value="FITB">Fill in the Blanks</option>
-                                <option value="TF">True / False</option>
-                                <option value="MATCH">Left-Right Matching</option>
-                              </select>
-                            </div>
-                            <div className="sm:w-32">
-                              <label className="block text-sm font-bold text-slate-700 mb-1">Marks</label>
-                              <input required type="number" min="1" max={globalMarksLeft} value={newSectionForm.section_marks} onChange={e => setNewSectionForm({...newSectionForm, section_marks: parseInt(e.target.value)})} className="w-full p-2.5 border rounded-xl outline-none" />
-                            </div>
-                            <button type="submit" className="bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 px-6 rounded-xl flex justify-center items-center gap-2">
-                              Create Section
-                            </button>
-                          </form>
-                          <p className="text-sm font-bold text-slate-500 mt-3">You can allocate up to {globalMarksLeft} more marks for new sections.</p>
-                        </div>
-                      )}
-                      
                     </div>
-                  </>
-                );
-              })()}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* RESULTS TAB */}
-      {activeTab === 'RESULTS' && (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <div className="flex flex-col md:flex-row md:items-center justify-between bg-white p-6 rounded-2xl shadow-sm border border-slate-100 gap-4">
-            <div>
-              <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight">Examination Results</h2>
-              <div className="flex items-center gap-3 mt-2">
-                <span className="text-slate-500 font-bold text-sm">Select Ended Exam:</span>
-                <select 
-                  value={selectedResultExamId} 
-                  onChange={(e) => setSelectedResultExamId(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 block p-2 font-bold"
-                >
-                  <option value="" disabled>Choose an exam...</option>
-                  {examsList.filter(e => e.status === 'ENDED').map(ex => (
-                    <option key={ex.exam_id} value={ex.exam_id}>
-                      {ex.title} ({ex.target_batch})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            
-            {selectedResultExamId && resultsData.length > 0 && (
-              <div className="flex flex-wrap items-center gap-3">
-                <button 
-                  onClick={handleDownloadJPG}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors flex items-center gap-2 shadow-sm border border-slate-200"
-                >
-                  <Download size={16} /> Download JPG
-                </button>
-                <button 
-                  onClick={handleDownloadPDF}
-                  className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-colors flex items-center gap-2 shadow-sm"
-                >
-                  <Download size={16} /> Download PDF
-                </button>
-                <button 
-                  onClick={handleClearOldScores}
-                  className="bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors flex items-center gap-2 shadow-sm border border-red-100 ml-auto"
-                >
-                  <Trash2 size={16} /> Clear All Past Records
-                </button>
-              </div>
-            )}
-          </div>
-
-          {selectedResultExamId ? (
-            resultsData.length > 0 ? (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto p-4">
-                {/* Wrap in a div specifically for capturing image */}
-                <div ref={resultsRef} className="bg-white p-6">
-                  {/* Print Header */}
-                  <div className="text-center mb-8 border-b-2 border-slate-800 pb-6">
-                    <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-wider">
-                      INSTITUTE OF COMPUTER SCIENCE AND TECHNOLOGY CHOWBERIA
-                    </h1>
-                    <h2 className="text-xl font-bold text-slate-700 mt-2">
-                      Result Sheet: {examsList.find(e => e.exam_id === selectedResultExamId)?.title}
-                    </h2>
-                    <p className="text-slate-500 font-medium mt-1">
-                      Target Batch: {examsList.find(e => e.exam_id === selectedResultExamId)?.target_batch}
-                    </p>
                   </div>
 
-                  {/* Result Table */}
-                  <table className="w-full text-left border-collapse border border-slate-200">
-                    <thead className="bg-slate-100">
-                      <tr className="text-slate-700 text-sm uppercase tracking-wider font-extrabold border-b border-slate-300">
-                        <th className="p-4 border-r border-slate-200 text-center">Rank</th>
-                        <th className="p-4 border-r border-slate-200">Student ID</th>
-                        <th className="p-4 border-r border-slate-200">Name</th>
-                        <th className="p-4 border-r border-slate-200 text-center">Score / Full</th>
-                        <th className="p-4 border-r border-slate-200 text-center">%</th>
-                        <th className="p-4 border-r border-slate-200 text-center">Violations</th>
-                        <th className="p-4 border-r border-slate-200 text-center">Status</th>
-                        <th className="p-4 border-l border-slate-200 text-center" data-html2canvas-ignore="true">View</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200">
-                      {resultsData.map((res, index) => {
-                        const isAbsent = !res.status || res.status === 'READY';
-                        const displayStatus = isAbsent ? 'Absent' : 
-                                              res.status === 'LOGGED_IN' ? 'Waiting' :
-                                              res.status === 'EXAMINEE' ? 'Active' :
-                                              res.status === 'PAUSED' ? 'Paused' : 'Completed';
-                        const hasData = !isAbsent && res.status !== 'LOGGED_IN';
-                        const rankDisplay = !hasData ? '—' : `#${index + 1}`;
-                        const percentage = res.full_marks > 0 ? Math.round((res.score / res.full_marks) * 100) : 0;
-                        
+                  <div className="flex gap-3 pt-4">
+                    <button type="button" onClick={() => setCreatingExam(false)} className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-xl">Cancel</button>
+                    <button type="submit" className="flex-1 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-md">Create & Build Set</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Edit Exam Multi-Batch Modal */}
+          {editingExamId && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl border border-slate-100">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-black text-slate-800">Edit Examination Config</h3>
+                  <button onClick={() => setEditingExamId(null)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+                </div>
+                <form onSubmit={handleSaveEditExam} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Exam Title</label>
+                    <input
+                      type="text"
+                      required
+                      value={editExamForm.title}
+                      onChange={(e) => setEditExamForm({ ...editExamForm, title: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Duration (Minutes)</label>
+                      <input
+                        type="number"
+                        required
+                        value={editExamForm.duration_minutes}
+                        onChange={(e) => setEditExamForm({ ...editExamForm, duration_minutes: parseInt(e.target.value) || 30 })}
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Full Marks</label>
+                      <input
+                        type="number"
+                        required
+                        value={editExamForm.full_marks}
+                        onChange={(e) => setEditExamForm({ ...editExamForm, full_marks: parseInt(e.target.value) || 100 })}
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Multi-Batch Selection & Shuffle Toggle */}
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
+                      Assigned Batches & Question Shuffle
+                    </label>
+                    <div className="space-y-2 max-h-48 overflow-y-auto border border-slate-200 rounded-2xl p-3">
+                      {batchesList.map(batch => {
+                        const isAssigned = editExamForm.assigned_batches.some(b => b.batch_name === batch.name);
+                        const assignedObj = editExamForm.assigned_batches.find(b => b.batch_name === batch.name);
+                        const shuffle = assignedObj ? assignedObj.shuffle_enabled : false;
+
                         return (
-                          <tr key={res.student_id} className="hover:bg-slate-50 text-slate-800 font-medium">
-                            <td className="p-4 border-r border-slate-200 text-center font-extrabold text-slate-500">{rankDisplay}</td>
-                            <td className="p-4 border-r border-slate-200 font-bold">{res.student_id}</td>
-                            <td className="p-4 border-r border-slate-200">{res.name}</td>
-                            <td className="p-4 border-r border-slate-200 text-center font-extrabold text-primary-700">
-                              {!hasData ? <span className="text-slate-400 font-normal">—</span> : <>{res.score} <span className="text-slate-400 font-medium text-sm">/ {res.full_marks}</span></>}
-                            </td>
-                            <td className="p-4 border-r border-slate-200 text-center font-bold text-slate-700">
-                              {!hasData ? <span className="text-slate-400 font-normal">—</span> : `${percentage}%`}
-                            </td>
-                            <td className="p-4 border-r border-slate-200 text-center font-bold text-red-600">
-                              {!hasData ? <span className="text-slate-400 font-normal">—</span> : (res.tab_violation_count > 0 ? res.tab_violation_count : '-')}
-                            </td>
-                            <td className="p-4 border-r border-slate-200 text-center font-bold text-sm">
-                              <span className={`px-3 py-1 rounded-full ${isAbsent ? 'bg-red-100 text-red-700' : res.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                                {displayStatus}
-                              </span>
-                            </td>
-                            <td className="p-4 border-l border-slate-200 text-center" data-html2canvas-ignore="true">
-                              {hasData ? (
-                                <button onClick={() => openAnswerSheet(res.student_id)} className="text-primary-600 hover:text-primary-800 transition-colors p-2 rounded-full hover:bg-primary-50 inline-flex items-center justify-center" title="View Answer Sheet">
-                                  <Eye size={18} />
-                                </button>
-                              ) : (
-                                <span className="text-slate-300 inline-flex items-center justify-center p-2"><Eye size={18} /></span>
-                              )}
-                            </td>
-                          </tr>
+                          <div key={batch.batch_id} className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50">
+                            <label className="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={isAssigned}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setEditExamForm({
+                                      ...editExamForm,
+                                      assigned_batches: [...editExamForm.assigned_batches, { batch_name: batch.name, shuffle_enabled: false }]
+                                    });
+                                  } else {
+                                    setEditExamForm({
+                                      ...editExamForm,
+                                      assigned_batches: editExamForm.assigned_batches.filter(b => b.batch_name !== batch.name)
+                                    });
+                                  }
+                                }}
+                                className="rounded text-primary-600 focus:ring-primary-500"
+                              />
+                              {batch.name}
+                            </label>
+
+                            {isAssigned && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditExamForm({
+                                    ...editExamForm,
+                                    assigned_batches: editExamForm.assigned_batches.map(b => 
+                                      b.batch_name === batch.name ? { ...b, shuffle_enabled: !b.shuffle_enabled } : b
+                                    )
+                                  });
+                                }}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1 transition-all ${
+                                  shuffle ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-500'
+                                }`}
+                              >
+                                <Shuffle size={12} /> Shuffle: {shuffle ? 'ON' : 'OFF'}
+                              </button>
+                            )}
+                          </div>
                         );
                       })}
-                    </tbody>
-                  </table>
-                  
-                  {/* Print Footer */}
-                  <div className="mt-8 text-right pr-8">
-                    <p className="text-slate-800 font-bold">Authorized Signature</p>
-                    <div className="w-48 border-t border-slate-800 mt-12 ml-auto"></div>
+                    </div>
                   </div>
-                </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <button type="button" onClick={() => setEditingExamId(null)} className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-xl">Cancel</button>
+                    <button type="submit" className="flex-1 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-md">Save Changes</button>
+                  </div>
+                </form>
               </div>
-            ) : (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-12 text-center">
-                <p className="text-slate-500 font-bold text-lg">No results found for this exam.</p>
-              </div>
-            )
-          ) : (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-12 text-center">
-              <div className="bg-primary-50 p-4 rounded-full inline-block mb-4 text-primary-500">
-                <Award size={48} />
-              </div>
-              <h3 className="font-bold text-slate-800 text-xl">Select an Exam</h3>
-              <p className="text-slate-500 font-medium mt-2">Only exams that have ended will appear in the list above.</p>
             </div>
           )}
         </div>
       )}
 
-      {/* ANSWER SHEET MODAL */}
-      {selectedStudentForAnswers && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex flex-col md:flex-row justify-center items-center p-4">
-          <div className="bg-white w-full max-w-5xl h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-            {/* Modal Header */}
-            <div className="bg-slate-800 text-white p-6 flex items-center justify-between shadow-md z-10">
-              <div className="flex items-center gap-4">
-                <button onClick={() => navigateAnswerSheet('prev')} className="p-2 hover:bg-slate-700 rounded-full transition-colors" title="Previous Student">
-                  <ChevronLeft size={24} />
-                </button>
-                <div>
-                  <h2 className="text-2xl font-extrabold tracking-tight">Answer Sheet Review</h2>
-                  {answerSheetData && (
-                    <p className="text-slate-300 font-medium text-sm mt-1">
-                      {answerSheetData.student.name} ({answerSheetData.student.student_id}) - {answerSheetData.student.class}
-                    </p>
-                  )}
-                </div>
-                <button onClick={() => navigateAnswerSheet('next')} className="p-2 hover:bg-slate-700 rounded-full transition-colors" title="Next Student">
-                  <ChevronRight size={24} />
-                </button>
+      {/* ========================================================================= */}
+      {/* 5. RESULTS TAB (PAGINATED ATTEMPTS & HISTORICAL SEARCH) */}
+      {/* ========================================================================= */}
+      {activeTab === 'RESULTS' && (
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+            <div>
+              <h3 className="text-xl font-black text-slate-800">Examination Results & Retest History</h3>
+              <p className="text-xs font-semibold text-slate-400 mt-0.5">Paginated historical attempts (10 per page)</p>
+            </div>
+            
+            {/* Server-side Search */}
+            <div className="flex items-center gap-2">
+              <div className="relative w-72">
+                <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                <input
+                  type="text"
+                  placeholder="Search exam attempt name..."
+                  value={examRunsSearch}
+                  onChange={(e) => {
+                    setExamRunsSearch(e.target.value);
+                    fetchExamRuns(0, e.target.value);
+                  }}
+                  className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary-500"
+                />
               </div>
-              <div className="flex items-center gap-3">
-                <button onClick={handleDownloadAnswerSheet} className="p-2 bg-slate-700 hover:bg-primary-600 rounded-full transition-colors shadow-sm flex items-center gap-2 px-4" title="Download PDF Answer Sheet">
-                  <Download size={20} /> <span className="font-bold text-sm hidden sm:inline">Export PDF</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Runs List (10 per request) */}
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 h-fit space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">Latest 10 Examination Runs</h4>
+                <span className="text-xs font-bold text-slate-500">Total: {examRunsTotal}</span>
+              </div>
+
+              {isRunsLoading ? (
+                <div className="p-8 text-center text-slate-400 font-bold">Loading examination runs...</div>
+              ) : examRuns.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 font-bold bg-slate-50 rounded-2xl">No examination runs found.</div>
+              ) : (
+                <div className="space-y-2.5">
+                  {examRuns.map(run => {
+                    const isSelected = selectedRun?.run_id === run.run_id;
+                    return (
+                      <div
+                        key={run.run_id}
+                        onClick={() => openRunResults(run)}
+                        className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                          isSelected
+                            ? 'border-primary-500 bg-primary-50/60 shadow-sm'
+                            : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <h5 className="font-extrabold text-slate-800 text-sm leading-snug">{run.exam_name}</h5>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteExamRun(run.run_id);
+                            }}
+                            title="Delete this historical run"
+                            className="text-slate-300 hover:text-red-600 p-1"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                        <p className="text-xs text-slate-500 font-medium">{run.exam_title}</p>
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-200/50 text-[11px] font-bold text-slate-400">
+                          <span>{new Date(run.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                          <span className="text-primary-700 bg-primary-100/60 px-2 py-0.5 rounded-full">{run.completed_students} / {run.total_students} submitted</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Pagination Controls */}
+              <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                <button
+                  disabled={examRunsOffset === 0 || isRunsLoading}
+                  onClick={() => {
+                    const newOffset = Math.max(0, examRunsOffset - 10);
+                    fetchExamRuns(newOffset, examRunsSearch);
+                  }}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 text-xs font-bold rounded-lg flex items-center gap-1"
+                >
+                  <ChevronLeft size={14} /> Previous
                 </button>
-                <button onClick={closeAnswerSheet} className="p-2 bg-slate-700 hover:bg-red-500 rounded-full transition-colors shadow-sm">
-                  <X size={24} />
+                <span className="text-xs font-bold text-slate-500">
+                  Page {Math.floor(examRunsOffset / 10) + 1} of {Math.max(1, Math.ceil(examRunsTotal / 10))}
+                </span>
+                <button
+                  disabled={examRunsOffset + 10 >= examRunsTotal || isRunsLoading}
+                  onClick={() => {
+                    const newOffset = examRunsOffset + 10;
+                    fetchExamRuns(newOffset, examRunsSearch);
+                  }}
+                  className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-40 text-white text-xs font-bold rounded-lg flex items-center gap-1 shadow-sm"
+                >
+                  Next 10 <ChevronRight size={14} />
                 </button>
               </div>
             </div>
 
-            {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto bg-slate-50 p-6 md:p-8 custom-scrollbar">
-              {isAnswerSheetLoading || !answerSheetData ? (
-                <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-4">
-                  <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
-                  <p className="font-bold tracking-wider uppercase text-sm">Loading Answer Sheet...</p>
-                </div>
-              ) : (
-                <div className="max-w-4xl mx-auto space-y-8">
-                  {/* Summary Card */}
-                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 grid grid-cols-2 md:grid-cols-4 gap-6">
+            {/* Run Scorecard / Details View */}
+            <div className="lg:col-span-2 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+              {selectedRun ? (
+                <div>
+                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-6">
                     <div>
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Exam</p>
-                      <p className="font-bold text-slate-800">{answerSheetData.student.exam_title}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Score</p>
-                      <p className="font-extrabold text-2xl text-primary-700">{answerSheetData.student.score} <span className="text-lg text-slate-400">/ {answerSheetData.student.full_marks}</span></p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Percentage</p>
-                      <p className="font-bold text-slate-800">{answerSheetData.student.full_marks > 0 ? Math.round((answerSheetData.student.score / answerSheetData.student.full_marks) * 100) : 0}%</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Status</p>
-                      <p className={`font-bold ${answerSheetData.student.status === 'COMPLETED' ? 'text-green-600' : 'text-amber-500'}`}>{answerSheetData.student.status}</p>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-primary-600 bg-primary-50 px-2.5 py-1 rounded-full">
+                        Attempt Scorecard
+                      </span>
+                      <h3 className="text-xl font-black text-slate-800 mt-2">{selectedRun.exam_name}</h3>
+                      <p className="text-xs font-bold text-slate-400">Exam: {selectedRun.exam_title} • Full Marks: {selectedRun.full_marks}</p>
                     </div>
                   </div>
 
-                  {/* Group Questions by Section */}
-                  {(() => {
-                    let qData = answerSheetData.answers || [];
-                    
-                    const sectionsObj: Record<string, { title: string, type: string, questions: any[] }> = {};
-                    qData.forEach((q: any) => {
-                      const secId = q.section_id || (q.question_type === 'FITB' ? 'default_fitb' : 'default_mcq');
-                      const secTitle = q.section_title || (q.question_type === 'FITB' ? 'Fill in the Blanks' : 'General Questions');
-                      if (!sectionsObj[secId]) sectionsObj[secId] = { title: secTitle, type: q.question_type, questions: [] };
-                      sectionsObj[secId].questions.push(q);
-                    });
-
-                    return Object.entries(sectionsObj).map(([secId, sec]) => (
-                      <div key={secId} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div className="bg-slate-100 border-b border-slate-200 px-6 py-3 flex items-center gap-2 text-slate-700 font-extrabold uppercase tracking-wider text-sm">
-                          {sec.title}
-                        </div>
-                        <div className="divide-y divide-slate-100">
-                          {sec.questions.map((q: any, idx: number) => {
-                            const studentAns = q.student_answer;
-                            const isCorrect = q.is_correct;
-                            
-                            return (
-                              <div key={q.question_id} className="p-6 md:p-8">
-                                <div className="flex gap-4 mb-6">
-                                  <div className="flex-shrink-0 w-10 h-10 bg-slate-100 text-slate-600 font-black rounded-xl flex items-center justify-center text-lg">
-                                    {idx + 1}
-                                  </div>
-                                  <div className="flex-grow">
-                                    {q.question_type === 'FITB' ? (
-                                      <h3 className="text-xl font-semibold text-slate-800 leading-relaxed">
-                                        {q.question_text_en.split(/_{2,}/).map((part: string, pIdx: number, partsArr: string[]) => {
-                                          if (pIdx === partsArr.length - 1) return <span key={pIdx}>{part}</span>;
-                                          return <span key={pIdx}>{part}<span style={{ borderColor: '#cbd5e1' }} className="inline-block mx-1 w-16 border-b-2"></span></span>;
-                                        })}
-                                      </h3>
-                                    ) : (
-                                      <QuestionTextRenderer text={q.question_text_en} textSize="text-xl" />
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Render Answers Based on Question Type */}
-                                <div className="ml-14 bg-slate-50 p-5 rounded-xl border border-slate-200">
-                                  {q.question_type === 'FITB' ? (
-                                    <div className="space-y-4">
-                                      {(() => {
-                                        try {
-                                          const correctArr = JSON.parse(q.correct_answer || '[]');
-                                          const studentArr = studentAns ? JSON.parse(studentAns) : [];
-                                          return correctArr.map((corrOpt: string, bIdx: number) => {
-                                            const sOpt = studentArr[bIdx];
-                                            const isBlankCorrect = sOpt === corrOpt;
-                                            return (
-                                              <div key={bIdx} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 pb-4 border-b border-slate-200 last:border-0 last:pb-0">
-                                                <div className="w-20 font-bold text-slate-400 text-sm uppercase tracking-wider">Blank {bIdx + 1}</div>
-                                                <div className="flex-1">
-                                                  <div className="flex items-center gap-2 mb-1">
-                                                    <span className="text-xs font-bold text-slate-500 w-16">Student:</span>
-                                                    <span className={`px-3 py-1 rounded-lg text-sm font-bold ${!sOpt ? 'bg-slate-200 text-slate-500 italic' : isBlankCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                      {getOptionText(q, sOpt) || '(Left Blank)'}
-                                                    </span>
-                                                  </div>
-                                                  <div className="flex items-center gap-2">
-                                                    <span className="text-xs font-bold text-slate-500 w-16">Correct:</span>
-                                                    <span className="px-3 py-1 rounded-lg text-sm font-bold bg-slate-200 text-slate-700">
-                                                      {getOptionText(q, corrOpt)}
-                                                    </span>
-                                                  </div>
-                                                </div>
-                                                <div className="flex items-center justify-end w-10">
-                                                  {isBlankCorrect ? <CheckCircle2 className="text-green-500" size={24} /> : <XCircle className="text-red-500" size={24} />}
-                                                </div>
-                                              </div>
-                                            );
-                                          });
-                                        } catch (e) { return <p className="text-red-500 font-bold">Error parsing FITB answers.</p>; }
-                                      })()}
-                                    </div>
-                                  ) : q.question_type === 'MCQ' || q.question_type === 'TF' ? (
-                                    <div className="flex flex-col sm:flex-row gap-6">
-                                      <div className="flex-1">
-                                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Student Answer</div>
-                                        <div className={`p-3 rounded-xl border-2 font-bold ${!studentAns ? 'bg-slate-100 border-slate-200 text-slate-500 italic' : isCorrect ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
-                                          {getOptionText(q, studentAns) || 'Not Answered'}
-                                        </div>
-                                      </div>
-                                      <div className="flex-1">
-                                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Correct Answer</div>
-                                        <div className="p-3 rounded-xl border-2 bg-slate-100 border-slate-200 text-slate-700 font-bold">
-                                          {getOptionText(q, q.correct_answer)}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ) : q.question_type === 'MATCH' ? (
-                                    <div className="space-y-4">
-                                      {(() => {
-                                        try {
-                                          const correctMap = JSON.parse(q.correct_answer || '{}');
-                                          const studentMap = studentAns ? JSON.parse(studentAns) : {};
-                                          return Object.entries(correctMap).map(([left, corrRight], i) => {
-                                            const sRight = studentMap[left];
-                                            const isMatchCorrect = sRight === corrRight;
-                                            return (
-                                              <div key={i} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 pb-4 border-b border-slate-200 last:border-0 last:pb-0">
-                                                <div className="flex-1 font-bold text-slate-700 bg-slate-100 p-2 rounded text-center">{getMatchOptionText(q, 'left', left)}</div>
-                                                <div className="flex-1">
-                                                  <div className="flex items-center gap-2 mb-1">
-                                                    <span className="text-xs font-bold text-slate-500 w-16">Student:</span>
-                                                    <span className={`px-3 py-1 rounded-lg text-sm font-bold flex-1 text-center ${!sRight ? 'bg-slate-200 text-slate-500 italic' : isMatchCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                      {sRight ? getMatchOptionText(q, 'right', String(sRight)) : '(Left Blank)'}
-                                                    </span>
-                                                  </div>
-                                                  <div className="flex items-center gap-2">
-                                                    <span className="text-xs font-bold text-slate-500 w-16">Correct:</span>
-                                                    <span className="px-3 py-1 rounded-lg text-sm font-bold bg-slate-200 text-slate-700 flex-1 text-center">
-                                                      {getMatchOptionText(q, 'right', String(corrRight))}
-                                                    </span>
-                                                  </div>
-                                                </div>
-                                                <div className="flex items-center justify-end w-10">
-                                                  {isMatchCorrect ? <CheckCircle2 className="text-green-500" size={24} /> : <XCircle className="text-red-500" size={24} />}
-                                                </div>
-                                              </div>
-                                            );
-                                          });
-                                        } catch(e) { return <p className="text-red-500 font-bold">Error parsing MATCH answers.</p>; }
-                                      })()}
-                                    </div>
-                                  ) : (
-                                    <div className="space-y-4">
-                                      <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
-                                        <AlertTriangle size={16} /> Generic Text View
-                                      </div>
-                                      <div>
-                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Student Answer</span>
-                                        <div className="bg-white p-3 rounded-lg border border-slate-200 text-slate-700 whitespace-pre-wrap font-medium">
-                                          {studentAns || '(Left Blank)'}
-                                        </div>
-                                      </div>
-                                      <div>
-                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Correct Answer / Reference</span>
-                                        <div className="bg-white p-3 rounded-lg border border-slate-200 text-slate-700 whitespace-pre-wrap font-medium">
-                                          {q.correct_answer}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Marks Banner */}
-                                  {(() => {
-                                    const awardedMarks = q.awarded_marks !== null && q.awarded_marks !== undefined ? Number(q.awarded_marks) : (isCorrect ? q.marks : 0);
-                                    const isPartial = awardedMarks > 0 && awardedMarks < q.marks;
-                                    const isFullyCorrect = awardedMarks === q.marks;
-                                    
-                                    return (
-                                      <div className={`mt-5 flex items-center justify-between px-4 py-2 rounded-lg font-extrabold text-sm ${isFullyCorrect ? 'bg-green-100 text-green-800' : isPartial ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-600'}`}>
-                                        <div className="flex items-center gap-2">
-                                          {isFullyCorrect ? <CheckCircle2 size={18} /> : isPartial ? <AlertTriangle size={18} /> : <XCircle size={18} />}
-                                          <span>{isFullyCorrect ? 'Correct' : isPartial ? 'Partially Correct' : 'Incorrect'}</span>
-                                        </div>
-                                        <div className="text-right">
-                                          {Number.isInteger(awardedMarks) ? awardedMarks : awardedMarks.toFixed(1)} <span className="opacity-60">/ {q.marks} Marks</span>
-                                        </div>
-                                      </div>
-                                    );
-                                  })()}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ));
-                  })()}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-100 text-[11px] font-black text-slate-400 uppercase tracking-wider">
+                          <th className="pb-3 px-3">Roll ID</th>
+                          <th className="pb-3 px-3">Student Name</th>
+                          <th className="pb-3 px-3">Batch</th>
+                          <th className="pb-3 px-3">Score</th>
+                          <th className="pb-3 px-3">Status</th>
+                          <th className="pb-3 px-3">Violations</th>
+                          <th className="pb-3 px-3 text-right">Answer Sheet</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {runResultsData.map((res) => (
+                          <tr key={res.student_id} className="hover:bg-slate-50/80">
+                            <td className="py-3 px-3 font-mono font-black text-slate-800">{res.student_id}</td>
+                            <td className="py-3 px-3 font-bold text-slate-800">{res.name}</td>
+                            <td className="py-3 px-3 text-xs font-bold text-slate-500">{res.batch}</td>
+                            <td className="py-3 px-3 font-extrabold text-primary-600 text-base">
+                              {res.score} / {res.full_marks}
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                                res.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
+                              }`}>
+                                {res.status}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 font-bold text-slate-600">{res.tab_violation_count || 0}</td>
+                            <td className="py-3 px-3 text-right">
+                              <button
+                                onClick={() => openAnswerSheet(res.student_id, selectedRun.exam_id)}
+                                className="px-3 py-1 bg-primary-50 hover:bg-primary-100 text-primary-700 text-xs font-bold rounded-lg transition-colors"
+                              >
+                                View Sheet
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-16 text-center text-slate-400 font-bold">
+                  Select an examination run from the left list to view student scorecards and answer sheets.
                 </div>
               )}
             </div>
@@ -2012,6 +2397,130 @@ export default function TeacherDashboard() {
         </div>
       )}
 
+      {/* ========================================================================= */}
+      {/* 6. INITIALIZATION MODAL (EXAMINATION NAME PROMPT) */}
+      {/* ========================================================================= */}
+      {showInitModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-100">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-black text-slate-800">Initialize Examination Run</h3>
+              <button onClick={() => setShowInitModal(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+            </div>
+            
+            <p className="text-xs text-slate-500 font-medium mb-6">
+              Enter a name for this examination attempt / retest run. This name will appear on the Results panel and will preserve past scores separately.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Examination Attempt Name</label>
+                <input
+                  type="text"
+                  required
+                  value={initExamName}
+                  onChange={(e) => setInitExamName(e.target.value)}
+                  placeholder="e.g. Mid Term Mathematics - Retest 1"
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowInitModal(false)}
+                  className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmInitialize}
+                  className="flex-1 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl text-sm shadow-md"
+                >
+                  Initialize
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 7. STUDENT ANSWER SHEET MODAL */}
+      {/* ========================================================================= */}
+      {selectedStudentForAnswers && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-4xl w-full shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center text-primary-600 font-black">
+                  <FileText size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-800">
+                    {answerSheetData ? answerSheetData.student.name : 'Loading Answer Sheet...'}
+                  </h3>
+                  <p className="text-xs font-bold text-slate-400">
+                    ID: {answerSheetData?.student?.student_id} • Score: {answerSheetData?.student?.score} / {answerSheetData?.student?.full_marks}
+                  </p>
+                </div>
+              </div>
+              <button onClick={closeAnswerSheet} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 space-y-4 pr-1">
+              {isAnswerSheetLoading ? (
+                <div className="p-12 text-center text-slate-400 font-bold">Loading submitted answer sheet...</div>
+              ) : !answerSheetData ? (
+                <div className="p-12 text-center text-slate-400 font-bold">No answers recorded for this session.</div>
+              ) : (
+                answerSheetData.answers.map((qa: any, idx: number) => {
+                  const isCorrect = qa.is_correct;
+                  return (
+                    <div key={qa.question_id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/60">
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <span className="font-extrabold text-slate-800 text-sm">
+                          {idx + 1}. {qa.question_text_en}
+                        </span>
+                        <span className={`text-xs font-black px-2.5 py-0.5 rounded-full ${
+                          isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                        }`}>
+                          {isCorrect ? `+${qa.awarded_marks || qa.marks} Marks` : '0 Marks'}
+                        </span>
+                      </div>
+
+                      <div className="space-y-1 text-xs">
+                        <p className="font-bold text-slate-600">
+                          Student Answer: <span className="font-black text-slate-800">{qa.student_answer || '(No submission)'}</span>
+                        </p>
+                        <p className="font-bold text-green-700">
+                          Correct Answer: <span className="font-black">{qa.correct_answer}</span>
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+              <button
+                onClick={() => navigateAnswerSheet('prev')}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg flex items-center gap-1"
+              >
+                <ChevronLeft size={14} /> Prev Student
+              </button>
+              <button
+                onClick={() => navigateAnswerSheet('next')}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg flex items-center gap-1"
+              >
+                Next Student <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

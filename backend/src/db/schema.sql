@@ -65,6 +65,42 @@ CREATE TABLE IF NOT EXISTS student_responses (
   PRIMARY KEY (session_id, question_id)
 );
 
+CREATE TABLE IF NOT EXISTS batches (
+  batch_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(100) UNIQUE NOT NULL,
+  course_class VARCHAR(100),
+  session VARCHAR(100),
+  description TEXT,
+  status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS exam_batches (
+  exam_id UUID NOT NULL REFERENCES exams(exam_id) ON DELETE CASCADE,
+  batch_name VARCHAR(100) NOT NULL,
+  shuffle_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (exam_id, batch_name)
+);
+
+CREATE TABLE IF NOT EXISTS exam_runs (
+  run_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  exam_id UUID NOT NULL REFERENCES exams(exam_id) ON DELETE CASCADE,
+  exam_name VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  started_at TIMESTAMP,
+  ended_at TIMESTAMP,
+  status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'
+);
+
+CREATE TABLE IF NOT EXISTS exam_session_question_order (
+  session_id UUID NOT NULL REFERENCES exam_sessions(session_id) ON DELETE CASCADE,
+  question_id UUID NOT NULL REFERENCES questions(question_id) ON DELETE CASCADE,
+  display_order INTEGER NOT NULL,
+  PRIMARY KEY (session_id, question_id)
+);
+
 CREATE TABLE IF NOT EXISTS download_audit_logs (
   log_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   student_id VARCHAR(3) NOT NULL,
@@ -73,3 +109,16 @@ CREATE TABLE IF NOT EXISTS download_audit_logs (
   download_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   ip_address VARCHAR(45)
 );
+
+CREATE INDEX IF NOT EXISTS idx_exams_title ON exams(title);
+CREATE INDEX IF NOT EXISTS idx_exams_scheduled ON exams(scheduled_start);
+CREATE INDEX IF NOT EXISTS idx_exam_runs_name ON exam_runs(exam_name);
+CREATE INDEX IF NOT EXISTS idx_exam_runs_created ON exam_runs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_exam_runs_exam_id ON exam_runs(exam_id);
+CREATE INDEX IF NOT EXISTS idx_students_batch ON students(batch);
+CREATE INDEX IF NOT EXISTS idx_exam_batches_exam ON exam_batches(exam_id);
+CREATE INDEX IF NOT EXISTS idx_exam_batches_batch ON exam_batches(batch_name);
+CREATE INDEX IF NOT EXISTS idx_exam_sessions_student ON exam_sessions(student_id);
+CREATE INDEX IF NOT EXISTS idx_exam_sessions_exam ON exam_sessions(exam_id);
+CREATE INDEX IF NOT EXISTS idx_exam_sessions_run ON exam_sessions(run_id);
+CREATE INDEX IF NOT EXISTS idx_session_qorder ON exam_session_question_order(session_id, display_order);
