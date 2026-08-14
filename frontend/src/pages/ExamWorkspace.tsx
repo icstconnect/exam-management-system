@@ -172,7 +172,16 @@ export default function ExamWorkspace() {
     socket.on('exam_ended', () => {
       setStatus('COMPLETED');
     });
-    socket.on('time_tick', (data: { seconds_left: number }) => setSecondsLeft(data.seconds_left));
+    socket.on('time_tick', (data: { seconds_left: number }) => {
+      if (typeof data.seconds_left === 'number') {
+        const remaining = Math.max(0, data.seconds_left);
+        setSecondsLeft(remaining);
+        if (remaining === 0) {
+          socket.emit('student_submit_exam', { session_id });
+          setStatus('COMPLETED');
+        }
+      }
+    });
 
     return () => {
       socket.off('exam_waiting');
@@ -218,24 +227,7 @@ export default function ExamWorkspace() {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    let timer: ReturnType<typeof setInterval>;
-    if (secondsLeft !== null && secondsLeft > 0) {
-      const endTime = Date.now() + secondsLeft * 1000;
-      timer = setInterval(() => {
-        setSecondsLeft(() => {
-          const remaining = Math.max(0, Math.round((endTime - Date.now()) / 1000));
-          if (remaining === 0) {
-            clearInterval(timer);
-            socket.emit('student_submit_exam', { session_id });
-            setStatus('COMPLETED');
-          }
-          return remaining;
-        });
-      }, 1000);
-    }
-
     return () => {
-      if (timer) clearInterval(timer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [status, session_id]);
@@ -520,9 +512,10 @@ export default function ExamWorkspace() {
   };
 
   const formatTime = (totalSeconds: number | null) => {
-    if (totalSeconds === null) return '--:--';
-    const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
-    const s = (totalSeconds % 60).toString().padStart(2, '0');
+    if (totalSeconds === null || totalSeconds === undefined) return '--:--';
+    const safeSeconds = Math.max(0, totalSeconds);
+    const m = Math.floor(safeSeconds / 60).toString().padStart(2, '0');
+    const s = (safeSeconds % 60).toString().padStart(2, '0');
     return `${m}:${s}`;
   };
 

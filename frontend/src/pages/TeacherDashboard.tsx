@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { socket, API_BASE } from '../App';
-import { Users, Play, Unlock, UserPlus, BookOpen, Plus, AlertTriangle, ArrowLeft, Trash2, Square, Award, Download, Lock, Edit, Eye, X, ChevronLeft, ChevronRight, RotateCcw, Search, Shuffle, Layers, ArrowRightLeft, FileText } from 'lucide-react';
+import { Users, Play, Unlock, UserPlus, BookOpen, Plus, AlertTriangle, ArrowLeft, Trash2, Square, Award, Download, Lock, Edit, Eye, X, ChevronLeft, ChevronRight, RotateCcw, Search, Shuffle, Layers, ArrowRightLeft, FileText, List, LayoutGrid } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 
 interface StudentSession {
@@ -179,10 +179,21 @@ export default function TeacherDashboard() {
   const [deleteExamError, setDeleteExamError] = useState('');
   const [deleteSuccessToast, setDeleteSuccessToast] = useState('');
 
+  // View Modes (List View vs Card View)
+  const [studentsViewMode, setStudentsViewMode] = useState<'list' | 'card'>('list');
+  const [batchesViewMode, setBatchesViewMode] = useState<'list' | 'card'>('card');
+  const [examsViewMode, setExamsViewMode] = useState<'list' | 'card'>('list');
+  const [runsViewMode, setRunsViewMode] = useState<'list' | 'card'>('list');
+
   // Monitor State
   const [selectedMonitorExamId, setSelectedMonitorExamId] = useState<string>('');
+  const selectedMonitorExamIdRef = useRef(selectedMonitorExamId);
   const [studentsSession, setStudentsSession] = useState<StudentSession[]>([]);
   const [examSecondsLeft, setExamSecondsLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    selectedMonitorExamIdRef.current = selectedMonitorExamId;
+  }, [selectedMonitorExamId]);
 
   // Examination Name Initialization Modal
   const [showInitModal, setShowInitModal] = useState(false);
@@ -477,12 +488,20 @@ export default function TeacherDashboard() {
       setExamsList(prev => prev.map(e => e.exam_id === data.exam_id ? { ...e, status: data.status } : e));
     });
 
+    socket.on('time_tick', (data: { exam_id?: string, seconds_left: number }) => {
+      if (!data.exam_id || data.exam_id === selectedMonitorExamIdRef.current) {
+        setExamSecondsLeft(data.seconds_left);
+      }
+    });
+
     return () => {
       socket.off('dashboard_update');
       socket.off('student_status_update');
       socket.off('exam_status_update');
+      socket.off('time_tick');
     };
   }, []);
+
 
   useEffect(() => {
     if (selectedMonitorExamId) {
@@ -935,11 +954,67 @@ export default function TeacherDashboard() {
     socket.emit('teacher_unpause_student', { session_id });
   };
 
-  const formatTimer = (totalSeconds: number | null) => {
+  const formatTimer = (totalSeconds: number | null, status?: string) => {
+    if (status === 'CREATED' && (!totalSeconds || totalSeconds === 0)) {
+      const exam = examsList.find(e => e.exam_id === selectedMonitorExamId);
+      if (exam && exam.duration_minutes) {
+        return `${String(exam.duration_minutes).padStart(2, '0')}:00`;
+      }
+      return 'Not Started';
+    }
+    if (status === 'PAUSED') {
+      if (totalSeconds === null || totalSeconds === undefined) return 'PAUSED';
+      const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+      const s = (totalSeconds % 60).toString().padStart(2, '0');
+      return `${m}:${s} (PAUSED)`;
+    }
+    if (status === 'ENDED') return '00:00';
     if (totalSeconds === null || totalSeconds === undefined) return '--:--';
     const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
     const s = (totalSeconds % 60).toString().padStart(2, '0');
     return `${m}:${s}`;
+  };
+
+  const renderAnswerContent = (qa: any, rawVal: string, isCorrectVal?: boolean) => {
+    if (!rawVal) return <span className="italic text-slate-400 font-medium">(No submission)</span>;
+    
+    if (qa.question_type === 'MATCH') {
+      try {
+        const parsed = typeof rawVal === 'string' ? JSON.parse(rawVal) : rawVal;
+        if (typeof parsed === 'object' && parsed !== null && Object.keys(parsed).length > 0) {
+          return (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1.5">
+              {Object.entries(parsed).map(([left, right], pIdx) => (
+                <div key={pIdx} className={`px-3 py-2 rounded-xl border text-xs font-semibold flex items-center justify-between gap-2 break-words ${isCorrectVal ? 'bg-emerald-50/90 border-emerald-200 text-emerald-950' : 'bg-slate-100 border-slate-200 text-slate-800'}`}>
+                  <span className="font-extrabold text-blue-900 break-words">{String(left)}</span>
+                  <span className="text-slate-400 font-black">➔</span>
+                  <span className="font-extrabold text-purple-900 break-words">{String(right)}</span>
+                </div>
+              ))}
+            </div>
+          );
+        }
+      } catch(e) {}
+    }
+
+    if (qa.question_type === 'FITB') {
+      try {
+        const parsed = typeof rawVal === 'string' ? JSON.parse(rawVal) : rawVal;
+        if (Array.isArray(parsed)) {
+          return (
+            <div className="flex flex-wrap gap-1.5 mt-1">
+              {parsed.map((blk: any, bIdx: number) => (
+                <span key={bIdx} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-bold border border-slate-200 text-xs break-words">
+                  <span className="text-slate-400 text-[10px]">[{bIdx + 1}]</span> {String(blk)}
+                </span>
+              ))}
+            </div>
+          );
+        }
+      } catch(e) {}
+    }
+
+    return <span className="font-black break-words whitespace-pre-wrap">{rawVal}</span>;
   };
 
   if (!isAuthenticated) {
@@ -1072,7 +1147,7 @@ export default function TeacherDashboard() {
               <div className="flex flex-wrap items-center gap-3">
                 <div className="bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200 text-center">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Remaining Time</p>
-                  <p className="text-xl font-black text-slate-800">{formatTimer(examSecondsLeft)}</p>
+                  <p className="text-xl font-black text-slate-800">{formatTimer(examSecondsLeft, selectedMonitorExam.status)}</p>
                 </div>
 
                 {selectedMonitorExam.status === 'CREATED' && (
@@ -1329,78 +1404,160 @@ export default function TeacherDashboard() {
                 <h3 className="text-lg font-black text-slate-800">All Registered Students</h3>
                 <p className="text-xs font-bold text-slate-400">Total: {students.length} students</p>
               </div>
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
-                <input
-                  type="text"
-                  placeholder="Search name, ID or batch..."
-                  value={searchStudentQuery}
-                  onChange={(e) => setSearchStudentQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary-500"
-                />
+              <div className="flex items-center gap-3">
+                {/* View Mode Toggle (Icon Only) */}
+                <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                  <button
+                    onClick={() => setStudentsViewMode('list')}
+                    title="List View"
+                    className={`p-1.5 rounded-lg transition-all ${
+                      studentsViewMode === 'list' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                    }`}
+                  >
+                    <List size={18} />
+                  </button>
+                  <button
+                    onClick={() => setStudentsViewMode('card')}
+                    title="Card View"
+                    className={`p-1.5 rounded-lg transition-all ${
+                      studentsViewMode === 'card' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                    }`}
+                  >
+                    <LayoutGrid size={18} />
+                  </button>
+                </div>
+
+                <div className="relative w-56 sm:w-64">
+                  <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                  <input
+                    type="text"
+                    placeholder="Search name, ID or batch..."
+                    value={searchStudentQuery}
+                    onChange={(e) => setSearchStudentQuery(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 text-[11px] font-black text-slate-400 uppercase tracking-wider">
-                    <th className="pb-3 px-3">Roll ID</th>
-                    <th className="pb-3 px-3">Name</th>
-                    <th className="pb-3 px-3">Batch</th>
-                    <th className="pb-3 px-3">Class</th>
-                    <th className="pb-3 px-3">Phone</th>
-                    <th className="pb-3 px-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {students
-                    .filter(s => 
-                      s.name.toLowerCase().includes(searchStudentQuery.toLowerCase()) ||
-                      s.student_id.includes(searchStudentQuery) ||
-                      (s.batch && s.batch.toLowerCase().includes(searchStudentQuery.toLowerCase()))
-                    )
-                    .map(s => (
-                      <tr key={s.student_id} className="hover:bg-slate-50/80">
-                        <td className="py-3 px-3 font-mono font-black text-slate-800">{s.student_id}</td>
-                        <td className="py-3 px-3 font-bold text-slate-800">{s.name}</td>
-                        <td className="py-3 px-3">
-                          <span className="px-2.5 py-0.5 bg-slate-100 text-slate-700 text-xs font-bold rounded-md">
-                            {s.batch}
+            {studentsViewMode === 'list' ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-[11px] font-black text-slate-400 uppercase tracking-wider">
+                      <th className="pb-3 px-3">Roll ID</th>
+                      <th className="pb-3 px-3">Name</th>
+                      <th className="pb-3 px-3">Batch</th>
+                      <th className="pb-3 px-3">Class</th>
+                      <th className="pb-3 px-3">Phone</th>
+                      <th className="pb-3 px-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {students
+                      .filter(s => 
+                        s.name.toLowerCase().includes(searchStudentQuery.toLowerCase()) ||
+                        s.student_id.includes(searchStudentQuery) ||
+                        (s.batch && s.batch.toLowerCase().includes(searchStudentQuery.toLowerCase()))
+                      )
+                      .map(s => (
+                        <tr key={s.student_id} className="hover:bg-slate-50/80">
+                          <td className="py-3 px-3 font-mono font-black text-slate-800">{s.student_id}</td>
+                          <td className="py-3 px-3 font-bold text-slate-800">{s.name}</td>
+                          <td className="py-3 px-3">
+                            <span className="px-2.5 py-0.5 bg-slate-100 text-slate-700 text-xs font-bold rounded-md">
+                              {s.batch}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-slate-600 font-medium">{s.class}</td>
+                          <td className="py-3 px-3 text-slate-500 font-mono text-xs">{s.phone_no}</td>
+                          <td className="py-3 px-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => {
+                                  setNewStudent({
+                                    student_id: s.student_id,
+                                    name: s.name,
+                                    phone_no: s.phone_no,
+                                    student_class: s.class,
+                                    batch: s.batch
+                                  });
+                                  setIsEditingStudent(true);
+                                }}
+                                title="Edit Student"
+                                className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                              >
+                                <Edit size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteStudent(s.student_id)}
+                                title="Delete Student"
+                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              /* Card Grid View */
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {students
+                  .filter(s => 
+                    s.name.toLowerCase().includes(searchStudentQuery.toLowerCase()) ||
+                    s.student_id.includes(searchStudentQuery) ||
+                    (s.batch && s.batch.toLowerCase().includes(searchStudentQuery.toLowerCase()))
+                  )
+                  .map(s => (
+                    <div key={s.student_id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/60 hover:bg-slate-50 transition-all flex flex-col justify-between">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div>
+                          <span className="font-mono text-[11px] font-black bg-primary-50 text-primary-700 px-2 py-0.5 rounded-md border border-primary-100 inline-block mb-1">
+                            ID: {s.student_id}
                           </span>
-                        </td>
-                        <td className="py-3 px-3 text-slate-600 font-medium">{s.class}</td>
-                        <td className="py-3 px-3 text-slate-500 font-mono text-xs">{s.phone_no}</td>
-                        <td className="py-3 px-3 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              onClick={() => {
-                                setNewStudent({
-                                  student_id: s.student_id,
-                                  name: s.name,
-                                  phone_no: s.phone_no,
-                                  student_class: s.class,
-                                  batch: s.batch
-                                });
-                                setIsEditingStudent(true);
-                              }}
-                              className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-                            >
-                              <Edit size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteStudent(s.student_id)}
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
+                          <h4 className="font-extrabold text-slate-800 text-sm leading-tight">{s.name}</h4>
+                          <p className="text-xs font-semibold text-slate-400 font-mono mt-0.5">{s.phone_no}</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => {
+                              setNewStudent({
+                                student_id: s.student_id,
+                                name: s.name,
+                                phone_no: s.phone_no,
+                                student_class: s.class,
+                                batch: s.batch
+                              });
+                              setIsEditingStudent(true);
+                            }}
+                            title="Edit Student"
+                            className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-white rounded-lg transition-colors"
+                          >
+                            <Edit size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteStudent(s.student_id)}
+                            title="Delete Student"
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-white rounded-lg transition-colors"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-xs font-bold mt-1">
+                        <span className="text-slate-500">{s.class}</span>
+                        <span className="bg-slate-200/70 text-slate-700 px-2.5 py-0.5 rounded-full text-[10px] font-black">
+                          {s.batch}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1416,7 +1573,29 @@ export default function TeacherDashboard() {
               <p className="text-xs font-semibold text-slate-400 mt-0.5">Create, edit, rename batches and organize students</p>
             </div>
             <div className="flex items-center gap-3">
-              <div className="relative w-64">
+              {/* View Mode Toggle (Icon Only) */}
+              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <button
+                  onClick={() => setBatchesViewMode('list')}
+                  title="List View"
+                  className={`p-1.5 rounded-lg transition-all ${
+                    batchesViewMode === 'list' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  <List size={18} />
+                </button>
+                <button
+                  onClick={() => setBatchesViewMode('card')}
+                  title="Card View"
+                  className={`p-1.5 rounded-lg transition-all ${
+                    batchesViewMode === 'card' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  <LayoutGrid size={18} />
+                </button>
+              </div>
+
+              <div className="relative w-56 sm:w-64">
                 <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
                 <input
                   type="text"
@@ -1428,67 +1607,136 @@ export default function TeacherDashboard() {
               </div>
               <button
                 onClick={() => setCreatingBatch(true)}
-                className="bg-primary-600 hover:bg-primary-700 text-white font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2 shadow-sm"
+                className="bg-primary-600 hover:bg-primary-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm"
               >
                 <Plus size={18} /> New Batch
               </button>
             </div>
           </div>
 
-          {/* Batches Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {batchesList
-              .filter(b => b.name.toLowerCase().includes(batchSearchQuery.toLowerCase()))
-              .map(batch => (
-                <div key={batch.batch_id} className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between hover:shadow-md transition-all">
-                  <div>
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h4 className="text-lg font-black text-slate-800">{batch.name}</h4>
-                        <span className="text-xs font-bold text-slate-400">{batch.course_class || 'Class Standard'} • Session {batch.session || '2026'}</span>
+          {batchesViewMode === 'card' ? (
+            /* Batches Grid View */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {batchesList
+                .filter(b => b.name.toLowerCase().includes(batchSearchQuery.toLowerCase()))
+                .map(batch => (
+                  <div key={batch.batch_id} className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between hover:shadow-md transition-all">
+                    <div>
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h4 className="text-lg font-black text-slate-800">{batch.name}</h4>
+                          <span className="text-xs font-bold text-slate-400">{batch.course_class || 'Class Standard'} • Session {batch.session || '2026'}</span>
+                        </div>
+                        <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full ${
+                          batch.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
+                        }`}>
+                          {batch.status}
+                        </span>
                       </div>
-                      <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full ${
-                        batch.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
-                      }`}>
-                        {batch.status}
-                      </span>
+
+                      {batch.description && (
+                        <p className="text-xs text-slate-500 font-medium line-clamp-2 mb-4">{batch.description}</p>
+                      )}
+
+                      <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-2xl mb-4 border border-slate-100">
+                        <Users size={18} className="text-primary-600" />
+                        <span className="text-sm font-extrabold text-slate-700">{batch.student_count || 0} Students Assigned</span>
+                      </div>
                     </div>
 
-                    {batch.description && (
-                      <p className="text-xs text-slate-500 font-medium line-clamp-2 mb-4">{batch.description}</p>
-                    )}
-
-                    <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-2xl mb-4 border border-slate-100">
-                      <Users size={18} className="text-primary-600" />
-                      <span className="text-sm font-extrabold text-slate-700">{batch.student_count || 0} Students Assigned</span>
+                    <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                      <button
+                        onClick={() => openViewBatchStudents(batch)}
+                        className="text-xs font-bold text-primary-600 hover:text-primary-700 flex items-center gap-1"
+                      >
+                        <Eye size={14} /> View Students
+                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => setEditingBatch(batch)}
+                          className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteBatch(batch.batch_id)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
                   </div>
-
-                  <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                    <button
-                      onClick={() => openViewBatchStudents(batch)}
-                      className="text-xs font-bold text-primary-600 hover:text-primary-700 flex items-center gap-1"
-                    >
-                      <Eye size={14} /> View Students
-                    </button>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => setEditingBatch(batch)}
-                        className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteBatch(batch.batch_id)}
-                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-          </div>
+                ))}
+            </div>
+          ) : (
+            /* Batches Table View */
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 text-[11px] font-black text-slate-400 uppercase tracking-wider">
+                    <th className="pb-3 px-3">Batch Name</th>
+                    <th className="pb-3 px-3">Class / Course</th>
+                    <th className="pb-3 px-3">Session</th>
+                    <th className="pb-3 px-3">Students</th>
+                    <th className="pb-3 px-3">Status</th>
+                    <th className="pb-3 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {batchesList
+                    .filter(b => b.name.toLowerCase().includes(batchSearchQuery.toLowerCase()))
+                    .map(batch => (
+                      <tr key={batch.batch_id} className="hover:bg-slate-50/80">
+                        <td className="py-3.5 px-3 font-bold text-slate-800">
+                          {batch.name}
+                          {batch.description && <p className="text-xs text-slate-400 font-normal line-clamp-1">{batch.description}</p>}
+                        </td>
+                        <td className="py-3.5 px-3 text-slate-600 font-medium">{batch.course_class || 'Class 5'}</td>
+                        <td className="py-3.5 px-3 text-slate-600 font-medium">{batch.session || '2026'}</td>
+                        <td className="py-3.5 px-3">
+                          <span className="px-2.5 py-0.5 bg-primary-50 text-primary-700 text-xs font-black rounded-md">
+                            {batch.student_count || 0} students
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-3">
+                          <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full ${
+                            batch.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
+                          }`}>
+                            {batch.status}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-3 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => openViewBatchStudents(batch)}
+                              title="View Students"
+                              className="px-2.5 py-1 bg-primary-50 hover:bg-primary-100 text-primary-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
+                            >
+                              <Eye size={13} /> View
+                            </button>
+                            <button
+                              onClick={() => setEditingBatch(batch)}
+                              title="Edit Batch"
+                              className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                            >
+                              <Edit size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteBatch(batch.batch_id)}
+                              title="Delete Batch"
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {/* Create Batch Modal */}
           {creatingBatch && (
@@ -1707,12 +1955,36 @@ export default function TeacherDashboard() {
                   <h3 className="text-xl font-black text-slate-800">Examination Sets</h3>
                   <p className="text-xs font-semibold text-slate-400 mt-0.5">Manage question sets and multi-batch assignments</p>
                 </div>
-                <button
-                  onClick={() => setCreatingExam(true)}
-                  className="bg-primary-600 hover:bg-primary-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm"
-                >
-                  <Plus size={18} /> Create Examination
-                </button>
+                <div className="flex items-center gap-3">
+                  {/* View Mode Toggle (Icon Only) */}
+                  <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                    <button
+                      onClick={() => setExamsViewMode('list')}
+                      title="List View"
+                      className={`p-1.5 rounded-lg transition-all ${
+                        examsViewMode === 'list' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                      }`}
+                    >
+                      <List size={18} />
+                    </button>
+                    <button
+                      onClick={() => setExamsViewMode('card')}
+                      title="Card View"
+                      className={`p-1.5 rounded-lg transition-all ${
+                        examsViewMode === 'card' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                      }`}
+                    >
+                      <LayoutGrid size={18} />
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={() => setCreatingExam(true)}
+                    className="bg-primary-600 hover:bg-primary-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm"
+                  >
+                    <Plus size={18} /> Create Examination
+                  </button>
+                </div>
               </div>
 
               {deleteSuccessToast && (
@@ -1725,86 +1997,168 @@ export default function TeacherDashboard() {
                 </div>
               )}
 
-              {/* Exams Table */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-100 text-[11px] font-black text-slate-400 uppercase tracking-wider">
-                      <th className="pb-3 px-3">Title</th>
-                      <th className="pb-3 px-3">Assigned Batches</th>
-                      <th className="pb-3 px-3">Duration</th>
-                      <th className="pb-3 px-3">Full Marks</th>
-                      <th className="pb-3 px-3">Status</th>
-                      <th className="pb-3 px-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {examsList.map(e => (
-                      <tr key={e.exam_id} className="hover:bg-slate-50/80">
-                        <td className="py-3.5 px-3 font-bold text-slate-800">{e.title}</td>
-                        <td className="py-3.5 px-3">
-                          <div className="flex flex-wrap gap-1">
-                            {e.assigned_batches && e.assigned_batches.length > 0 ? (
-                              e.assigned_batches.map(b => (
-                                <span key={b.batch_name} className="px-2 py-0.5 bg-slate-100 text-slate-700 text-xs font-bold rounded flex items-center gap-1">
-                                  {b.batch_name}
-                                  {b.shuffle_enabled && <Shuffle size={10} className="text-primary-600" />}
+              {examsViewMode === 'list' ? (
+                /* Exams Table View */
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-[11px] font-black text-slate-400 uppercase tracking-wider">
+                        <th className="pb-3 px-3">Title</th>
+                        <th className="pb-3 px-3">Assigned Batches</th>
+                        <th className="pb-3 px-3">Duration</th>
+                        <th className="pb-3 px-3">Full Marks</th>
+                        <th className="pb-3 px-3">Status</th>
+                        <th className="pb-3 px-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {examsList.map(e => (
+                        <tr key={e.exam_id} className="hover:bg-slate-50/80">
+                          <td className="py-3.5 px-3 font-bold text-slate-800">{e.title}</td>
+                          <td className="py-3.5 px-3">
+                            <div className="flex flex-wrap gap-1">
+                              {e.assigned_batches && e.assigned_batches.length > 0 ? (
+                                e.assigned_batches.map(b => (
+                                  <span key={b.batch_name} className="px-2 py-0.5 bg-slate-100 text-slate-700 text-xs font-bold rounded flex items-center gap-1">
+                                    {b.batch_name}
+                                    {b.shuffle_enabled && <Shuffle size={10} className="text-primary-600" />}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="px-2 py-0.5 bg-slate-100 text-slate-700 text-xs font-bold rounded">
+                                  {e.target_batch}
                                 </span>
-                              ))
-                            ) : (
-                              <span className="px-2 py-0.5 bg-slate-100 text-slate-700 text-xs font-bold rounded">
-                                {e.target_batch}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-3 text-slate-600 font-medium">{e.duration_minutes} Mins</td>
-                        <td className="py-3.5 px-3 font-bold text-slate-700">{e.full_marks}</td>
-                        <td className="py-3.5 px-3">
-                          <span className="px-2.5 py-0.5 bg-primary-50 text-primary-700 text-xs font-black rounded-full">
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-3 text-slate-600 font-medium">{e.duration_minutes} Mins</td>
+                          <td className="py-3.5 px-3 font-bold text-slate-700">{e.full_marks}</td>
+                          <td className="py-3.5 px-3">
+                            <span className="px-2.5 py-0.5 bg-primary-50 text-primary-700 text-xs font-black rounded-full">
+                              {e.status}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => handleDownloadTeacherQuestionPaper(e.exam_id, e.title)}
+                                title="Download Full Question Set with Answers (PDF)"
+                                disabled={isDownloadingQuestionPaper}
+                                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors"
+                              >
+                                <Download size={14} /> Download Set
+                              </button>
+                              <button
+                                onClick={() => setSelectedExamIdBuilder(e.exam_id)}
+                                className="px-3 py-1.5 bg-primary-50 hover:bg-primary-100 text-primary-700 text-xs font-bold rounded-lg transition-colors"
+                              >
+                                Edit Questions
+                              </button>
+                              <button
+                                onClick={() => handleOpenEditExam(e)}
+                                title="Edit Examination Configuration"
+                                className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-slate-100 rounded-lg"
+                              >
+                                <Edit size={16} />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setDeleteExamError('');
+                                  setConfirmDeleteExam(e);
+                                }}
+                                title="Delete Examination"
+                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                /* Exams Card Grid View */
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {examsList.map(e => (
+                    <div key={e.exam_id} className="p-6 rounded-3xl border border-slate-100 bg-slate-50/60 hover:bg-slate-50 hover:shadow-md transition-all flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <h4 className="font-black text-slate-800 text-base leading-snug">{e.title}</h4>
+                          <span className="px-2.5 py-0.5 bg-primary-50 text-primary-700 text-[10px] font-black rounded-full uppercase">
                             {e.status}
                           </span>
-                        </td>
-                        <td className="py-3.5 px-3 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              onClick={() => handleDownloadTeacherQuestionPaper(e.exam_id, e.title)}
-                              title="Download Full Question Set with Answers (PDF)"
-                              disabled={isDownloadingQuestionPaper}
-                              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors"
-                            >
-                              <Download size={14} /> Download Set
-                            </button>
-                            <button
-                              onClick={() => setSelectedExamIdBuilder(e.exam_id)}
-                              className="px-3 py-1.5 bg-primary-50 hover:bg-primary-100 text-primary-700 text-xs font-bold rounded-lg transition-colors"
-                            >
-                              Edit Questions
-                            </button>
-                            <button
-                              onClick={() => handleOpenEditExam(e)}
-                              title="Edit Examination Configuration"
-                              className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-slate-100 rounded-lg"
-                            >
-                              <Edit size={16} />
-                            </button>
-                            <button
-                              onClick={() => {
-                                setDeleteExamError('');
-                                setConfirmDeleteExam(e);
-                              }}
-                              title="Delete Examination"
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                        </div>
+
+                        <div className="space-y-2 mb-4 text-xs font-bold text-slate-500">
+                          <div className="flex items-center justify-between">
+                            <span>Duration:</span>
+                            <span className="text-slate-800">{e.duration_minutes} Minutes</span>
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                          <div className="flex items-center justify-between">
+                            <span>Full Marks:</span>
+                            <span className="text-slate-800">{e.full_marks}</span>
+                          </div>
+                          <div className="pt-2 border-t border-slate-200/60">
+                            <span className="text-[10px] uppercase text-slate-400 tracking-wider block mb-1">Batches:</span>
+                            <div className="flex flex-wrap gap-1">
+                              {e.assigned_batches && e.assigned_batches.length > 0 ? (
+                                e.assigned_batches.map(b => (
+                                  <span key={b.batch_name} className="px-2 py-0.5 bg-white text-slate-700 text-[11px] font-bold rounded-md border border-slate-200 flex items-center gap-1">
+                                    {b.batch_name}
+                                    {b.shuffle_enabled && <Shuffle size={10} className="text-primary-600" />}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="px-2 py-0.5 bg-white text-slate-700 text-[11px] font-bold rounded-md border border-slate-200">
+                                  {e.target_batch}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-4 border-t border-slate-200/60 flex items-center justify-between gap-2">
+                        <button
+                          onClick={() => handleDownloadTeacherQuestionPaper(e.exam_id, e.title)}
+                          title="Download Full Question Set (PDF)"
+                          disabled={isDownloadingQuestionPaper}
+                          className="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-lg flex items-center gap-1 border border-slate-200 transition-colors"
+                        >
+                          <Download size={13} /> PDF
+                        </button>
+                        <button
+                          onClick={() => setSelectedExamIdBuilder(e.exam_id)}
+                          className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors"
+                        >
+                          Edit Questions
+                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleOpenEditExam(e)}
+                            title="Edit Exam Config"
+                            className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-white rounded-lg transition-colors"
+                          >
+                            <Edit size={16} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setDeleteExamError('');
+                              setConfirmDeleteExam(e);
+                            }}
+                            title="Delete Examination"
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-white rounded-lg transition-colors"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             /* Question & Section Builder Screen */
@@ -2351,9 +2705,31 @@ export default function TeacherDashboard() {
               <p className="text-xs font-semibold text-slate-400 mt-0.5">Paginated historical attempts (10 per page)</p>
             </div>
             
-            {/* Server-side Search */}
-            <div className="flex items-center gap-2">
-              <div className="relative w-72">
+            <div className="flex items-center gap-3">
+              {/* View Mode Toggle (Icon Only) */}
+              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <button
+                  onClick={() => setRunsViewMode('list')}
+                  title="List View"
+                  className={`p-1.5 rounded-lg transition-all ${
+                    runsViewMode === 'list' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  <List size={18} />
+                </button>
+                <button
+                  onClick={() => setRunsViewMode('card')}
+                  title="Card View"
+                  className={`p-1.5 rounded-lg transition-all ${
+                    runsViewMode === 'card' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  <LayoutGrid size={18} />
+                </button>
+              </div>
+
+              {/* Server-side Search */}
+              <div className="relative w-56 sm:w-72">
                 <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
                 <input
                   type="text"
@@ -2382,7 +2758,7 @@ export default function TeacherDashboard() {
               ) : examRuns.length === 0 ? (
                 <div className="p-8 text-center text-slate-400 font-bold bg-slate-50 rounded-2xl">No examination runs found.</div>
               ) : (
-                <div className="space-y-2.5">
+                <div className={runsViewMode === 'card' ? 'grid grid-cols-1 gap-3' : 'space-y-2.5'}>
                   {examRuns.map(run => {
                     const isSelected = selectedRun?.run_id === run.run_id;
                     return (
@@ -2565,12 +2941,12 @@ export default function TeacherDashboard() {
       )}
 
       {/* ========================================================================= */}
-      {/* 7. STUDENT ANSWER SHEET MODAL */}
+      {/* 7. STUDENT ANSWER SHEET MODAL (SAFE WRAP & LONG CONTENT FIX) */}
       {/* ========================================================================= */}
       {selectedStudentForAnswers && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-4xl w-full shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4">
+          <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-4xl w-full shadow-2xl border border-slate-100 max-h-[88vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3 flex-shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center text-primary-600 font-black">
                   <FileText size={20} />
@@ -2584,10 +2960,10 @@ export default function TeacherDashboard() {
                   </p>
                 </div>
               </div>
-              <button onClick={closeAnswerSheet} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+              <button onClick={closeAnswerSheet} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"><X size={20}/></button>
             </div>
 
-            <div className="overflow-y-auto flex-1 space-y-4 pr-1">
+            <div className="overflow-y-auto flex-1 space-y-4 pr-1.5 overscroll-contain">
               {isAnswerSheetLoading ? (
                 <div className="p-12 text-center text-slate-400 font-bold">Loading submitted answer sheet...</div>
               ) : !answerSheetData ? (
@@ -2596,25 +2972,38 @@ export default function TeacherDashboard() {
                 answerSheetData.answers.map((qa: any, idx: number) => {
                   const isCorrect = qa.is_correct;
                   return (
-                    <div key={qa.question_id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/60">
+                    <div key={qa.question_id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/60 break-words">
                       <div className="flex items-start justify-between gap-3 mb-2">
-                        <span className="font-extrabold text-slate-800 text-sm">
-                          {idx + 1}. {qa.question_text_en}
-                        </span>
-                        <span className={`text-xs font-black px-2.5 py-0.5 rounded-full ${
+                        <div className="flex-1 space-y-0.5">
+                          <span className="font-extrabold text-slate-800 text-sm leading-relaxed block break-words">
+                            {idx + 1}. {qa.question_text_en}
+                          </span>
+                          {qa.question_text_bn && (
+                            <span className="font-bold text-slate-600 text-xs leading-relaxed block break-words">
+                              {qa.question_text_bn}
+                            </span>
+                          )}
+                        </div>
+                        <span className={`text-xs font-black px-2.5 py-0.5 rounded-full flex-shrink-0 ${
                           isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
                         }`}>
                           {isCorrect ? `+${qa.awarded_marks || qa.marks} Marks` : '0 Marks'}
                         </span>
                       </div>
 
-                      <div className="space-y-1 text-xs">
-                        <p className="font-bold text-slate-600">
-                          Student Answer: <span className="font-black text-slate-800">{qa.student_answer || '(No submission)'}</span>
-                        </p>
-                        <p className="font-bold text-green-700">
-                          Correct Answer: <span className="font-black">{qa.correct_answer}</span>
-                        </p>
+                      <div className="space-y-2 text-xs pt-2 border-t border-slate-200/50">
+                        <div>
+                          <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px] block mb-0.5">Student Submitted Answer:</span>
+                          <div className="text-slate-800">
+                            {renderAnswerContent(qa, qa.student_answer, isCorrect)}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="font-bold text-emerald-700 uppercase tracking-wider text-[10px] block mb-0.5">Correct Answer Key:</span>
+                          <div className="text-emerald-900">
+                            {renderAnswerContent(qa, qa.correct_answer, true)}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   );
@@ -2622,16 +3011,16 @@ export default function TeacherDashboard() {
               )}
             </div>
 
-            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+            <div className="flex items-center justify-between pt-3 border-t border-slate-100 flex-shrink-0">
               <button
                 onClick={() => navigateAnswerSheet('prev')}
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg flex items-center gap-1"
+                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors"
               >
                 <ChevronLeft size={14} /> Prev Student
               </button>
               <button
                 onClick={() => navigateAnswerSheet('next')}
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg flex items-center gap-1"
+                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors"
               >
                 Next Student <ChevronRight size={14} />
               </button>
