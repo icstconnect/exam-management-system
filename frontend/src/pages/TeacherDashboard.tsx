@@ -439,7 +439,18 @@ export default function TeacherDashboard() {
     checkRecovery();
     
     socket.on('dashboard_update', (data: { students: StudentSession[], status: any, global_seconds_left?: number }) => {
-      setStudentsSession(data.students);
+      const uniqueMap = new Map<string, StudentSession>();
+      (data.students || []).forEach(st => {
+        if (!uniqueMap.has(st.student_id)) {
+          uniqueMap.set(st.student_id, st);
+        } else {
+          const existing = uniqueMap.get(st.student_id)!;
+          if (!existing.session_id && st.session_id) {
+            uniqueMap.set(st.student_id, st);
+          }
+        }
+      });
+      setStudentsSession(Array.from(uniqueMap.values()));
       if (data.global_seconds_left !== undefined) {
         setExamSecondsLeft(data.global_seconds_left);
       }
@@ -471,6 +482,7 @@ export default function TeacherDashboard() {
 
   useEffect(() => {
     if (selectedMonitorExamId) {
+      setStudentsSession([]);
       socket.emit('monitor_exam', { exam_id: selectedMonitorExamId });
     }
   }, [selectedMonitorExamId]);
@@ -1134,7 +1146,7 @@ export default function TeacherDashboard() {
                   }
 
                   return (
-                    <div key={st.student_id} className={`p-4 rounded-2xl border transition-all ${statusBg}`}>
+                    <div key={st.session_id ? `${st.student_id}-${st.session_id}` : st.student_id} className={`p-4 rounded-2xl border transition-all ${statusBg}`}>
                       <div className="flex items-start justify-between mb-2">
                         <div>
                           <span className="text-xs font-black text-slate-400">ID: {st.student_id}</span>

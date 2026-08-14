@@ -1054,13 +1054,14 @@ io.on('connection', (socket: Socket) => {
         const activeRunId = runRes.rows[0]?.run_id || null;
 
         const updatedStudentsRes = await pool.query(`
-          SELECT 
+          SELECT DISTINCT ON (s.student_id)
             s.student_id, s.name, s.batch, s.class,
-            es.session_id, es.status, es.password_provided, es.tab_violation_count, es.seconds_left
+            es.session_id, COALESCE(es.status, 'READY') as status, es.password_provided, 
+            COALESCE(es.tab_violation_count, 0) as tab_violation_count, es.seconds_left
           FROM students s
           LEFT JOIN exam_sessions es ON s.student_id = es.student_id AND es.exam_id = $1 AND ($3::uuid IS NULL OR es.run_id = $3)
           WHERE s.batch = ANY($2)
-          ORDER BY s.student_id ASC
+          ORDER BY s.student_id ASC, (es.run_id = $3) DESC NULLS LAST, es.last_active_timestamp DESC NULLS LAST, es.session_id DESC NULLS LAST
         `, [exam_id, assignedBatches, activeRunId]);
 
         io.to('teacher_dashboard').emit('dashboard_update', { 
