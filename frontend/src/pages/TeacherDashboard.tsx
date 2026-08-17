@@ -184,6 +184,14 @@ export default function TeacherDashboard() {
   const [batchesViewMode, setBatchesViewMode] = useState<'list' | 'card'>('card');
   const [examsViewMode, setExamsViewMode] = useState<'list' | 'card'>('list');
   const [runsViewMode, setRunsViewMode] = useState<'list' | 'card'>('list');
+  const [monitorViewMode, setMonitorViewMode] = useState<'card' | 'list'>(() => {
+    return (localStorage.getItem('icst_monitor_view_mode') as 'card' | 'list') || 'card';
+  });
+
+  const handleSetMonitorViewMode = (mode: 'card' | 'list') => {
+    setMonitorViewMode(mode);
+    localStorage.setItem('icst_monitor_view_mode', mode);
+  };
 
   // Monitor State
   const [selectedMonitorExamId, setSelectedMonitorExamId] = useState<string>('');
@@ -215,6 +223,11 @@ export default function TeacherDashboard() {
   const [isRunsLoading, setIsRunsLoading] = useState(false);
   const [selectedRun, setSelectedRun] = useState<ExamRun | null>(null);
   const [runResultsData, setRunResultsData] = useState<ResultData[]>([]);
+
+  // Delete Run Confirmation Modal State
+  const [runToDelete, setRunToDelete] = useState<ExamRun | null>(null);
+  const [isDeletingRun, setIsDeletingRun] = useState(false);
+  const [deleteRunError, setDeleteRunError] = useState('');
 
   // Answer Sheet View State
   const [selectedStudentForAnswers, setSelectedStudentForAnswers] = useState<string | null>(null);
@@ -259,19 +272,28 @@ export default function TeacherDashboard() {
     }
   };
 
-  const deleteExamRun = async (runId: string) => {
-    if (!window.confirm('Are you sure you want to permanently delete this examination run and its student results?')) return;
+  const handleConfirmDeleteRun = async () => {
+    if (!runToDelete) return;
+    setIsDeletingRun(true);
+    setDeleteRunError('');
     try {
-      const res = await fetch(`${API_BASE}/api/exam-runs/${runId}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/api/exam-runs/${runToDelete.run_id}`, { method: 'DELETE' });
       if (res.ok) {
-        if (selectedRun?.run_id === runId) {
+        if (selectedRun?.run_id === runToDelete.run_id) {
           setSelectedRun(null);
           setRunResultsData([]);
         }
+        setRunToDelete(null);
         fetchExamRuns(examRunsOffset, examRunsSearch);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setDeleteRunError(data.message || 'Unable to delete this examination run. Please try again.');
       }
     } catch (e) {
       console.error('Error deleting exam run:', e);
+      setDeleteRunError('Unable to delete this examination run. Please try again.');
+    } finally {
+      setIsDeletingRun(false);
     }
   };
 
@@ -1351,21 +1373,55 @@ export default function TeacherDashboard() {
             )}
           </div>
 
-          {/* Student Live Monitor Grid */}
+          {/* Student Live Monitor Section */}
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
               <div>
                 <h3 className="text-xl font-black text-slate-800">Student Live Monitor</h3>
                 <p className="text-xs font-semibold text-slate-400 mt-0.5">
                   {selectedMonitorExam ? selectedMonitorExam.title : 'No exam selected'} • Target Batch: <span className="text-primary-600 font-bold">{selectedMonitorBatch || 'None Selected'}</span> • Status: <span className="font-bold text-slate-700">{monitorBatchStatus}</span>
                 </p>
               </div>
-              <div className="flex items-center gap-4 text-xs font-bold">
-                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-slate-300"></span> Ready</span>
-                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-blue-500"></span> Logged In</span>
-                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-green-500"></span> Examinee</span>
-                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-amber-500"></span> Paused</span>
-                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-purple-500"></span> Completed</span>
+
+              <div className="flex flex-wrap items-center gap-4">
+                {/* Status Legend */}
+                <div className="flex items-center gap-3 text-xs font-bold">
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-300"></span> Ready</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Logged In</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-500"></span> Examinee</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Paused</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-purple-500"></span> Completed</span>
+                </div>
+
+                {/* View Toggle (Icons only: Card View / List View) */}
+                <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => handleSetMonitorViewMode('card')}
+                    title="Card View"
+                    aria-label="Card View"
+                    className={`p-1.5 rounded-lg transition-all ${
+                      monitorViewMode === 'card'
+                        ? 'bg-white text-primary-600 shadow-sm'
+                        : 'text-slate-400 hover:text-slate-700'
+                    }`}
+                  >
+                    <LayoutGrid size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSetMonitorViewMode('list')}
+                    title="List View"
+                    aria-label="List View"
+                    className={`p-1.5 rounded-lg transition-all ${
+                      monitorViewMode === 'list'
+                        ? 'bg-white text-primary-600 shadow-sm'
+                        : 'text-slate-400 hover:text-slate-700'
+                    }`}
+                  >
+                    <List size={18} />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1377,7 +1433,96 @@ export default function TeacherDashboard() {
               <div className="p-12 text-center text-slate-400 font-bold bg-slate-50 rounded-2xl border border-dashed border-slate-200">
                 No examinees initialized for {selectedMonitorBatch} yet. Click &quot;Initialize Exam&quot; to assign passwords and prepare sessions.
               </div>
+            ) : monitorViewMode === 'list' ? (
+              /* ================= LIST VIEW ================= */
+              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-black text-slate-400 uppercase tracking-wider">
+                      <th className="py-3.5 px-4">Student ID</th>
+                      <th className="py-3.5 px-4">Student Name</th>
+                      <th className="py-3.5 px-4">Batch</th>
+                      <th className="py-3.5 px-4">Status</th>
+                      <th className="py-3.5 px-4 text-center">Violations</th>
+                      <th className="py-3.5 px-4">Password</th>
+                      <th className="py-3.5 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white font-medium">
+                    {studentsSession.map((st) => {
+                      let statusBadge = 'bg-slate-100 text-slate-700 border-slate-200';
+                      if (st.status === 'LOGGED_IN') {
+                        statusBadge = 'bg-blue-50 text-blue-700 border-blue-200';
+                      } else if (st.status === 'EXAMINEE') {
+                        statusBadge = 'bg-green-50 text-green-700 border-green-200';
+                      } else if (st.status === 'PAUSED') {
+                        statusBadge = 'bg-amber-50 text-amber-800 border-amber-300 animate-pulse';
+                      } else if (st.status === 'COMPLETED') {
+                        statusBadge = 'bg-purple-50 text-purple-700 border-purple-200';
+                      }
+
+                      return (
+                        <tr key={st.session_id ? `${st.student_id}-${st.session_id}` : st.student_id} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="py-3.5 px-4 font-mono font-bold text-slate-500 text-xs">
+                            {st.student_id}
+                          </td>
+                          <td className="py-3.5 px-4 font-extrabold text-slate-800">
+                            {st.name}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className="text-[11px] font-bold bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full">
+                              {st.batch || selectedMonitorBatch || '-'}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className={`text-[11px] font-black uppercase px-2.5 py-1 rounded-full border ${statusBadge}`}>
+                              {st.status || 'READY'}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            <span className={`font-extrabold text-xs px-2 py-0.5 rounded-md ${
+                              (st.tab_violation_count || 0) > 0 ? 'bg-red-50 text-red-600 font-black' : 'text-slate-400'
+                            }`}>
+                              {st.tab_violation_count || 0}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            {st.password_provided ? (
+                              <span className="font-mono font-black text-slate-700 text-xs bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/60">
+                                {st.password_provided}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 text-xs italic">Not generated</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {st.status === 'PAUSED' && st.session_id && (
+                                <button
+                                  onClick={() => handleUnpauseStudent(st.session_id)}
+                                  className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white font-bold text-[11px] rounded-lg flex items-center gap-1 shadow-sm transition-colors"
+                                >
+                                  <Unlock size={12} /> Unlock
+                                </button>
+                              )}
+                              {!st.session_id && (
+                                <button
+                                  onClick={() => triggerInitializeStudent(st.student_id)}
+                                  className="px-2.5 py-1 bg-primary-600 hover:bg-primary-700 text-white font-bold text-[11px] rounded-lg shadow-sm transition-colors"
+                                >
+                                  Init
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             ) : (
+              /* ================= CARD VIEW (DEFAULT) ================= */
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {studentsSession.map((st) => {
                   let statusBg = 'bg-slate-50 border-slate-200 text-slate-600';
@@ -2920,12 +3065,13 @@ export default function TeacherDashboard() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              deleteExamRun(run.run_id);
+                              setRunToDelete(run);
+                              setDeleteRunError('');
                             }}
                             title="Delete this historical run"
-                            className="text-slate-300 hover:text-red-600 p-1"
+                            className="text-slate-300 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
                           >
-                            <Trash2 size={14} />
+                            <Trash2 size={15} />
                           </button>
                         </div>
                         <p className="text-xs text-slate-500 font-medium">{run.exam_title}</p>
@@ -3176,6 +3322,134 @@ export default function TeacherDashboard() {
                 className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors"
               >
                 Next Student <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 8. DELETE EXAMINATION RUN CONFIRMATION MODAL */}
+      {/* ========================================================================= */}
+      {runToDelete && (
+        <div 
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-run-modal-title"
+        >
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-100 text-center animate-in fade-in zoom-in-95 duration-150 relative">
+            <button
+              onClick={() => {
+                if (!isDeletingRun) {
+                  setRunToDelete(null);
+                  setDeleteRunError('');
+                }
+              }}
+              disabled={isDeletingRun}
+              className="absolute right-5 top-5 text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 disabled:opacity-40 transition-colors"
+              aria-label="Close dialog"
+            >
+              <X size={20} />
+            </button>
+
+            {/* Trash Can Icon */}
+            <div className="w-16 h-16 rounded-3xl bg-red-50 border border-red-100 flex items-center justify-center text-red-600 mx-auto mb-4 shadow-sm">
+              <Trash2 size={30} />
+            </div>
+
+            <h3 id="delete-run-modal-title" className="text-xl font-black text-slate-800 mb-1">
+              Delete Examination Run?
+            </h3>
+            <p className="text-xs text-slate-500 font-medium mb-5 leading-relaxed">
+              You are about to permanently delete this examination run and its associated results.
+            </p>
+
+            {/* Run Details Box */}
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 text-left space-y-2.5 mb-4 text-xs">
+              <div>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                  Examination
+                </span>
+                <span className="font-extrabold text-slate-800 text-sm">
+                  {runToDelete.exam_title || 'N/A'}
+                </span>
+              </div>
+              <div className="pt-2 border-t border-slate-200/60">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                  Attempt / Badge
+                </span>
+                <span className="font-bold text-slate-700">
+                  {runToDelete.exam_name || 'N/A'}
+                </span>
+              </div>
+              <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                    Date & Time
+                  </span>
+                  <span className="font-bold text-slate-600">
+                    {runToDelete.created_at
+                      ? new Date(runToDelete.created_at).toLocaleDateString('en-GB', {
+                          day: '2-digit',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : 'N/A'}
+                  </span>
+                </div>
+                {runToDelete.total_students !== undefined && (
+                  <span className="text-[11px] font-bold bg-slate-200/80 text-slate-700 px-2.5 py-1 rounded-full">
+                    {runToDelete.completed_students || 0} / {runToDelete.total_students || 0} submitted
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Warning Alert */}
+            <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 py-2.5 px-3.5 rounded-xl border border-amber-200 mb-4">
+              <AlertTriangle size={15} className="text-amber-600 flex-shrink-0" />
+              <span>This action cannot be undone.</span>
+            </div>
+
+            {/* Error Message if any */}
+            {deleteRunError && (
+              <div className="text-xs font-bold text-red-600 bg-red-50 p-3 rounded-xl border border-red-200 mb-4 text-left">
+                {deleteRunError}
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                disabled={isDeletingRun}
+                onClick={() => {
+                  setRunToDelete(null);
+                  setDeleteRunError('');
+                }}
+                className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingRun}
+                onClick={handleConfirmDeleteRun}
+                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isDeletingRun ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={16} />
+                    <span>Delete Run</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
