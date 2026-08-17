@@ -1,0 +1,797 @@
+{
+  "title": "DITA with AI Half Yearly Examination",
+  "target_batch": "",
+  "batches": [],
+  "duration_minutes": 60,
+  "full_marks": 60,
+  "status": "CREATED",
+  "sections": [
+    {
+      "title": "Section 1: Multiple Choice Questions (DITA with AI)",
+      "section_type": "MCQ",
+      "section_marks": 60,
+      "questions": [
+        {
+          "question_type": "MCQ",
+          "question_text_en": "1. Which computer component is known as the 'Brain' of the computer?",
+          "question_text_bn": "১. কোন যন্ত্রাংশকে কম্পিউটারের মস্তিষ্ক বলা হয়?",
+          "options": [
+            "A) Monitor / মনিটর",
+            "B) CPU / সিপিইউ",
+            "C) RAM / র্যাম",
+            "D) Hard Disk / হার্ড ডিস্ক"
+          ],
+          "correct_answer": "B) CPU / সিপিইউ",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "2. In Windows, which drive usually contains the installed OS by default?",
+          "question_text_bn": "২. সাধারণভাবে উইন্ডোজে কোন ড্রাইভে অপারেটিং সিস্টেম ইনস্টল থাকে?",
+          "options": [
+            "A) D: Drive / ডি: ড্রাইভ",
+            "B) E: Drive / ই: ড্রাইভ",
+            "C) C: Drive / সি: ড্রাইভ",
+            "D) F: Drive / এফ: ড্রাইভ"
+          ],
+          "correct_answer": "C) C: Drive / সি: ড্রাইভ",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "3. What is the shortcut key to open the Task Manager in Windows?",
+          "question_text_bn": "৩. উইন্ডোজে টাস্ক ম্যানেজার খোলার শর্টকাট কী কোনটি?",
+          "options": [
+            "A) Ctrl + Shift + Esc",
+            "B) Ctrl + Alt + Delete",
+            "C) Win + R",
+            "D) Win + E"
+          ],
+          "correct_answer": "A) Ctrl + Shift + Esc",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "4. What are the three fundamental file permissions in Linux?",
+          "question_text_bn": "৪. লিনাক্সে মূল তিনটি ফাইল পারমিশন কী কী?",
+          "options": [
+            "A) Open, Close, Edit / ওপেন, ক্লোজ, এডিট",
+            "B) Read (r), Write (w), Execute (x) / রিড, রাইট, এক্সিকিউট",
+            "C) Copy, Paste, Delete / কপি, পেস্ট, ডিলিট",
+            "D) Save, Run, Hide / সেভ, রান, হাইড"
+          ],
+          "correct_answer": "B) Read (r), Write (w), Execute (x) / রিড, রাইট, এক্সিকিউট",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "5. What is the default built-in antivirus of Windows called?",
+          "question_text_bn": "৫. উইন্ডোজের নিজস্ব অ্যান্টিভাইরাসের নাম কী?",
+          "options": [
+            "A) Windows Defender / উইন্ডোজ ডিফেন্ডার",
+            "B) Avast / অ্যাভাস্ট",
+            "C) Quick Heal / কুইক হিল",
+            "D) Norton / নরটন"
+          ],
+          "correct_answer": "A) Windows Defender / উইন্ডোজ ডিফেন্ডার",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "6. What is the file extension of a standard Notepad text file?",
+          "question_text_bn": "৬. সাধারণ নোটপ্যাড (Notepad) টেক্সট ফাইলের এক্সটেনশন কোনটি?",
+          "options": [
+            "A) .mp4",
+            "B) .docx",
+            "C) .txt",
+            "D) .jpg"
+          ],
+          "correct_answer": "C) .txt",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "7. Which keyboard key is used to cancel a command or close a popup dialog?",
+          "question_text_bn": "৭. কোনো কমান্ড ক্যানসেল বা বাতিল করতে কীবোর্ডের কোন বোতাম ব্যবহৃত হয়?",
+          "options": [
+            "A) Enter / এন্টার",
+            "B) Esc / এস্কেপ",
+            "C) Spacebar / স্পেসবার",
+            "D) Tab / ট্যাব"
+          ],
+          "correct_answer": "B) Esc / এস্কেপ",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "8. Which command is typed in CMD to display the computer's IP address?",
+          "question_text_bn": "৮. CMD-তে কম্পিউটারের আইপি অ্যাড্রেস দেখতে কোন কমান্ডটি লিখতে হয়?",
+          "options": [
+            "A) ping",
+            "B) ipconfig",
+            "C) mkdir",
+            "D) pwd"
+          ],
+          "correct_answer": "B) ipconfig",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "9. What device provides temporary power backup to a desktop computer when electricity goes out?",
+          "question_text_bn": "৯. বিদ্যুৎ চলে গেলে কম্পিউটারকে কিছু সময়ের জন্য চালু রাখে কোনটি?",
+          "options": [
+            "A) CPU / সিপিইউ",
+            "B) UPS / ইউপিএস",
+            "C) SMPS / এসএমপিএস",
+            "D) Motherboard / মাদারবোর্ড"
+          ],
+          "correct_answer": "B) UPS / ইউপিএস",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "10. What command is typed into the Run dialog box to open Microsoft Word?",
+          "question_text_bn": "১০. Run বক্সে কী লিখে সরাসরি MS Word খোলা যায়?",
+          "options": [
+            "A) msword",
+            "B) winword",
+            "C) worddoc",
+            "D) office"
+          ],
+          "correct_answer": "B) winword",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "11. What is the area containing various tools and tabs in MS Word called?",
+          "question_text_bn": "১১. MS Word-এ বিভিন্ন টুলস ও ট্যাব যে অংশে থাকে তাকে কী বলে?",
+          "options": [
+            "A) Status Bar / স্ট্যাটাস বার",
+            "B) Ribbon / রিবন",
+            "C) Title Bar / টাইটেল বার",
+            "D) Scroll Bar / স্ক্রোল বার"
+          ],
+          "correct_answer": "B) Ribbon / রিবন",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "12. In MS Word, which feature is used to draw a line through the middle of the selected text?",
+          "question_text_bn": "১২. MS Word-এ লেখার মাঝখান দিয়ে দাগ টানার অপশন কোনটি?",
+          "options": [
+            "A) Subscript / সাবস্ক্রিপ্ট",
+            "B) Superscript / সুপারস্ক্রিপ্ট",
+            "C) Strikethrough / স্ট্রাইকথ্রু",
+            "D) Underline / আন্ডারলাইন"
+          ],
+          "correct_answer": "C) Strikethrough / স্ট্রাইকথ্রু",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "13. What is the shortcut key to justify text on both left and right margins in MS Word?",
+          "question_text_bn": "১৩. MS Word-এ লেখার দুই দিক সমান (Justify) করার শর্টকাট কী কোনটি?",
+          "options": [
+            "A) Ctrl + L",
+            "B) Ctrl + R",
+            "C) Ctrl + E",
+            "D) Ctrl + J"
+          ],
+          "correct_answer": "D) Ctrl + J",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "14. What are the vertical blocks/lines in a table called?",
+          "question_text_bn": "১৪. টেবিলের লম্বা-লম্বি লাইন বা ঘরগুলোকে কী বলা হয়?",
+          "options": [
+            "A) Row / রো",
+            "B) Column / কলাম",
+            "C) Cell / সেল",
+            "D) Border / বর্ডার"
+          ],
+          "correct_answer": "B) Column / কলাম",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "15. Which feature in MS Word makes the first letter of a paragraph very large, like in newspapers?",
+          "question_text_bn": "১৫. খবরের কাগজের মতো লেখার প্রথম অক্ষরটি অনেক বড় করতে কোন অপশন ব্যবহার করা হয়?",
+          "options": [
+            "A) WordArt / ওয়ার্ডআর্ট",
+            "B) Drop Cap / ড্রপ ক্যাপ",
+            "C) Text Box / টেক্সট বক্স",
+            "D) Header / হেডার"
+          ],
+          "correct_answer": "B) Drop Cap / ড্রপ ক্যাপ",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "16. Which orientation makes a page horizontal (wide)?",
+          "question_text_bn": "১৬. পেজকে আড়াআড়ি বা চওড়া করতে কোন Orientation নির্বাচন করতে হয়?",
+          "options": [
+            "A) Portrait / পোর্ট্রেট",
+            "B) Landscape / ল্যান্ডস্কেপ",
+            "C) Vertical / ভার্টিক্যাল",
+            "D) Margin / মার্জিন"
+          ],
+          "correct_answer": "B) Landscape / ল্যান্ডস্কেপ",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "17. Which MS Word feature allows sending a single letter to multiple recipients at once?",
+          "question_text_bn": "১৭. MS Word-এ একটি চিঠি একসাথে বহু ব্যক্তির কাছে পাঠাতে কোন অপশন ব্যবহৃত হয়?",
+          "options": [
+            "A) Track Changes / ট্র্যাক চেঞ্জেস",
+            "B) Mail Merge / মেইল মার্জ",
+            "C) Macro / ম্যাক্রো",
+            "D) Bookmark / বুকমার্ক"
+          ],
+          "correct_answer": "B) Mail Merge / মেইল মার্জ",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "18. What is the shortcut key to open the Thesaurus (Synonyms) tool in MS Word?",
+          "question_text_bn": "১৮. MS Word-এ শব্দের সমার্থক শব্দ (Thesaurus) খোঁজার শর্টকাট কী কোনটি?",
+          "options": [
+            "A) F7",
+            "B) Shift + F7",
+            "C) Ctrl + F7",
+            "D) Alt + F7"
+          ],
+          "correct_answer": "B) Shift + F7",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "19. Which view is the default viewing layout in MS Word?",
+          "question_text_bn": "১৯. MS Word-এর ডিফল্ট ভিউ মোড কোনটি?",
+          "options": [
+            "A) Read Mode / রিড মোড",
+            "B) Print Layout / প্রিন্ট লেআউট",
+            "C) Web Layout / ওয়েব লেআউট",
+            "D) Outline / আউটলাইন"
+          ],
+          "correct_answer": "B) Print Layout / প্রিন্ট লেআউট",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "20. How many times must you click on a paragraph to select the entire paragraph at once?",
+          "question_text_bn": "২০. মাউস দিয়ে একটি পুরো প্যারাগ্রাফ সিলেক্ট করতে পরপর কতবার ক্লিক করতে হয়?",
+          "options": [
+            "A) Single Click / ১ বার",
+            "B) Double Click / ২ বার",
+            "C) Triple Click / ৩ বার",
+            "D) Right Click / রাইট ক্লিক"
+          ],
+          "correct_answer": "C) Triple Click / ৩ বার",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "21. What is the shortcut key to create a Hyperlink in MS Word?",
+          "question_text_bn": "২১. MS Word-এ লেখার সাথে কোনো লিংক যুক্ত (Hyperlink) করার শর্টকাট কী কোনটি?",
+          "options": [
+            "A) Ctrl + K",
+            "B) Ctrl + H",
+            "C) Ctrl + L",
+            "D) Ctrl + P"
+          ],
+          "correct_answer": "A) Ctrl + K",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "22. An Excel file is generally called a ___.",
+          "question_text_bn": "২২. এক্সেলের ফাইলকে সাধারণভাবে কী বলা হয়?",
+          "options": [
+            "A) Document / ডকুমেন্ট",
+            "B) Workbook / ওয়ার্কবুক",
+            "C) Slide / স্লাইড",
+            "D) Database / ডেটাবেস"
+          ],
+          "correct_answer": "B) Workbook / ওয়ার্কবুক",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "23. What is the basic formula to add the values of cells A1 and B1 in Excel?",
+          "question_text_bn": "২৩. এক্সেল-এ A1 এবং B1 সেলের মান যোগ করার মূল সূত্র কোনটি?",
+          "options": [
+            "A) =A1+B1",
+            "B) ADD(A1+B1)",
+            "C) =A1:B1",
+            "D) A1+B1="
+          ],
+          "correct_answer": "A) =A1+B1",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "24. Which symbol is used before the column and row to lock a cell (Absolute Reference) in Excel?",
+          "question_text_bn": "২৪. এক্সেলে সেল লক (Absolute Reference) করতে রো এবং কলামের আগে কোন চিহ্ন বসে?",
+          "options": [
+            "A) #",
+            "B) @",
+            "C) $",
+            "D) %"
+          ],
+          "correct_answer": "C) $",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "25. Which function is used to find the highest (maximum) number in an Excel range?",
+          "question_text_bn": "২৫. এক্সেলে সবচেয়ে বড় সংখ্যা খুঁজে বের করতে কোন ফাংশন ব্যবহৃত হয়?",
+          "options": [
+            "A) =MIN()",
+            "B) =MAX()",
+            "C) =HIGH()",
+            "D) =TOP()"
+          ],
+          "correct_answer": "B) =MAX()",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "26. How many logical parts/arguments does an IF function have in Excel?",
+          "question_text_bn": "২৬. এক্সেলের IF ফাংশনের মূল কয়টি অংশ থাকে?",
+          "options": [
+            "A) 2",
+            "B) 3",
+            "C) 4",
+            "D) 5"
+          ],
+          "correct_answer": "B) 3",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "27. Which Excel function returns both current date and current time?",
+          "question_text_bn": "২৭. বর্তমান তারিখ ও সময় উভয়ই দেখানোর জন্য এক্সেলের কোন ফাংশনটি কাজ করে?",
+          "options": [
+            "A) =TODAY()",
+            "B) =NOW()",
+            "C) =TIME()",
+            "D) =DATE()"
+          ],
+          "correct_answer": "B) =NOW()",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "28. What is the shortcut key to toggle/apply Filter on column headers in Excel?",
+          "question_text_bn": "২৮. এক্সেলে ফিল্টার (Filter) চালু করার শর্টকাট কী কোনটি?",
+          "options": [
+            "A) Ctrl + Shift + L",
+            "B) Ctrl + Shift + F",
+            "C) Alt + F4",
+            "D) Ctrl + F"
+          ],
+          "correct_answer": "A) Ctrl + Shift + L",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "29. What is the shortcut key to insert a new Worksheet in Excel?",
+          "question_text_bn": "২৯. এক্সেলে নতুন শিট (Worksheet) নেওয়ার শর্টকাট কী কোনটি?",
+          "options": [
+            "A) Shift + F11",
+            "B) Shift + F12",
+            "C) Ctrl + F11",
+            "D) Alt + Shift + N"
+          ],
+          "correct_answer": "A) Shift + F11",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "30. Which Excel error indicates that a number is being divided by zero?",
+          "question_text_bn": "৩০. এক্সেলে কোনো সংখ্যাকে শূন্য দিয়ে ভাগ করার চেষ্টা করলে কোন এরর আসে?",
+          "options": [
+            "A) #VALUE!",
+            "B) #NAME?",
+            "C) #DIV/0!",
+            "D) #REF!"
+          ],
+          "correct_answer": "C) #DIV/0!",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "31. What is the shortcut key to copy data or formula from the cell above (Fill Down) in Excel?",
+          "question_text_bn": "৩১. এক্সেলে ওপরের সেলের লেখা বা ফর্মুলা সরাসরি নিচে কপি (Fill Down) করার শর্টকাট কী কোনটি?",
+          "options": [
+            "A) Ctrl + D",
+            "B) Ctrl + R",
+            "C) Ctrl + Down Arrow",
+            "D) Ctrl + Shift + D"
+          ],
+          "correct_answer": "A) Ctrl + D",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "32. In Excel, which feature is used to convert vertical data to horizontal or vice versa?",
+          "question_text_bn": "৩২. এক্সেলে লম্বা-লম্বি ডেটাকে আড়াআড়ি বা আড়াআড়ি ডেটাকে লম্বা করতে কোন অপশন ব্যবহার করা হয়?",
+          "options": [
+            "A) Transpose / ট্রান্সপোজ",
+            "B) Wrap Text / র্যাপ টেক্সট",
+            "C) Merge & Center / মার্জ অ্যান্ড সেন্টার",
+            "D) Sort / সর্ট"
+          ],
+          "correct_answer": "A) Transpose / ট্রান্সপোজ",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "33. What is the shortcut key to enter and edit any active formula in Excel?",
+          "question_text_bn": "৩৩. এক্সেলে কোনো সেলের ফর্মুলা এডিট করার শর্টকাট কী কোনটি?",
+          "options": [
+            "A) F1",
+            "B) F2",
+            "C) F4",
+            "D) F5"
+          ],
+          "correct_answer": "B) F2",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "34. In VLOOKUP syntax, what value is typed in Range_lookup for an Exact Match?",
+          "question_text_bn": "৩৪. VLOOKUP সূত্রে হুবহু মিল (Exact Match) পাওয়ার জন্য Range_lookup-এ কী দিতে হয়?",
+          "options": [
+            "A) 0 (False)",
+            "B) 1 (True)",
+            "C) 2",
+            "D) -1"
+          ],
+          "correct_answer": "A) 0 (False)",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "35. Which lookup function is used to search for data horizontally across rows?",
+          "question_text_bn": "৩৫. আড়াআড়ি বা রো-ভিত্তিক ডেটা খোঁজার জন্য এক্সেলের কোন ফাংশনটি ব্যবহৃত হয়?",
+          "options": [
+            "A) VLOOKUP",
+            "B) HLOOKUP",
+            "C) SEARCH",
+            "D) ROW"
+          ],
+          "correct_answer": "B) HLOOKUP",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "36. Which function is used in Excel to remove unnecessary spaces before and after text?",
+          "question_text_bn": "৩৬. টেক্সটের আগে ও পরের অপ্রয়োজনীয় স্পেস মুছে ফেলতে কোন ফাংশন ব্যবহৃত হয়?",
+          "options": [
+            "A) CLEAN",
+            "B) TRIM",
+            "C) PROPER",
+            "D) CLEAR"
+          ],
+          "correct_answer": "B) TRIM",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "37. Which Excel function counts the total number of characters (including spaces) in a text string?",
+          "question_text_bn": "৩৭. টেক্সটে মোট কতগুলি অক্ষর (স্পেস সহ) আছে তা মাপতে কোন ফাংশন ব্যবহৃত হয়?",
+          "options": [
+            "A) COUNT",
+            "B) COUNTA",
+            "C) LEN",
+            "D) LENGTH"
+          ],
+          "correct_answer": "C) LEN",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "38. Which Wildcard character in Excel represents a single unknown character?",
+          "question_text_bn": "৩৮. এক্সেলে শুধুমাত্র একটি অজানা অক্ষরের জন্য কোন Wildcard চিহ্ন ব্যবহৃত হয়?",
+          "options": [
+            "A) * (Asterisk)",
+            "B) ? (Question Mark)",
+            "C) # (Hash)",
+            "D) % (Percent)"
+          ],
+          "correct_answer": "B) ? (Question Mark)",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "39. Which information function checks whether an Excel cell is completely empty?",
+          "question_text_bn": "৩৯. এক্সেলের সেলটি ফাঁকা কি না তা যাচাই করতে কোন ফাংশন ব্যবহৃত হয়?",
+          "options": [
+            "A) ISNUMBER",
+            "B) ISTEXT",
+            "C) ISBLANK",
+            "D) ISERROR"
+          ],
+          "correct_answer": "C) ISBLANK",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "40. What is the shortcut key to open the Name Manager window in Excel?",
+          "question_text_bn": "৪০. এক্সেলে Name Manager খোলার শর্টকাট কী কোনটি?",
+          "options": [
+            "A) Ctrl + F3",
+            "B) Shift + F3",
+            "C) Alt + F3",
+            "D) F3"
+          ],
+          "correct_answer": "A) Ctrl + F3",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "41. Which feature in Excel converts an actual formula into a permanent calculated value?",
+          "question_text_bn": "৪১. এক্সেলে ফর্মুলা সরিয়ে শুধু তার ফাইনাল রেজাল্ট স্থায়ী রাখতে কোনটি ব্যবহৃত হয়?",
+          "options": [
+            "A) Paste Special > Values",
+            "B) Clear All",
+            "C) Flash Fill",
+            "D) AutoFit"
+          ],
+          "correct_answer": "A) Paste Special > Values",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "42. Which Excel feature allows creating drop-down lists and restricting user input?",
+          "question_text_bn": "৪২. এক্সেলে ড্রপ-ডাউন লিস্ট তৈরি ও ডেটা এন্ট্রিতে নিয়ম বাঁধতে কোনটি ব্যবহৃত হয়?",
+          "options": [
+            "A) Conditional Formatting / কন্ডিশনাল ফরম্যাটিং",
+            "B) Data Validation / ডেটা ভ্যালিডেশন",
+            "C) Consolidate / কনসলিডেট",
+            "D) Subtotal / সাবটোটাল"
+          ],
+          "correct_answer": "B) Data Validation / ডেটা ভ্যালিডেশন",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "43. What is the shortcut key to convert a normal cell range into an Official Excel Table?",
+          "question_text_bn": "৪৩. সাধারণ সেল রেঞ্জকে এক্সেলের অফিশিয়াল টেবিলে রূপান্তর করার শর্টকাট কী কোনটি?",
+          "options": [
+            "A) Ctrl + T",
+            "B) Ctrl + Shift + T",
+            "C) Alt + T",
+            "D) Ctrl + B"
+          ],
+          "correct_answer": "A) Ctrl + T",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "44. Which chart is best suited for representing data as proportions or percentage shares of a whole?",
+          "question_text_bn": "৪৪. শতাংশ বা ভাগের অনুপাত বোঝাতে কোন চার্ট সবচেয়ে বেশি উপযুক্ত?",
+          "options": [
+            "A) Line Chart / লাইন চার্ট",
+            "B) Column Chart / কলাম চার্ট",
+            "C) Pie Chart / পাই চার্ট",
+            "D) Radar Chart / রাডার চার্ট"
+          ],
+          "correct_answer": "C) Pie Chart / পাই চার্ট",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "45. What is the explanatory guide in a chart that identifies colors and series names called?",
+          "question_text_bn": "৪৫. চার্টের কোন রঙটি কী নির্দেশ করে তা জানার জন্য কী থাকে?",
+          "options": [
+            "A) Legend / লিজেন্ড",
+            "B) Gridlines / গ্রিডলাইনস",
+            "C) Sparklines / স্পার্কলাইনস",
+            "D) Axis Title / অ্যাক্সিস টাইটেল"
+          ],
+          "correct_answer": "A) Legend / লিজেন্ড",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "46. What are the four core field areas of an Excel Pivot Table?",
+          "question_text_bn": "৪৬. এক্সেলের পিভট টেবিলের চারটি মূল অংশ কী কী?",
+          "options": [
+            "A) Top, Bottom, Left, Right",
+            "B) Filters, Columns, Rows, Values",
+            "C) Font, Size, Color, Border",
+            "D) Name, Date, Time, Type"
+          ],
+          "correct_answer": "B) Filters, Columns, Rows, Values",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "47. What is the visual filter button used with Pivot Tables and Tables in Excel called?",
+          "question_text_bn": "৪৭. পিভট টেবিল বা সাধারণ টেবিলে সহজে ক্লিক করে ফিল্টার করার বাটনকে কী বলে?",
+          "options": [
+            "A) Slicer / স্লাইসার",
+            "B) Splitter / স্প্লিটার",
+            "C) Cutter / কাটার",
+            "D) Filter Bar / ফিল্টার বার"
+          ],
+          "correct_answer": "A) Slicer / স্লাইসার",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "48. Which What-If Analysis tool in Excel helps find the required input to achieve a specific target value?",
+          "question_text_bn": "৪৮. নির্দিষ্ট টার্গেট ভ্যালুতে পৌঁছাতে প্রয়োজনীয় ইনপুট কত হবে তা বের করে কোন টুল?",
+          "options": [
+            "A) Goal Seek / গোল সিক",
+            "B) Slicer / স্লাইসার",
+            "C) Data Validation / ডেটা ভ্যালিডেশন",
+            "D) Text to Columns / টেক্সট টু কলামস"
+          ],
+          "correct_answer": "A) Goal Seek / গোল সিক",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "49. Which advanced chart type displays geographic data across a 3D Earth globe?",
+          "question_text_bn": "৪৯. ভৌগোলিক বা লোকেশনের ডেটা পৃথিবীর গ্লোবের ওপর দেখতে কোনটি ব্যবহৃত হয়?",
+          "options": [
+            "A) 3D Map",
+            "B) Waterfall Chart",
+            "C) Radar Chart",
+            "D) Funnel Chart"
+          ],
+          "correct_answer": "A) 3D Map",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "50. What is the instruction or question provided to an AI model called?",
+          "question_text_bn": "৫০. AI-কে কাজ করার জন্য যে নির্দেশ বা প্রশ্ন দেওয়া হয় তাকে কী বলে?",
+          "options": [
+            "A) Prompt / প্রম্পট",
+            "B) Code / কোড",
+            "C) Script / স্ক্রিপ্ট",
+            "D) Token / টোকেন"
+          ],
+          "correct_answer": "A) Prompt / প্রম্পট",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "51. Giving AI examples of the desired task beforehand is known as which prompting technique?",
+          "question_text_bn": "৫১. AI-কে কাজ দেওয়ার আগে দু-একটি উদাহরণ দিয়ে দেওয়াকে কী প্রম্পটিং বলে?",
+          "options": [
+            "A) Few-shot Prompting / ফিউ-শট প্রম্পটিং",
+            "B) Zero-shot Prompting / জিরো-শট প্রম্পটিং",
+            "C) Chain of Thought / চেইন অফ থট",
+            "D) Negative Prompting / নেগেটিভ প্রম্পটিং"
+          ],
+          "correct_answer": "A) Few-shot Prompting / ফিউ-শট প্রম্পটিং",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "52. Which tools are top examples of Text-to-Image AI generation?",
+          "question_text_bn": "৫২. টেক্সট থেকে ছবি (Text-to-Image) তৈরির সেরা এআই টুল কোনটি?",
+          "options": [
+            "A) Midjourney & DALL-E / মিডজার্নি ও ডাল-ই",
+            "B) MS Word & Excel / এমএস ওয়ার্ড ও এক্সেল",
+            "C) Notepad & WordPad / নোটপ্যাড ও ওয়ার্ডপ্যাড",
+            "D) VLC & WinRAR / ভিএলসি ও উইনরার"
+          ],
+          "correct_answer": "A) Midjourney & DALL-E / মিডজার্নি ও ডাল-ই",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "53. What is it called when an AI presents completely false or fabricated facts with high confidence?",
+          "question_text_bn": "৫৩. AI যখন সম্পূর্ণ ভুল বা কাল্পনিক তথ্যকে আত্মবিশ্বাসের সাথে উপস্থাপন করে তাকে কী বলে?",
+          "options": [
+            "A) Hallucination / হ্যালুসিনেশন",
+            "B) Automation / অটোমেশন",
+            "C) Formatting / ফরম্যাটিং",
+            "D) Debugging / ডিবাগিং"
+          ],
+          "correct_answer": "A) Hallucination / হ্যালুসিনেশন",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "54. Multi-modal AI models (like Gemini 1.5) can simultaneously process ___.",
+          "question_text_bn": "৫৪. মাল্টিমোডাল এআই (যেমন জেমিনি ১.৫) একসাথে কী কী প্রসেস করতে পারে?",
+          "options": [
+            "A) Text, Images, and Videos / টেক্সট, ছবি ও ভিডিও",
+            "B) Only Text / শুধুমাত্র টেক্সট",
+            "C) Only Numbers / শুধুমাত্র সংখ্যা",
+            "D) Only Audio / শুধুমাত্র অডিও"
+          ],
+          "correct_answer": "A) Text, Images, and Videos / টেক্সট, ছবি ও ভিডিও",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "55. In MS Word, what is the shortcut key to automatically insert the current Date?",
+          "question_text_bn": "৫৫. MS Word-এ শর্টকাটে সরাসরি আজকের তারিখ বসানোর কী কোনটি?",
+          "options": [
+            "A) Alt + Shift + D",
+            "B) Alt + Shift + T",
+            "C) Ctrl + Shift + D",
+            "D) Ctrl + D"
+          ],
+          "correct_answer": "A) Alt + Shift + D",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "56. In AI prompting, what parameter is used to reproduce identical image generation styles repeatedly?",
+          "question_text_bn": "৫৬. AI ইমেজ তৈরিতে একই ধরণের আউটপুট বারবার পেতে কোন প্যারামিটার ব্যবহার করা হয়?",
+          "options": [
+            "A) Seed / সীড",
+            "B) Crop / ক্রপ",
+            "C) Ratio / রেশিও",
+            "D) Tag / ট্যাগ"
+          ],
+          "correct_answer": "A) Seed / সীড",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "57. Which programming query language can AI write to manage and query relational databases?",
+          "question_text_bn": "৫৭. ডেটাবেস থেকে ডেটা কোয়েরি করতে AI-কে দিয়ে কোন ভাষার কোড লেখানো যায়?",
+          "options": [
+            "A) SQL",
+            "B) CSS",
+            "C) HTML",
+            "D) JSON"
+          ],
+          "correct_answer": "A) SQL",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "58. What is the chart called that AI can draft to visualize project management timelines and tasks?",
+          "question_text_bn": "৫৮. প্রোজেক্টের সময়সীমা ও টাস্ক সুন্দরভাবে দেখাতে কোন চার্ট ব্যবহার করা হয়?",
+          "options": [
+            "A) Gantt Chart / গ্যান্ট চার্ট",
+            "B) Pie Chart / পাই চার্ট",
+            "C) Radar Chart / রাডার চার্ট",
+            "D) Bubble Chart / বাবল চার্ট"
+          ],
+          "correct_answer": "A) Gantt Chart / গ্যান্ট চার্ট",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "59. Which modern development framework combines AI to clear and validate IoT system architecture?",
+          "question_text_bn": "৫৯. স্মার্ট গ্যাজেট বা আর্কিটেকচারের প্যাটার্ন বুঝতে AI কোন ক্ষেত্রে দারুণ কাজে লাগে?",
+          "options": [
+            "A) IoT Architecture / আইওটি আর্কিটেকচার",
+            "B) Paintbrush / পেইন্টব্রাশ",
+            "C) Calculator / ক্যালকুলেটর",
+            "D) Floppy Disk / ফ্লপি ডিস্ক"
+          ],
+          "correct_answer": "A) IoT Architecture / আইওটি আর্কিটেকচার",
+          "marks": 1
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "60. How can AI assist candidates in career transitions and employment search?",
+          "question_text_bn": "৬০. চাকরির জন্য ক্যারিয়ার পরিবর্তন বা স্ট্র্যাটেজি তৈরিতে AI কীভাবে সাহায্য করে?",
+          "options": [
+            "A) Job search strategy & career transition / কেরিয়ার ট্রানজিশন ও জব সার্চ স্ট্র্যাটেজি বানিয়ে",
+            "B) By repairing computer monitor / মনিটর মেরামত করে",
+            "C) By printing on paper directly / সরাসরি কাগজে প্রিন্ট করে",
+            "D) By cutting hardware cables / হার্ডওয়্যার তার কেটে দিয়ে"
+          ],
+          "correct_answer": "A) Job search strategy & career transition / কেরিয়ার ট্রানজিশন ও জব সার্চ স্ট্র্যাটেজি বানিয়ে",
+          "marks": 1
+        }
+      ]
+    }
+  ]
+}

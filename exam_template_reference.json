@@ -1,0 +1,143 @@
+{
+  "title": "Computer Fundamentals & Information Technology Assessment",
+  "target_batch": "VIII,IX Batch - 1",
+  "batches": [
+    {
+      "batch_name": "VIII,IX Batch - 1",
+      "shuffle_enabled": true
+    },
+    {
+      "batch_name": "JDX IX,X",
+      "shuffle_enabled": false
+    }
+  ],
+  "duration_minutes": 45,
+  "full_marks": 50,
+  "status": "CREATED",
+  "sections": [
+    {
+      "title": "Section 1: Multiple Choice Questions (Computer Basics & Hardware)",
+      "section_type": "MCQ",
+      "section_marks": 15,
+      "questions": [
+        {
+          "question_type": "MCQ",
+          "question_text_en": "Which computer component is known as the 'Brain' of the computer, responsible for executing instructions?",
+          "question_text_bn": "কম্পিউটারের কোন যন্ত্রাংশকে 'মস্তিষ্ক' বলা হয়, যা নির্দেশাবলী কার্যকর করার জন্য দায়ী?",
+          "options": [
+            "A) Hard Disk Drive (HDD) / হার্ড ডিস্ক ড্রাইভ (এইচডিডি)",
+            "B) Central Processing Unit (CPU) / সেন্ট্রাল প্রসেসিং ইউনিট (সিপিইউ)",
+            "C) Random Access Memory (RAM) / র্যান্ডম অ্যাক্সেস মেমোরি (র‌্যাম)",
+            "D) Power Supply Unit (PSU) / পাওয়ার সাপ্লাই ইউনিট (পিএসইউ)"
+          ],
+          "correct_answer": "B) Central Processing Unit (CPU) / সেন্ট্রাল প্রসেসিং ইউনিট (সিপিইউ)",
+          "marks": 2
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "Which of the following is an example of non-volatile primary memory that retains its data when power is turned off?",
+          "question_text_bn": "নিচের কোনটি নন-ভোলাটাইল প্রাইমারি মেমোরি যা বিদ্যুৎ চলে গেলেও ডেটা সংরক্ষণ করে রাখে?",
+          "options": [
+            "A) RAM (Random Access Memory) / র্যান্ডম অ্যাক্সেস মেমোরি",
+            "B) ROM (Read-Only Memory) / রিড-অনলি মেমোরি",
+            "C) Cache Memory / ক্যাশ মেমোরি",
+            "D) Register Memory / রেজিস্টার মেমোরি"
+          ],
+          "correct_answer": "B) ROM (Read-Only Memory) / রিড-অনলি মেমোরি",
+          "marks": 2
+        },
+        {
+          "question_type": "MCQ",
+          "question_text_en": "What protocol is used to securely browse websites over the World Wide Web with encryption?",
+          "question_text_bn": "এনক্রিপশনের মাধ্যমে নিরাপদে ওয়েবসাইট ব্রাউজ করার জন্য কোন প্রোটোকল ব্যবহার করা হয়?",
+          "options": [
+            "A) HTTP / হাইপারটেক্সট ট্রান্সফার প্রোটোকল",
+            "B) FTP / ফাইল ট্রান্সফার প্রোটোকল",
+            "C) HTTPS / হাইপারটেক্সট ট্রান্সফার প্রোটোকল সিকিউর",
+            "D) SMTP / সিম্পল মেইল ট্রান্সফার প্রোটোকল"
+          ],
+          "correct_answer": "C) HTTPS / হাইপারটেক্সট ট্রান্সফার প্রোটোকল সিকিউর",
+          "marks": 2
+        }
+      ]
+    },
+    {
+      "title": "Section 2: True or False",
+      "section_type": "TF",
+      "section_marks": 10,
+      "questions": [
+        {
+          "question_type": "TF",
+          "question_text_en": "An operating system (e.g., Windows, Linux) acts as an interface between user applications and computer hardware.",
+          "question_text_bn": "একটি অপারেটিং সিস্টেম ব্যবহারকারীর অ্যাপ্লিকেশন এবং কম্পিউটার হার্ডওয়্যারের মধ্যে সংযোগকারী ইন্টারফেস হিসেবে কাজ করে।",
+          "options": [
+            "True / সত্য",
+            "False / মিথ্যা"
+          ],
+          "correct_answer": "True / সত্য",
+          "marks": 2
+        },
+        {
+          "question_type": "TF",
+          "question_text_en": "RAM is secondary storage that permanently stores files and installed software.",
+          "question_text_bn": "RAM হলো সেকেন্ডারি স্টোরেজ যা ফাইল এবং ইনস্টল করা সফটওয়্যার স্থায়ীভাবে সংরক্ষণ করে।",
+          "options": [
+            "True / সত্য",
+            "False / মিথ্যা"
+          ],
+          "correct_answer": "False / মিথ্যা",
+          "marks": 2
+        }
+      ]
+    },
+    {
+      "title": "Section 3: Fill in the Blanks",
+      "section_type": "FITB",
+      "section_marks": 10,
+      "questions": [
+        {
+          "question_type": "FITB",
+          "question_text_en": "1 Byte is equal to ___ bits, and 1 Kilobyte (KB) is equal to ___ Bytes.",
+          "question_text_bn": "১ বাইট সমান ___ বিট, এবং ১ কিলোবাইট (KB) সমান ___ বাইট।",
+          "options": [
+            "8 / ৮",
+            "1024 / ১০২৪",
+            "4 / ৪",
+            "1000 / ১০০০",
+            "16 / ১৬"
+          ],
+          "correct_answer": "[\"8 / ৮\", \"1024 / ১০২৪\"]",
+          "marks": 4
+        }
+      ]
+    },
+    {
+      "title": "Section 4: Match the Following",
+      "section_type": "MATCH",
+      "section_marks": 15,
+      "questions": [
+        {
+          "question_type": "MATCH",
+          "question_text_en": "Match each device/concept with its correct category:",
+          "question_text_bn": "প্রতিটি ডিভাইস/ধারণাকে তার সঠিক ক্যাটাগরির সাথে মিল করুন:",
+          "options": {
+            "left": [
+              { "id": "1", "text": "Keyboard / Mouse (কীবোর্ড / মাউস)" },
+              { "id": "2", "text": "Monitor / Printer (মনিটর / প্রিন্টার)" },
+              { "id": "3", "text": "SSD / Hard Disk (এসএসডি / হার্ড ডিস্ক)" },
+              { "id": "4", "text": "Linux / Windows (লিনাক্স / উইন্ডোজ)" }
+            ],
+            "right": [
+              { "id": "A", "text": "Input Device (ইনপুট ডিভাইস)" },
+              { "id": "B", "text": "Output Device (আউটপুট ডিভাইস)" },
+              { "id": "C", "text": "Secondary Storage (সেকেন্ডারি স্টোরেজ)" },
+              { "id": "D", "text": "System Software / OS (সিস্টেম সফটওয়্যার)" }
+            ]
+          },
+          "correct_answer": "{\"1\":\"A\",\"2\":\"B\",\"3\":\"C\",\"4\":\"D\"}",
+          "marks": 4
+        }
+      ]
+    }
+  ]
+}

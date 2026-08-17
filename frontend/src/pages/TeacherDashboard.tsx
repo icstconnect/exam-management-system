@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { socket, API_BASE } from '../App';
 import { Users, Play, Unlock, UserPlus, BookOpen, Plus, AlertTriangle, ArrowLeft, Trash2, Square, Award, Download, Lock, Edit, Eye, X, ChevronLeft, ChevronRight, RotateCcw, Search, Shuffle, Layers, ArrowRightLeft, FileText, List, LayoutGrid } from 'lucide-react';
 import { jsPDF } from 'jspdf';
@@ -188,12 +188,19 @@ export default function TeacherDashboard() {
   // Monitor State
   const [selectedMonitorExamId, setSelectedMonitorExamId] = useState<string>('');
   const selectedMonitorExamIdRef = useRef(selectedMonitorExamId);
+  const [selectedMonitorBatch, setSelectedMonitorBatch] = useState<string>('');
+  const selectedMonitorBatchRef = useRef(selectedMonitorBatch);
+  const [monitorBatchStatus, setMonitorBatchStatus] = useState<string>('CREATED');
   const [studentsSession, setStudentsSession] = useState<StudentSession[]>([]);
   const [examSecondsLeft, setExamSecondsLeft] = useState<number | null>(null);
 
   useEffect(() => {
     selectedMonitorExamIdRef.current = selectedMonitorExamId;
   }, [selectedMonitorExamId]);
+
+  useEffect(() => {
+    selectedMonitorBatchRef.current = selectedMonitorBatch;
+  }, [selectedMonitorBatch]);
 
   // Examination Name Initialization Modal
   const [showInitModal, setShowInitModal] = useState(false);
@@ -447,13 +454,30 @@ export default function TeacherDashboard() {
     } catch (e) { console.error(e); }
   };
 
+  const currentExamAssignedBatches = useMemo(() => {
+    const exam = examsList.find(e => e.exam_id === selectedMonitorExamId);
+    if (!exam) return [];
+    if (Array.isArray(exam.assigned_batches) && exam.assigned_batches.length > 0) {
+      return exam.assigned_batches.map((b: any) => typeof b === 'string' ? b : b.batch_name).filter(Boolean);
+    }
+    if (exam.target_batch) return [exam.target_batch];
+    return [];
+  }, [selectedMonitorExamId, examsList]);
+
   useEffect(() => {
     socket.emit('join_teacher_dashboard');
     fetchData();
     fetchBatches();
     checkRecovery();
     
-    socket.on('dashboard_update', (data: { students: StudentSession[], status: any, global_seconds_left?: number }) => {
+    socket.on('dashboard_update', (data: { exam_id?: string, target_batch?: string | null, students: StudentSession[], status: any, global_seconds_left?: number, assigned_batches?: string[] }) => {
+      if (data.exam_id && data.exam_id !== selectedMonitorExamIdRef.current) return;
+      if (data.target_batch && selectedMonitorBatchRef.current && data.target_batch !== selectedMonitorBatchRef.current) return;
+
+      if (data.target_batch && !selectedMonitorBatchRef.current) {
+        setSelectedMonitorBatch(data.target_batch);
+      }
+
       const uniqueMap = new Map<string, StudentSession>();
       (data.students || []).forEach(st => {
         if (!uniqueMap.has(st.student_id)) {
@@ -466,6 +490,9 @@ export default function TeacherDashboard() {
         }
       });
       setStudentsSession(Array.from(uniqueMap.values()));
+      if (data.status) {
+        setMonitorBatchStatus(data.status);
+      }
       if (data.global_seconds_left !== undefined) {
         setExamSecondsLeft(data.global_seconds_left);
       }
@@ -484,14 +511,19 @@ export default function TeacherDashboard() {
       }));
     });
 
-    socket.on('exam_status_update', (data: { exam_id: string, status: any }) => {
+    socket.on('exam_status_update', (data: { exam_id: string, batch_name?: string, status: any }) => {
+      if (data.exam_id === selectedMonitorExamIdRef.current) {
+        if (!data.batch_name || !selectedMonitorBatchRef.current || data.batch_name === selectedMonitorBatchRef.current) {
+          setMonitorBatchStatus(data.status);
+        }
+      }
       setExamsList(prev => prev.map(e => e.exam_id === data.exam_id ? { ...e, status: data.status } : e));
     });
 
-    socket.on('time_tick', (data: { exam_id?: string, seconds_left: number }) => {
-      if (!data.exam_id || data.exam_id === selectedMonitorExamIdRef.current) {
-        setExamSecondsLeft(data.seconds_left);
-      }
+    socket.on('time_tick', (data: { exam_id?: string, batch_name?: string, seconds_left: number }) => {
+      if (data.exam_id && data.exam_id !== selectedMonitorExamIdRef.current) return;
+      if (data.batch_name && selectedMonitorBatchRef.current && data.batch_name !== selectedMonitorBatchRef.current) return;
+      setExamSecondsLeft(data.seconds_left);
     });
 
     return () => {
@@ -502,13 +534,33 @@ export default function TeacherDashboard() {
     };
   }, []);
 
-
   useEffect(() => {
     if (selectedMonitorExamId) {
-      setStudentsSession([]);
-      socket.emit('monitor_exam', { exam_id: selectedMonitorExamId });
+      const exam = examsList.find(e => e.exam_id === selectedMonitorExamId);
+      let assigned: string[] = [];
+      if (exam) {
+        if (Array.isArray(exam.assigned_batches) && exam.assigned_batches.length > 0) {
+          assigned = exam.assigned_batches.map((b: any) => typeof b === 'string' ? b : b.batch_name).filter(Boolean);
+        } else if (exam.target_batch) {
+          assigned = [exam.target_batch];
+        }
+      }
+      if (assigned.length === 1) {
+        setSelectedMonitorBatch(assigned[0]);
+        socket.emit('monitor_exam', { exam_id: selectedMonitorExamId, batch_name: assigned[0] });
+      } else {
+        setSelectedMonitorBatch(prev => {
+          if (prev && assigned.includes(prev)) {
+            socket.emit('monitor_exam', { exam_id: selectedMonitorExamId, batch_name: prev });
+            return prev;
+          }
+          setStudentsSession([]);
+          socket.emit('monitor_exam', { exam_id: selectedMonitorExamId });
+          return '';
+        });
+      }
     }
-  }, [selectedMonitorExamId]);
+  }, [selectedMonitorExamId, examsList]);
 
   useEffect(() => {
     if (activeTab === 'RESULTS') {
@@ -894,32 +946,77 @@ export default function TeacherDashboard() {
   };
 
   // Monitor Exam Controls
+  const handleSelectMonitorExam = (examId: string) => {
+    setSelectedMonitorExamId(examId);
+    const exam = examsList.find(e => e.exam_id === examId);
+    let assigned: string[] = [];
+    if (exam) {
+      if (Array.isArray(exam.assigned_batches) && exam.assigned_batches.length > 0) {
+        assigned = exam.assigned_batches.map((b: any) => typeof b === 'string' ? b : b.batch_name).filter(Boolean);
+      } else if (exam.target_batch) {
+        assigned = [exam.target_batch];
+      }
+    }
+    if (assigned.length === 1) {
+      setSelectedMonitorBatch(assigned[0]);
+      socket.emit('monitor_exam', { exam_id: examId, batch_name: assigned[0] });
+    } else {
+      setSelectedMonitorBatch('');
+      setStudentsSession([]);
+      socket.emit('monitor_exam', { exam_id: examId });
+    }
+  };
+
+  const handleSelectMonitorBatch = (batchName: string) => {
+    setSelectedMonitorBatch(batchName);
+    if (selectedMonitorExamId && batchName) {
+      socket.emit('monitor_exam', { exam_id: selectedMonitorExamId, batch_name: batchName });
+    } else {
+      setStudentsSession([]);
+      socket.emit('monitor_exam', { exam_id: selectedMonitorExamId });
+    }
+  };
+
   const triggerInitializeExam = () => {
+    if (!selectedMonitorBatch) {
+      alert('Please select a Target Batch first.');
+      return;
+    }
     const activeExam = examsList.find(e => e.exam_id === selectedMonitorExamId);
     const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-    setInitExamName(activeExam ? `${activeExam.title} - ${dateStr}` : `Exam Attempt - ${dateStr}`);
+    setInitExamName(activeExam ? `${activeExam.title} - ${selectedMonitorBatch} (${dateStr})` : `Exam Attempt - ${dateStr}`);
     setInitTargetStudentId(null);
     setShowInitModal(true);
   };
 
   const triggerInitializeStudent = (student_id: string) => {
+    if (!selectedMonitorBatch) {
+      alert('Please select a Target Batch first.');
+      return;
+    }
     const activeExam = examsList.find(e => e.exam_id === selectedMonitorExamId);
     const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-    setInitExamName(activeExam ? `${activeExam.title} - ${dateStr}` : `Exam Run - ${dateStr}`);
+    setInitExamName(activeExam ? `${activeExam.title} - ${selectedMonitorBatch} (${dateStr})` : `Exam Run - ${dateStr}`);
     setInitTargetStudentId(student_id);
     setShowInitModal(true);
   };
 
   const handleConfirmInitialize = () => {
+    if (!selectedMonitorBatch) {
+      alert('Please select a Target Batch first.');
+      return;
+    }
     if (initTargetStudentId) {
       socket.emit('teacher_initialize_student', {
         exam_id: selectedMonitorExamId,
         student_id: initTargetStudentId,
+        batch_name: selectedMonitorBatch,
         exam_name: initExamName
       });
     } else {
       socket.emit('teacher_initialize_exam', {
         exam_id: selectedMonitorExamId,
+        batch_name: selectedMonitorBatch,
         exam_name: initExamName
       });
     }
@@ -927,26 +1024,34 @@ export default function TeacherDashboard() {
   };
 
   const handleStartExam = () => {
-    socket.emit('teacher_start_exam', { exam_id: selectedMonitorExamId });
+    if (!selectedMonitorBatch) {
+      alert('Please select a Target Batch first before starting the exam.');
+      return;
+    }
+    socket.emit('teacher_start_exam', { exam_id: selectedMonitorExamId, batch_name: selectedMonitorBatch });
   };
 
   const handlePauseExam = () => {
-    socket.emit('teacher_pause_exam', { exam_id: selectedMonitorExamId });
+    if (!selectedMonitorBatch) return;
+    socket.emit('teacher_pause_exam', { exam_id: selectedMonitorExamId, batch_name: selectedMonitorBatch });
   };
 
   const handleResumeExam = () => {
-    socket.emit('teacher_resume_exam', { exam_id: selectedMonitorExamId });
+    if (!selectedMonitorBatch) return;
+    socket.emit('teacher_resume_exam', { exam_id: selectedMonitorExamId, batch_name: selectedMonitorBatch });
   };
 
   const handleStopExam = () => {
-    if (window.confirm('Are you sure you want to stop the exam? All active student sessions will be automatically submitted.')) {
-      socket.emit('teacher_stop_exam', { exam_id: selectedMonitorExamId });
+    if (!selectedMonitorBatch) return;
+    if (window.confirm(`Are you sure you want to stop the exam for ${selectedMonitorBatch}? All active examinee sessions in this batch will be automatically submitted.`)) {
+      socket.emit('teacher_stop_exam', { exam_id: selectedMonitorExamId, batch_name: selectedMonitorBatch });
     }
   };
 
   const handleSafeResetExam = () => {
-    if (window.confirm('Reset this examination for a new run/attempt? Note: All previous completed scores and answer sheets will be safely preserved in Results.')) {
-      socket.emit('teacher_reset_exam', { exam_id: selectedMonitorExamId });
+    if (!selectedMonitorBatch) return;
+    if (window.confirm(`Reset examination for ${selectedMonitorBatch} for a new run/attempt? Note: All previous completed scores and answer sheets will be safely preserved in Results.`)) {
+      socket.emit('teacher_reset_exam', { exam_id: selectedMonitorExamId, batch_name: selectedMonitorBatch });
     }
   };
 
@@ -1128,29 +1233,62 @@ export default function TeacherDashboard() {
         <div className="space-y-6">
           {/* Exam Selector & Controls */}
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-wrap items-center justify-between gap-6">
-            <div className="flex-1 min-w-[280px]">
-              <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Select Active Exam to Monitor</label>
-              <select
-                value={selectedMonitorExamId}
-                onChange={(e) => setSelectedMonitorExamId(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 text-base focus:ring-2 focus:ring-primary-500"
-              >
-                {examsList.map(e => (
-                  <option key={e.exam_id} value={e.exam_id}>
-                    {e.title} ({e.target_batch}) — [{e.status}]
-                  </option>
-                ))}
-              </select>
+            <div className="flex flex-wrap items-center gap-4 flex-1 min-w-[320px]">
+              {/* Examination Selector */}
+              <div className="flex-1 min-w-[240px]">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
+                  Select Active Exam to Monitor
+                </label>
+                <select
+                  value={selectedMonitorExamId}
+                  onChange={(e) => handleSelectMonitorExam(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 text-sm focus:ring-2 focus:ring-primary-500"
+                >
+                  {examsList.map(e => (
+                    <option key={e.exam_id} value={e.exam_id}>
+                      {e.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Target Batch Selector */}
+              <div className="flex-1 min-w-[200px]">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
+                  Target Batch <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedMonitorBatch}
+                  onChange={(e) => handleSelectMonitorBatch(e.target.value)}
+                  className={`w-full px-4 py-3 bg-slate-50 border rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary-500 ${
+                    !selectedMonitorBatch ? 'border-amber-300 text-amber-800 bg-amber-50/40' : 'border-slate-200 text-slate-800'
+                  }`}
+                >
+                  {currentExamAssignedBatches.length > 1 && (
+                    <option value="">-- Select Target Batch --</option>
+                  )}
+                  {currentExamAssignedBatches.map(b => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                  {currentExamAssignedBatches.length === 0 && (
+                    <option value="">No batches assigned</option>
+                  )}
+                </select>
+              </div>
             </div>
 
             {selectedMonitorExam && (
               <div className="flex flex-wrap items-center gap-3">
                 <div className="bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200 text-center">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Remaining Time</p>
-                  <p className="text-xl font-black text-slate-800">{formatTimer(examSecondsLeft, selectedMonitorExam.status)}</p>
+                  <p className="text-xl font-black text-slate-800">
+                    {!selectedMonitorBatch ? '--:--' : formatTimer(examSecondsLeft, monitorBatchStatus)}
+                  </p>
                 </div>
 
-                {selectedMonitorExam.status === 'CREATED' && (
+                {monitorBatchStatus === 'CREATED' && (
                   <>
                     <button
                       onClick={triggerInitializeExam}
@@ -1167,7 +1305,7 @@ export default function TeacherDashboard() {
                   </>
                 )}
 
-                {selectedMonitorExam.status === 'STARTED' && (
+                {monitorBatchStatus === 'STARTED' && (
                   <>
                     <button
                       onClick={handlePauseExam}
@@ -1184,7 +1322,7 @@ export default function TeacherDashboard() {
                   </>
                 )}
 
-                {selectedMonitorExam.status === 'PAUSED' && (
+                {monitorBatchStatus === 'PAUSED' && (
                   <>
                     <button
                       onClick={handleResumeExam}
@@ -1201,7 +1339,7 @@ export default function TeacherDashboard() {
                   </>
                 )}
 
-                {selectedMonitorExam.status === 'ENDED' && (
+                {monitorBatchStatus === 'ENDED' && (
                   <button
                     onClick={handleSafeResetExam}
                     className="bg-slate-800 hover:bg-black text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition-all"
@@ -1218,7 +1356,9 @@ export default function TeacherDashboard() {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-xl font-black text-slate-800">Student Live Monitor</h3>
-                <p className="text-xs font-semibold text-slate-400 mt-0.5">Real-time examinee connection and status</p>
+                <p className="text-xs font-semibold text-slate-400 mt-0.5">
+                  {selectedMonitorExam ? selectedMonitorExam.title : 'No exam selected'} • Target Batch: <span className="text-primary-600 font-bold">{selectedMonitorBatch || 'None Selected'}</span> • Status: <span className="font-bold text-slate-700">{monitorBatchStatus}</span>
+                </p>
               </div>
               <div className="flex items-center gap-4 text-xs font-bold">
                 <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-slate-300"></span> Ready</span>
@@ -1229,9 +1369,13 @@ export default function TeacherDashboard() {
               </div>
             </div>
 
-            {studentsSession.length === 0 ? (
+            {!selectedMonitorBatch ? (
+              <div className="p-12 text-center text-amber-800 bg-amber-50/60 rounded-2xl border border-dashed border-amber-200 font-bold">
+                Please select a <span className="underline">Target Batch</span> from the dropdown above to view and control examinees.
+              </div>
+            ) : studentsSession.length === 0 ? (
               <div className="p-12 text-center text-slate-400 font-bold bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                No examinees initialized for this exam yet. Click &quot;Initialize Exam&quot; to assign passwords and prepare sessions.
+                No examinees initialized for {selectedMonitorBatch} yet. Click &quot;Initialize Exam&quot; to assign passwords and prepare sessions.
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -2902,8 +3046,17 @@ export default function TeacherDashboard() {
               <button onClick={() => setShowInitModal(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
             </div>
             
-            <p className="text-xs text-slate-500 font-medium mb-6">
-              Enter a name for this examination attempt / retest run. This name will appear on the Results panel and will preserve past scores separately.
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 mb-4 space-y-1 text-xs">
+              <p className="text-slate-500 font-bold">
+                Examination: <span className="text-slate-800 font-black">{selectedMonitorExam?.title}</span>
+              </p>
+              <p className="text-slate-500 font-bold">
+                Target Batch: <span className="inline-block px-2 py-0.5 bg-primary-100 text-primary-800 font-black rounded-md">{selectedMonitorBatch}</span>
+              </p>
+            </div>
+
+            <p className="text-xs text-slate-500 font-medium mb-4">
+              Enter an examination badge / attempt name for this batch run. This name will appear on the Results panel and will preserve past scores separately.
             </p>
 
             <div className="space-y-4">
@@ -2914,7 +3067,7 @@ export default function TeacherDashboard() {
                   required
                   value={initExamName}
                   onChange={(e) => setInitExamName(e.target.value)}
-                  placeholder="e.g. Mid Term Mathematics - Retest 1"
+                  placeholder="e.g. DITA Half Yearly - Batch A (10:00 AM)"
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-primary-500"
                 />
               </div>
@@ -2932,7 +3085,7 @@ export default function TeacherDashboard() {
                   onClick={handleConfirmInitialize}
                   className="flex-1 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl text-sm shadow-md"
                 >
-                  Initialize
+                  Initialize Exam
                 </button>
               </div>
             </div>

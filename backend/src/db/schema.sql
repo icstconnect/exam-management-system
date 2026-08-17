@@ -89,10 +89,12 @@ CREATE TABLE IF NOT EXISTS exam_batches (
 CREATE TABLE IF NOT EXISTS exam_runs (
   run_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   exam_id UUID NOT NULL REFERENCES exams(exam_id) ON DELETE CASCADE,
+  batch_name VARCHAR(100),
   exam_name VARCHAR(255) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   started_at TIMESTAMP,
   ended_at TIMESTAMP,
+  seconds_left INTEGER,
   status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'
 );
 

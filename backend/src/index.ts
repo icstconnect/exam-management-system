@@ -47,13 +47,17 @@ const PORT = parseInt(process.env.PORT || '3001', 10);
       CREATE TABLE IF NOT EXISTS exam_runs (
         run_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         exam_id UUID NOT NULL REFERENCES exams(exam_id) ON DELETE CASCADE,
+        batch_name VARCHAR(100),
         exam_name VARCHAR(255) NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         started_at TIMESTAMP,
         ended_at TIMESTAMP,
+        seconds_left INTEGER,
         status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'
       );
 
+      ALTER TABLE exam_runs ADD COLUMN IF NOT EXISTS batch_name VARCHAR(100);
+      ALTER TABLE exam_runs ADD COLUMN IF NOT EXISTS seconds_left INTEGER;
       ALTER TABLE exam_sessions ADD COLUMN IF NOT EXISTS run_id UUID REFERENCES exam_runs(run_id) ON DELETE SET NULL;
 
       CREATE TABLE IF NOT EXISTS exam_session_question_order (
@@ -1050,24 +1054,123 @@ async function forceSubmitExam(session_id: string) {
   } catch(e) { console.error('Auto-submit error:', e); }
 }
 
-// Real-time Authoritative Exam Timer Engine (1-second tick synchronization)
-async function startExamTimerEngine(exam_id: string, initialSeconds?: number) {
-  if (activeExamTimers.has(exam_id)) {
-    const existing = activeExamTimers.get(exam_id)!;
+// Timer Key helper for batch-specific timer isolation
+const getTimerKey = (exam_id: string, batch_name?: string | null) => {
+  const b = (batch_name || '').trim();
+  return b ? `${exam_id}::${b}` : exam_id;
+};
+
+// Helper to sync teacher dashboard across assigned batches with target batch context
+const broadcastDashboardUpdate = async (exam_id: string, target_batch?: string | null) => {
+  try {
+    const examRes = await pool.query("SELECT title, target_batch, status, duration_minutes, global_seconds_left FROM exams WHERE exam_id = $1", [exam_id]);
+    if (examRes.rows.length === 0) return;
+    const exam = examRes.rows[0];
+
+    // Get all assigned batches for this exam
+    const batchesRes = await pool.query("SELECT batch_name FROM exam_batches WHERE exam_id = $1 ORDER BY batch_name ASC", [exam_id]);
+    let assignedBatches = batchesRes.rows.map(r => r.batch_name);
+    if (assignedBatches.length === 0 && exam.target_batch) {
+      assignedBatches = [exam.target_batch];
+    }
+
+    // Determine active target batch
+    let effectiveBatch = target_batch && target_batch.trim() ? target_batch.trim() : null;
+    if (!effectiveBatch && assignedBatches.length === 1) {
+      effectiveBatch = assignedBatches[0];
+    }
+
+    let activeRun: any = null;
+    let runStatus = exam.status;
+    let runSecondsLeft = (exam.duration_minutes || 60) * 60;
+
+    if (effectiveBatch) {
+      const runRes = await pool.query(`
+        SELECT run_id, exam_name, status, seconds_left, started_at, ended_at 
+        FROM exam_runs 
+        WHERE exam_id = $1 AND (batch_name = $2 OR (batch_name IS NULL AND status = 'ACTIVE'))
+        ORDER BY created_at DESC LIMIT 1
+      `, [exam_id, effectiveBatch]);
+
+      if (runRes.rows.length > 0) {
+        activeRun = runRes.rows[0];
+        runStatus = activeRun.status;
+        const timerKey = getTimerKey(exam_id, effectiveBatch);
+        if (activeExamTimers.has(timerKey)) {
+          runSecondsLeft = activeExamTimers.get(timerKey)!.secondsLeft;
+        } else if (typeof activeRun.seconds_left === 'number') {
+          runSecondsLeft = activeRun.seconds_left;
+        }
+      } else {
+        runStatus = 'CREATED';
+      }
+
+      // Query students belonging specifically to effectiveBatch
+      const studentsRes = await pool.query(`
+        SELECT DISTINCT ON (s.student_id)
+          s.student_id, s.name, s.batch, s.class,
+          es.session_id, COALESCE(es.status, 'READY') as status, es.password_provided, 
+          COALESCE(es.tab_violation_count, 0) as tab_violation_count, es.seconds_left
+        FROM students s
+        LEFT JOIN exam_sessions es ON s.student_id = es.student_id AND es.exam_id = $1 AND ($3::uuid IS NULL OR es.run_id = $3)
+        WHERE s.batch = $2
+        ORDER BY s.student_id ASC, (es.run_id = $3) DESC NULLS LAST, es.last_active_timestamp DESC NULLS LAST, es.session_id DESC NULLS LAST
+      `, [exam_id, effectiveBatch, activeRun?.run_id || null]);
+
+      io.to('teacher_dashboard').emit('dashboard_update', { 
+        exam_id,
+        target_batch: effectiveBatch,
+        assigned_batches: assignedBatches,
+        students: studentsRes.rows, 
+        status: runStatus, 
+        global_seconds_left: runSecondsLeft,
+        run_id: activeRun?.run_id || null
+      });
+    } else {
+      // Multi-batch exam with no target batch selected yet
+      io.to('teacher_dashboard').emit('dashboard_update', { 
+        exam_id,
+        target_batch: null,
+        assigned_batches: assignedBatches,
+        students: [], 
+        status: 'CREATED', 
+        global_seconds_left: (exam.duration_minutes || 60) * 60,
+        run_id: null
+      });
+    }
+  } catch(e) { console.error('Error broadcasting update', e); }
+};
+
+// Real-time Authoritative Exam Timer Engine (1-second tick synchronization per batch run)
+async function startExamTimerEngine(exam_id: string, batch_name?: string | null, initialSeconds?: number) {
+  const timerKey = getTimerKey(exam_id, batch_name);
+  if (activeExamTimers.has(timerKey)) {
+    const existing = activeExamTimers.get(timerKey)!;
     if (existing.timer) clearInterval(existing.timer);
-    activeExamTimers.delete(exam_id);
+    activeExamTimers.delete(timerKey);
   }
 
   let secondsLeft = initialSeconds;
   if (secondsLeft === undefined || secondsLeft === null) {
     try {
-      const examCheck = await pool.query("SELECT global_seconds_left, duration_minutes FROM exams WHERE exam_id = $1", [exam_id]);
-      if (examCheck.rows.length > 0) {
-        secondsLeft = typeof examCheck.rows[0].global_seconds_left === 'number' 
-          ? examCheck.rows[0].global_seconds_left 
-          : (examCheck.rows[0].duration_minutes || 30) * 60;
-      } else {
-        secondsLeft = 1800;
+      if (batch_name) {
+        const runCheck = await pool.query(
+          "SELECT seconds_left FROM exam_runs WHERE exam_id = $1 AND batch_name = $2 AND status != 'ENDED' ORDER BY created_at DESC LIMIT 1",
+          [exam_id, batch_name]
+        );
+        if (runCheck.rows.length > 0 && typeof runCheck.rows[0].seconds_left === 'number') {
+          secondsLeft = runCheck.rows[0].seconds_left;
+        }
+      }
+      if (secondsLeft === undefined || secondsLeft === null) {
+        const examCheck = await pool.query("SELECT global_seconds_left, duration_minutes FROM exams WHERE exam_id = $1", [exam_id]);
+        if (examCheck.rows.length > 0) {
+          secondsLeft = typeof examCheck.rows[0].global_seconds_left === 'number' 
+            ? examCheck.rows[0].global_seconds_left 
+            : (examCheck.rows[0].duration_minutes || 30) * 60;
+        } else {
+          secondsLeft = 1800;
+        }
       }
     } catch(err) {
       secondsLeft = 1800;
@@ -1087,44 +1190,46 @@ async function startExamTimerEngine(exam_id: string, initialSeconds?: number) {
       if (state.secondsLeft <= 0) {
         state.secondsLeft = 0;
         clearInterval(state.timer);
-        activeExamTimers.delete(exam_id);
+        activeExamTimers.delete(timerKey);
 
-        const activeSessions = await pool.query("SELECT session_id FROM exam_sessions WHERE exam_id = $1 AND status IN ('LOGGED_IN', 'EXAMINEE', 'PAUSED')", [exam_id]);
-        for (const row of activeSessions.rows) {
-          await forceSubmitExam(row.session_id);
+        if (batch_name) {
+          // Force submit only examinees belonging to this specific batch run
+          const activeSessions = await pool.query(`
+            SELECT es.session_id 
+            FROM exam_sessions es
+            JOIN students s ON es.student_id = s.student_id
+            WHERE es.exam_id = $1 AND s.batch = $2 AND es.status IN ('LOGGED_IN', 'EXAMINEE', 'PAUSED')
+          `, [exam_id, batch_name]);
+          for (const row of activeSessions.rows) {
+            await forceSubmitExam(row.session_id);
+          }
+
+          await pool.query(
+            "UPDATE exam_runs SET ended_at = CURRENT_TIMESTAMP, status = 'ENDED', seconds_left = 0 WHERE exam_id = $1 AND batch_name = $2 AND status != 'ENDED'",
+            [exam_id, batch_name]
+          );
+
+          io.to(`exam_${exam_id}_${batch_name}`).emit('exam_ended', { message: 'Time is up!' });
+          io.to('teacher_dashboard').emit('exam_status_update', { exam_id, batch_name, status: 'ENDED' });
+          io.to('teacher_dashboard').emit('time_tick', { exam_id, batch_name, seconds_left: 0 });
+          io.to(`exam_${exam_id}_${batch_name}`).emit('time_tick', { exam_id, batch_name, seconds_left: 0 });
+          
+          await broadcastDashboardUpdate(exam_id, batch_name);
+        } else {
+          const activeSessions = await pool.query("SELECT session_id FROM exam_sessions WHERE exam_id = $1 AND status IN ('LOGGED_IN', 'EXAMINEE', 'PAUSED')", [exam_id]);
+          for (const row of activeSessions.rows) {
+            await forceSubmitExam(row.session_id);
+          }
+          
+          await pool.query("UPDATE exams SET status = 'ENDED', actual_end_time = CURRENT_TIMESTAMP, global_seconds_left = 0 WHERE exam_id = $1", [exam_id]);
+          await pool.query("UPDATE exam_runs SET ended_at = CURRENT_TIMESTAMP, status = 'ENDED', seconds_left = 0 WHERE exam_id = $1 AND status = 'ACTIVE'", [exam_id]);
+          
+          io.to(`exam_${exam_id}`).emit('exam_ended', { message: 'Time is up!' });
+          io.to('teacher_dashboard').emit('exam_status_update', { exam_id, status: 'ENDED' });
+          io.to('teacher_dashboard').emit('time_tick', { exam_id, seconds_left: 0 });
+          io.to(`exam_${exam_id}`).emit('time_tick', { exam_id, seconds_left: 0 });
+          await broadcastDashboardUpdate(exam_id);
         }
-        
-        await pool.query("UPDATE exams SET status = 'ENDED', actual_end_time = CURRENT_TIMESTAMP, global_seconds_left = 0 WHERE exam_id = $1", [exam_id]);
-        await pool.query("UPDATE exam_runs SET ended_at = CURRENT_TIMESTAMP, status = 'ENDED' WHERE exam_id = $1 AND status = 'ACTIVE'", [exam_id]);
-        
-        io.to(`exam_${exam_id}`).emit('exam_ended', { message: 'Time is up!' });
-        io.to('teacher_dashboard').emit('exam_status_update', { exam_id, status: 'ENDED' });
-        io.to('teacher_dashboard').emit('time_tick', { exam_id, seconds_left: 0 });
-        io.to(`exam_${exam_id}`).emit('time_tick', { exam_id, seconds_left: 0 });
-        
-        // Final dashboard sync
-        const examRes = await pool.query("SELECT target_batch FROM exams WHERE exam_id = $1", [exam_id]);
-        const batchesRes = await pool.query("SELECT batch_name FROM exam_batches WHERE exam_id = $1", [exam_id]);
-        let assignedBatches = batchesRes.rows.map(r => r.batch_name);
-        if (assignedBatches.length === 0 && examRes.rows[0]?.target_batch) assignedBatches = [examRes.rows[0].target_batch];
-
-        const updatedStudentsRes = await pool.query(`
-          SELECT DISTINCT ON (s.student_id)
-            s.student_id, s.name, s.batch, s.class,
-            es.session_id, COALESCE(es.status, 'READY') as status, es.password_provided, 
-            COALESCE(es.tab_violation_count, 0) as tab_violation_count, es.seconds_left
-          FROM students s
-          LEFT JOIN exam_sessions es ON s.student_id = es.student_id AND es.exam_id = $1
-          WHERE s.batch = ANY($2)
-          ORDER BY s.student_id ASC, es.last_active_timestamp DESC NULLS LAST, es.session_id DESC NULLS LAST
-        `, [exam_id, assignedBatches]);
-
-        io.to('teacher_dashboard').emit('dashboard_update', { 
-          students: updatedStudentsRes.rows, 
-          status: 'ENDED', 
-          global_seconds_left: 0,
-          assigned_batches: assignedBatches
-        });
         return;
       }
 
@@ -1133,12 +1238,21 @@ async function startExamTimerEngine(exam_id: string, initialSeconds?: number) {
       state.lastTick = Date.now();
 
       // Authoritative 1-second broadcast to both Teacher Dashboard and Student Workspace rooms
-      io.to('teacher_dashboard').emit('time_tick', { exam_id, seconds_left: state.secondsLeft });
-      io.to(`exam_${exam_id}`).emit('time_tick', { exam_id, seconds_left: state.secondsLeft });
+      io.to('teacher_dashboard').emit('time_tick', { exam_id, batch_name: batch_name || undefined, seconds_left: state.secondsLeft });
+      if (batch_name) {
+        io.to(`exam_${exam_id}_${batch_name}`).emit('time_tick', { exam_id, batch_name, seconds_left: state.secondsLeft });
+      }
+      io.to(`exam_${exam_id}`).emit('time_tick', { exam_id, batch_name: batch_name || undefined, seconds_left: state.secondsLeft });
 
       dbPersistCounter++;
       if (dbPersistCounter >= 5 || state.secondsLeft === 0) {
         dbPersistCounter = 0;
+        if (batch_name) {
+          await pool.query(
+            "UPDATE exam_runs SET seconds_left = $1 WHERE exam_id = $2 AND batch_name = $3 AND status = 'STARTED'",
+            [state.secondsLeft, exam_id, batch_name]
+          );
+        }
         await pool.query("UPDATE exams SET global_seconds_left = $2 WHERE exam_id = $1 AND status = 'STARTED'", [exam_id, state.secondsLeft]);
       }
     } catch (e) {
@@ -1146,7 +1260,7 @@ async function startExamTimerEngine(exam_id: string, initialSeconds?: number) {
     }
   }, 1000);
 
-  activeExamTimers.set(exam_id, state);
+  activeExamTimers.set(timerKey, state);
 }
 
 // ==========================================
@@ -1156,50 +1270,7 @@ async function startExamTimerEngine(exam_id: string, initialSeconds?: number) {
 io.on('connection', (socket: Socket) => {
   console.log(`New connection: ${socket.id}`);
 
-  // Helper to sync teacher dashboard across multiple assigned batches
-  const broadcastDashboardUpdate = async (exam_id: string) => {
-    try {
-      const examRes = await pool.query("SELECT target_batch, status, global_seconds_left FROM exams WHERE exam_id = $1", [exam_id]);
-      if (examRes.rows.length > 0) {
-        const { target_batch, status, global_seconds_left } = examRes.rows[0];
-
-        // Get all assigned batches for this exam
-        const batchesRes = await pool.query("SELECT batch_name FROM exam_batches WHERE exam_id = $1", [exam_id]);
-        let assignedBatches = batchesRes.rows.map(r => r.batch_name);
-        if (assignedBatches.length === 0 && target_batch) {
-          assignedBatches = [target_batch];
-        }
-
-        // Get latest active run for this exam
-        const runRes = await pool.query("SELECT run_id FROM exam_runs WHERE exam_id = $1 AND status = 'ACTIVE' ORDER BY created_at DESC LIMIT 1", [exam_id]);
-        const activeRunId = runRes.rows[0]?.run_id || null;
-
-        const updatedStudentsRes = await pool.query(`
-          SELECT DISTINCT ON (s.student_id)
-            s.student_id, s.name, s.batch, s.class,
-            es.session_id, COALESCE(es.status, 'READY') as status, es.password_provided, 
-            COALESCE(es.tab_violation_count, 0) as tab_violation_count, es.seconds_left
-          FROM students s
-          LEFT JOIN exam_sessions es ON s.student_id = es.student_id AND es.exam_id = $1 AND ($3::uuid IS NULL OR es.run_id = $3)
-          WHERE s.batch = ANY($2)
-          ORDER BY s.student_id ASC, (es.run_id = $3) DESC NULLS LAST, es.last_active_timestamp DESC NULLS LAST, es.session_id DESC NULLS LAST
-        `, [exam_id, assignedBatches, activeRunId]);
-
-        const effectiveSecondsLeft = activeExamTimers.has(exam_id) 
-          ? activeExamTimers.get(exam_id)!.secondsLeft 
-          : global_seconds_left;
-
-        io.to('teacher_dashboard').emit('dashboard_update', { 
-          students: updatedStudentsRes.rows, 
-          status, 
-          global_seconds_left: effectiveSecondsLeft,
-          assigned_batches: assignedBatches
-        });
-      }
-    } catch(e) { console.error('Error broadcasting update', e); }
-  };
-
-  // Student Login Event
+  // Student Login Event (Resolves active run for student's specific batch)
   socket.on('student_login', async (data: { student_id: string; password_provided: string }) => {
     try {
       const { student_id, password_provided } = data;
@@ -1214,11 +1285,11 @@ io.on('connection', (socket: Socket) => {
 
       // 2. Identify the CURRENT active or scheduled examination for the student's batch
       const examRes = await pool.query(`
-        SELECT e.exam_id, e.title, e.duration_minutes, e.status, e.scheduled_start, e.target_batch
+        SELECT e.exam_id, e.title, e.duration_minutes, e.status as exam_status, e.scheduled_start, e.target_batch
         FROM exams e
         LEFT JOIN exam_batches eb ON eb.exam_id = e.exam_id
         WHERE (eb.batch_name = $1 OR e.target_batch = $1)
-          AND e.status != 'ENDED'
+          AND COALESCE(e.is_deleted, false) = false
         ORDER BY 
           CASE WHEN e.status = 'STARTED' THEN 1
                WHEN e.status = 'PAUSED' THEN 2
@@ -1237,15 +1308,20 @@ io.on('connection', (socket: Socket) => {
       const activeExam = examRes.rows[0];
       const exam_id = activeExam.exam_id;
 
-      // 3. Find if there is an active exam_run for this exam
-      const runRes = await pool.query("SELECT run_id FROM exam_runs WHERE exam_id = $1 AND status = 'ACTIVE' ORDER BY created_at DESC LIMIT 1", [exam_id]);
+      // 3. Find if there is an active exam_run for this student's specific batch
+      const runRes = await pool.query(`
+        SELECT run_id, status FROM exam_runs 
+        WHERE exam_id = $1 AND (batch_name = $2 OR (batch_name IS NULL AND status = 'ACTIVE')) AND status != 'ENDED'
+        ORDER BY created_at DESC LIMIT 1
+      `, [exam_id, student.batch]);
       const activeRunId = runRes.rows[0]?.run_id || null;
+      const runStatus = runRes.rows[0]?.status || activeExam.exam_status;
 
       const defaultPassword = `${student.name.split(' ')[0].toUpperCase()}@${student_id}`;
       let session: any = null;
 
       if (activeRunId) {
-        // Look for session belonging specifically to this active run
+        // Look for session belonging specifically to this active batch run
         const runSessionRes = await pool.query(
           "SELECT * FROM exam_sessions WHERE exam_id = $1 AND student_id = $2 AND run_id = $3",
           [exam_id, student_id, activeRunId]
@@ -1253,7 +1329,7 @@ io.on('connection', (socket: Socket) => {
         if (runSessionRes.rows.length > 0) {
           session = runSessionRes.rows[0];
         } else {
-          // Auto-create session for this active run
+          // Auto-create session for this active batch run
           const newSessionId = require('crypto').randomUUID();
           const createdSession = await pool.query(`
             INSERT INTO exam_sessions (session_id, exam_id, student_id, run_id, status, password_provided)
@@ -1263,7 +1339,7 @@ io.on('connection', (socket: Socket) => {
           session = createdSession.rows[0];
         }
       } else {
-        // Exam is in CREATED status (upcoming/retest). Look for non-completed session or create new
+        // Look for non-completed session or create new
         const createdSessionRes = await pool.query(`
           SELECT * FROM exam_sessions 
           WHERE exam_id = $1 AND student_id = $2 AND status != 'COMPLETED'
@@ -1300,16 +1376,18 @@ io.on('connection', (socket: Socket) => {
       // Ensure deterministic question order is created
       await ensureStudentQuestionOrder(session.session_id, exam_id, student.batch);
 
-      // Join socket rooms
+      // Join socket rooms (global exam room & batch-isolated room)
       socket.join(session.session_id);
       socket.join(`exam_${exam_id}`);
+      socket.join(`exam_${exam_id}_${student.batch}`);
+      if (activeRunId) socket.join(`exam_run_${activeRunId}`);
 
       socket.emit('login_success', {
         session_id: session.session_id,
         student_id,
         exam_id,
         exam_title: activeExam.title,
-        exam_status: activeExam.status,
+        exam_status: runStatus,
         session_status: newStatus
       });
 
@@ -1331,10 +1409,10 @@ io.on('connection', (socket: Socket) => {
     console.log(`Teacher joined dashboard: ${socket.id}`);
   });
 
-  // Teacher selecting an exam to monitor
-  socket.on('monitor_exam', async (data: { exam_id: string }) => {
+  // Teacher selecting an exam & batch to monitor
+  socket.on('monitor_exam', async (data: { exam_id: string, batch_name?: string }) => {
     try {
-      await broadcastDashboardUpdate(data.exam_id);
+      await broadcastDashboardUpdate(data.exam_id, data.batch_name);
     } catch (e) { console.error(e); }
   });
 
@@ -1348,10 +1426,13 @@ io.on('connection', (socket: Socket) => {
       socket.join(data.session_id);
 
       const sessionRes = await pool.query(`
-        SELECT es.session_id, es.exam_id, es.student_id, es.run_id, es.status as session_status, es.seconds_left, s.batch as student_batch, e.status as exam_status, e.global_seconds_left
+        SELECT es.session_id, es.exam_id, es.student_id, es.run_id, es.status as session_status, es.seconds_left, 
+               s.batch as student_batch, e.status as exam_status, e.global_seconds_left,
+               er.status as run_status, er.seconds_left as run_seconds_left
         FROM exam_sessions es
         JOIN students s ON es.student_id = s.student_id
         JOIN exams e ON es.exam_id = e.exam_id
+        LEFT JOIN exam_runs er ON es.run_id = er.run_id
         WHERE es.session_id = $1
       `, [data.session_id]);
 
@@ -1362,27 +1443,32 @@ io.on('connection', (socket: Socket) => {
 
       const session = sessionRes.rows[0];
       socket.join(`exam_${session.exam_id}`);
+      socket.join(`exam_${session.exam_id}_${session.student_batch}`);
+      if (session.run_id) socket.join(`exam_run_${session.run_id}`);
 
       // Ensure deterministic question order is ready
       await ensureStudentQuestionOrder(data.session_id, session.exam_id, session.student_batch);
 
+      const effectiveStatus = session.run_status || session.exam_status;
+
       // Handle completed state
-      if (session.session_status === 'COMPLETED' || session.exam_status === 'ENDED') {
+      if (session.session_status === 'COMPLETED' || effectiveStatus === 'ENDED') {
         socket.emit('exam_completed');
         return;
       }
 
       // Handle waiting state for unstarted exam
-      if (session.exam_status === 'CREATED' || session.session_status === 'READY' || session.session_status === 'LOGGED_IN') {
+      if (effectiveStatus === 'CREATED' || session.session_status === 'READY' || session.session_status === 'LOGGED_IN') {
         socket.emit('exam_waiting');
         return;
       }
 
       // Handle active/started exam
-      if (session.exam_status === 'STARTED' || session.exam_status === 'PAUSED') {
-        let currentSecondsLeft = activeExamTimers.has(session.exam_id)
-          ? activeExamTimers.get(session.exam_id)!.secondsLeft
-          : (session.global_seconds_left ?? 1800);
+      if (effectiveStatus === 'STARTED' || effectiveStatus === 'PAUSED') {
+        const timerKey = getTimerKey(session.exam_id, session.student_batch);
+        let currentSecondsLeft = activeExamTimers.has(timerKey)
+          ? activeExamTimers.get(timerKey)!.secondsLeft
+          : (session.run_seconds_left ?? session.global_seconds_left ?? 1800);
         
         if (session.session_status !== 'EXAMINEE' && session.session_status !== 'PAUSED') {
           await pool.query("UPDATE exam_sessions SET status = 'EXAMINEE' WHERE session_id = $1", [data.session_id]);
@@ -1418,7 +1504,7 @@ io.on('connection', (socket: Socket) => {
           previous_answers: previousAnswers 
         });
 
-        if (session.session_status === 'PAUSED' || session.exam_status === 'PAUSED') {
+        if (session.session_status === 'PAUSED' || effectiveStatus === 'PAUSED') {
           socket.emit('exam_paused');
         }
       }
@@ -1451,87 +1537,102 @@ io.on('connection', (socket: Socket) => {
         try {
           const correctMap = JSON.parse(correctStr);
           const selectedMap = JSON.parse(selected_option);
-          let correctCount = 0;
-          const totalPairs = Object.keys(correctMap).length;
-          
-          for (const key in selectedMap) {
-            if (correctMap[key] === selectedMap[key]) {
-              correctCount++;
-            }
-          }
-          
-          is_correct = correctCount === totalPairs && totalPairs > 0;
-          if (totalPairs > 0) {
-            awarded_marks = (correctCount / totalPairs) * qMarks;
-          } else {
-            awarded_marks = 0;
-          }
+          is_correct = Object.keys(correctMap).every(k => correctMap[k] === selectedMap[k]);
         } catch(e) {}
       } else {
-        is_correct = correctStr === selected_option;
+        is_correct = (selected_option || '').trim() === (correctStr || '').trim();
       }
 
-      if (awarded_marks === null) {
-        awarded_marks = is_correct ? qMarks : 0;
-      }
+      awarded_marks = is_correct ? qMarks : 0;
 
-      // Upsert into student_responses
       await pool.query(`
         INSERT INTO student_responses (session_id, question_id, selected_option, is_correct, awarded_marks)
         VALUES ($1, $2, $3, $4, $5)
         ON CONFLICT (session_id, question_id) 
         DO UPDATE SET selected_option = EXCLUDED.selected_option, is_correct = EXCLUDED.is_correct, awarded_marks = EXCLUDED.awarded_marks
       `, [session_id, question_id, selected_option, is_correct, awarded_marks]);
-    } catch(e) { console.error(e); }
+
+      // Calculate total score for session
+      const scoreRes = await pool.query("SELECT COALESCE(SUM(awarded_marks), 0) as total_score FROM student_responses WHERE session_id = $1", [session_id]);
+      const currentScore = scoreRes.rows[0]?.total_score || 0;
+      await pool.query("UPDATE exam_sessions SET score = $1, last_active_timestamp = CURRENT_TIMESTAMP WHERE session_id = $2", [currentScore, session_id]);
+
+      socket.emit('answer_saved', { question_id });
+    } catch (e) { console.error('submit_answer error:', e); }
   });
 
-  // Submit Exam
-  socket.on('student_submit_exam', async (data: { session_id: string }) => {
-    await forceSubmitExam(data.session_id);
+  // Finish / Submit Exam from Student
+  socket.on('finish_exam', async (data: { session_id: string }) => {
+    try {
+      const { session_id } = data;
+      const sessionRes = await pool.query("SELECT student_id, exam_id FROM exam_sessions WHERE session_id = $1", [session_id]);
+      if (sessionRes.rows.length === 0) return;
+
+      const { student_id, exam_id } = sessionRes.rows[0];
+
+      // Finalize score
+      const scoreRes = await pool.query("SELECT COALESCE(SUM(awarded_marks), 0) as total_score FROM student_responses WHERE session_id = $1", [session_id]);
+      const finalScore = scoreRes.rows[0]?.total_score || 0;
+
+      await pool.query("UPDATE exam_sessions SET status = 'COMPLETED', score = $1, last_active_timestamp = CURRENT_TIMESTAMP WHERE session_id = $2", [finalScore, session_id]);
+
+      socket.emit('exam_completed');
+      io.to('teacher_dashboard').emit('student_status_update', {
+        student_id,
+        status: 'COMPLETED'
+      });
+    } catch(e) { console.error('finish_exam error:', e); }
   });
 
-  // Tab Violation
+  // Tab Violation Tracking
   socket.on('tab_violation', async (data: { session_id: string }) => {
     try {
       const { session_id } = data;
       const res = await pool.query(`
         UPDATE exam_sessions 
-        SET status = 'PAUSED', tab_violation_count = tab_violation_count + 1 
+        SET tab_violation_count = tab_violation_count + 1 
         WHERE session_id = $1 
         RETURNING student_id, tab_violation_count
       `, [session_id]);
-      
-      socket.emit('exam_paused');
-      
+
       if (res.rows.length > 0) {
+        const { student_id, tab_violation_count } = res.rows[0];
         io.to('teacher_dashboard').emit('student_status_update', {
-          student_id: res.rows[0].student_id,
-          status: 'PAUSED',
-          tab_violation_count: res.rows[0].tab_violation_count
+          student_id,
+          tab_violation_count
         });
       }
-    } catch(e) { console.error(e); }
+    } catch(e) { console.error('tab_violation error:', e); }
   });
 
-  // Teacher Initialize Student (with exam_name support for attempt tracking)
-  socket.on('teacher_initialize_student', async (data: { exam_id: string, student_id: string, exam_name?: string }) => {
+  // Teacher Initialize Student (with batch-specific run support)
+  socket.on('teacher_initialize_student', async (data: { exam_id: string, student_id: string, batch_name?: string, exam_name?: string }) => {
     try {
-      const { exam_id, student_id, exam_name } = data;
+      const { exam_id, student_id, batch_name, exam_name } = data;
       
-      const examRes = await pool.query("SELECT title, target_batch FROM exams WHERE exam_id = $1", [exam_id]);
+      const examRes = await pool.query("SELECT title, duration_minutes, target_batch FROM exams WHERE exam_id = $1", [exam_id]);
       if (examRes.rows.length === 0) return;
 
       const studentRes = await pool.query("SELECT name, batch FROM students WHERE student_id = $1", [student_id]);
       if (studentRes.rows.length === 0) return;
+      const studentBatch = batch_name || studentRes.rows[0].batch;
 
-      // Get or create active exam_run
+      // Get or create active exam_run for this student's batch
       let run_id: string;
-      const activeRunRes = await pool.query("SELECT run_id FROM exam_runs WHERE exam_id = $1 AND status = 'ACTIVE' ORDER BY created_at DESC LIMIT 1", [exam_id]);
+      const activeRunRes = await pool.query(
+        "SELECT run_id FROM exam_runs WHERE exam_id = $1 AND (batch_name = $2 OR (batch_name IS NULL AND status = 'ACTIVE')) AND status != 'ENDED' ORDER BY created_at DESC LIMIT 1",
+        [exam_id, studentBatch]
+      );
+
       if (activeRunRes.rows.length > 0) {
         run_id = activeRunRes.rows[0].run_id;
       } else {
-        const runName = exam_name || `${examRes.rows[0].title} - ${new Date().toLocaleDateString()}`;
-        const newRun = await pool.query("INSERT INTO exam_runs (exam_id, exam_name, status) VALUES ($1, $2, 'ACTIVE') RETURNING run_id", [exam_id, runName]);
+        const runName = exam_name || `${examRes.rows[0].title} - ${studentBatch}`;
+        const initialSeconds = (examRes.rows[0].duration_minutes || 60) * 60;
+        const newRun = await pool.query(
+          "INSERT INTO exam_runs (exam_id, batch_name, exam_name, status, seconds_left) VALUES ($1, $2, $3, 'CREATED', $4) RETURNING run_id",
+          [exam_id, studentBatch, runName, initialSeconds]
+        );
         run_id = newRun.rows[0].run_id;
       }
 
@@ -1549,39 +1650,47 @@ io.on('connection', (socket: Socket) => {
       const effectiveSessionId = sessionRes.rows[0].session_id;
       await ensureStudentQuestionOrder(effectiveSessionId, exam_id, studentRes.rows[0].batch);
 
-      await broadcastDashboardUpdate(exam_id);
+      await broadcastDashboardUpdate(exam_id, studentBatch);
     } catch (e) { console.error(e); }
   });
 
-  // Teacher Initialize Exam (creates new Exam Run attempt with provided Examination Name)
-  socket.on('teacher_initialize_exam', async (data: { exam_id: string, exam_name?: string }) => {
+  // Teacher Initialize Exam (creates new Exam Run attempt for the SELECTED TARGET BATCH only)
+  socket.on('teacher_initialize_exam', async (data: { exam_id: string, batch_name: string, exam_name?: string }) => {
     try {
-      const { exam_id, exam_name } = data;
-      const examRes = await pool.query("SELECT title, target_batch FROM exams WHERE exam_id = $1", [exam_id]);
+      const { exam_id, batch_name, exam_name } = data;
+      const examRes = await pool.query("SELECT title, duration_minutes, target_batch FROM exams WHERE exam_id = $1", [exam_id]);
       if (examRes.rows.length === 0) return;
 
-      // 1. Create a brand new exam_run for this attempt/retest
-      const runTitle = exam_name && exam_name.trim() ? exam_name.trim() : `${examRes.rows[0].title} - ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+      if (!batch_name) {
+        console.error('Target batch is required to initialize examination');
+        return;
+      }
+
+      // Close previous unended run for this batch to ensure fresh attempt
+      await pool.query(
+        "UPDATE exam_runs SET status = 'ENDED', ended_at = CURRENT_TIMESTAMP WHERE exam_id = $1 AND batch_name = $2 AND status != 'ENDED'",
+        [exam_id, batch_name]
+      );
+
+      // 1. Create a brand new exam_run for this batch attempt
+      const runTitle = exam_name && exam_name.trim() 
+        ? exam_name.trim() 
+        : `${examRes.rows[0].title} - ${batch_name} (${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })})`;
+      
+      const initialSeconds = (examRes.rows[0].duration_minutes || 60) * 60;
       const runRes = await pool.query(
-        "INSERT INTO exam_runs (exam_id, exam_name, status) VALUES ($1, $2, 'ACTIVE') RETURNING run_id",
-        [exam_id, runTitle]
+        "INSERT INTO exam_runs (exam_id, batch_name, exam_name, status, seconds_left) VALUES ($1, $2, $3, 'CREATED', $4) RETURNING run_id",
+        [exam_id, batch_name, runTitle, initialSeconds]
       );
       const run_id = runRes.rows[0].run_id;
 
-      // 2. Fetch all assigned batches for this exam
-      const batchesRes = await pool.query("SELECT batch_name FROM exam_batches WHERE exam_id = $1", [exam_id]);
-      let assignedBatches = batchesRes.rows.map(r => r.batch_name);
-      if (assignedBatches.length === 0 && examRes.rows[0].target_batch) {
-        assignedBatches = [examRes.rows[0].target_batch];
-      }
-
-      // 3. Fetch all students across all assigned batches
+      // 2. Fetch students belonging ONLY to the selected target batch
       const studentsRes = await pool.query(
-        "SELECT student_id, name, batch FROM students WHERE batch = ANY($1) ORDER BY student_id ASC",
-        [assignedBatches]
+        "SELECT student_id, name, batch FROM students WHERE batch = $1 ORDER BY student_id ASC",
+        [batch_name]
       );
 
-      // 4. Create sessions & generate deterministic question order for each student
+      // 3. Create sessions & generate deterministic question order for each student
       for (const student of studentsRes.rows) {
         const password = `${student.name.split(' ')[0].toUpperCase()}@${student.student_id}`;
         const newSessionId = require('crypto').randomUUID();
@@ -1598,35 +1707,56 @@ io.on('connection', (socket: Socket) => {
         await ensureStudentQuestionOrder(effectiveSessionId, exam_id, student.batch);
       }
 
-      // 5. Sync dashboard
-      await broadcastDashboardUpdate(exam_id);
-    } catch(e) { console.error('Error initializing exam:', e); }
+      // 4. Sync dashboard
+      await broadcastDashboardUpdate(exam_id, batch_name);
+    } catch(e) { console.error('Error initializing exam for batch:', e); }
   });
 
-  // Teacher Start Exam
-  socket.on('teacher_start_exam', async (data: { exam_id: string }) => {
+  // Teacher Start Exam (Starts the selected Examination + Target Batch run only)
+  socket.on('teacher_start_exam', async (data: { exam_id: string, batch_name: string }) => {
     try {
-      const exam_id = data.exam_id;
+      const { exam_id, batch_name } = data;
+      if (!batch_name) return;
+
       const examRes = await pool.query("SELECT duration_minutes FROM exams WHERE exam_id = $1", [exam_id]);
       if (examRes.rows.length === 0) return;
       const durationSeconds = examRes.rows[0].duration_minutes * 60;
 
-      await pool.query(
-        "UPDATE exams SET status = 'STARTED', actual_start_time = CURRENT_TIMESTAMP, global_seconds_left = $2 WHERE exam_id = $1",
-        [exam_id, durationSeconds]
+      // Find or create run for this batch
+      let run_id: string;
+      const runCheck = await pool.query(
+        "SELECT run_id, seconds_left FROM exam_runs WHERE exam_id = $1 AND batch_name = $2 AND status != 'ENDED' ORDER BY created_at DESC LIMIT 1",
+        [exam_id, batch_name]
       );
 
-      // Update active run start time
-      await pool.query(
-        "UPDATE exam_runs SET started_at = CURRENT_TIMESTAMP WHERE exam_id = $1 AND status = 'ACTIVE'",
-        [exam_id]
-      );
+      if (runCheck.rows.length > 0) {
+        run_id = runCheck.rows[0].run_id;
+        await pool.query(
+          "UPDATE exam_runs SET status = 'STARTED', started_at = CURRENT_TIMESTAMP, seconds_left = COALESCE(seconds_left, $2) WHERE run_id = $1",
+          [run_id, durationSeconds]
+        );
+      } else {
+        const examTitleRes = await pool.query("SELECT title FROM exams WHERE exam_id = $1", [exam_id]);
+        const defaultRunName = `${examTitleRes.rows[0]?.title || 'Exam'} - ${batch_name}`;
+        const newRun = await pool.query(
+          "INSERT INTO exam_runs (exam_id, batch_name, exam_name, status, started_at, seconds_left) VALUES ($1, $2, $3, 'STARTED', CURRENT_TIMESTAMP, $4) RETURNING run_id",
+          [exam_id, batch_name, defaultRunName, durationSeconds]
+        );
+        run_id = newRun.rows[0].run_id;
+      }
 
       const sectionsRes = await pool.query("SELECT section_id, title, section_type, section_marks FROM exam_sections WHERE exam_id = $1 ORDER BY section_id", [exam_id]);
       const questionsRes = await pool.query("SELECT question_id, section_id, question_type, question_text_en, question_text_bn, options_json, marks FROM questions WHERE exam_id = $1 ORDER BY section_id, question_id", [exam_id]);
       
-      startExamTimerEngine(exam_id, durationSeconds);
+      startExamTimerEngine(exam_id, batch_name, durationSeconds);
 
+      // Broadcast start event to this batch's room
+      io.to(`exam_${exam_id}_${batch_name}`).emit('exam_started', { 
+        questions: questionsRes.rows, 
+        sections: sectionsRes.rows, 
+        seconds_left: durationSeconds, 
+        previous_answers: {} 
+      });
       io.to(`exam_${exam_id}`).emit('exam_started', { 
         questions: questionsRes.rows, 
         sections: sectionsRes.rows, 
@@ -1634,101 +1764,146 @@ io.on('connection', (socket: Socket) => {
         previous_answers: {} 
       });
       
-      io.to('teacher_dashboard').emit('exam_status_update', { exam_id, status: 'STARTED' });
-      await broadcastDashboardUpdate(exam_id);
+      io.to('teacher_dashboard').emit('exam_status_update', { exam_id, batch_name, status: 'STARTED' });
+      await broadcastDashboardUpdate(exam_id, batch_name);
     } catch (e) { console.error(e); }
   });
 
-  // Teacher Stop Exam
-  socket.on('teacher_stop_exam', async (data: { exam_id: string }) => {
+  // Teacher Stop Exam (Stops only the selected Examination + Target Batch run)
+  socket.on('teacher_stop_exam', async (data: { exam_id: string, batch_name: string }) => {
     try {
-      const exam_id = data.exam_id;
-      if (activeExamTimers.has(exam_id)) {
-        const t = activeExamTimers.get(exam_id)!;
+      const { exam_id, batch_name } = data;
+      const timerKey = getTimerKey(exam_id, batch_name);
+
+      if (activeExamTimers.has(timerKey)) {
+        const t = activeExamTimers.get(timerKey)!;
         if (t.timer) clearInterval(t.timer);
-        activeExamTimers.delete(exam_id);
+        activeExamTimers.delete(timerKey);
       }
 
-      await pool.query("UPDATE exams SET status = 'ENDED', actual_end_time = CURRENT_TIMESTAMP, global_seconds_left = 0 WHERE exam_id = $1", [exam_id]);
-      await pool.query("UPDATE exam_runs SET ended_at = CURRENT_TIMESTAMP, status = 'ENDED' WHERE exam_id = $1 AND status = 'ACTIVE'", [exam_id]);
+      await pool.query(
+        "UPDATE exam_runs SET ended_at = CURRENT_TIMESTAMP, status = 'ENDED', seconds_left = 0 WHERE exam_id = $1 AND (batch_name = $2 OR (batch_name IS NULL AND status != 'ENDED'))",
+        [exam_id, batch_name]
+      );
       
-      const activeSessions = await pool.query("SELECT session_id FROM exam_sessions WHERE exam_id = $1 AND status IN ('LOGGED_IN', 'EXAMINEE', 'PAUSED')", [exam_id]);
+      // Auto-submit active examinees of this batch
+      const activeSessions = await pool.query(`
+        SELECT es.session_id 
+        FROM exam_sessions es
+        JOIN students s ON es.student_id = s.student_id
+        WHERE es.exam_id = $1 AND s.batch = $2 AND es.status IN ('LOGGED_IN', 'EXAMINEE', 'PAUSED')
+      `, [exam_id, batch_name]);
+
       for (const row of activeSessions.rows) {
         await forceSubmitExam(row.session_id);
       }
 
-      io.to(`exam_${exam_id}`).emit('exam_ended', { message: 'The exam has been stopped by the teacher.' });
-      io.to('teacher_dashboard').emit('exam_status_update', { exam_id, status: 'ENDED' });
-      io.to('teacher_dashboard').emit('time_tick', { exam_id, seconds_left: 0 });
-      io.to(`exam_${exam_id}`).emit('time_tick', { exam_id, seconds_left: 0 });
-      await broadcastDashboardUpdate(exam_id);
+      io.to(`exam_${exam_id}_${batch_name}`).emit('exam_ended', { message: 'The exam has been stopped by the teacher.' });
+      io.to('teacher_dashboard').emit('exam_status_update', { exam_id, batch_name, status: 'ENDED' });
+      io.to('teacher_dashboard').emit('time_tick', { exam_id, batch_name, seconds_left: 0 });
+      await broadcastDashboardUpdate(exam_id, batch_name);
     } catch (e) { console.error(e); }
   });
 
-  // Teacher Pause Exam
-  socket.on('teacher_pause_exam', async (data: { exam_id: string }) => {
+  // Teacher Pause Exam (Pauses only the selected Examination + Target Batch run)
+  socket.on('teacher_pause_exam', async (data: { exam_id: string, batch_name: string }) => {
     try {
-      const exam_id = data.exam_id;
+      const { exam_id, batch_name } = data;
+      const timerKey = getTimerKey(exam_id, batch_name);
       let currentSeconds = 0;
-      if (activeExamTimers.has(exam_id)) {
-        const t = activeExamTimers.get(exam_id)!;
+
+      if (activeExamTimers.has(timerKey)) {
+        const t = activeExamTimers.get(timerKey)!;
         currentSeconds = t.secondsLeft;
         if (t.timer) clearInterval(t.timer);
-        activeExamTimers.delete(exam_id);
+        activeExamTimers.delete(timerKey);
       } else {
-        const exRes = await pool.query("SELECT global_seconds_left, duration_minutes FROM exams WHERE exam_id = $1", [exam_id]);
-        currentSeconds = exRes.rows[0]?.global_seconds_left ?? ((exRes.rows[0]?.duration_minutes || 30) * 60);
+        const runRes = await pool.query(
+          "SELECT seconds_left FROM exam_runs WHERE exam_id = $1 AND batch_name = $2 AND status != 'ENDED' ORDER BY created_at DESC LIMIT 1",
+          [exam_id, batch_name]
+        );
+        currentSeconds = runRes.rows[0]?.seconds_left ?? 1800;
       }
 
-      await pool.query("UPDATE exams SET status = 'PAUSED', global_seconds_left = $2 WHERE exam_id = $1", [exam_id, currentSeconds]);
-      await pool.query("UPDATE exam_sessions SET status = 'PAUSED' WHERE exam_id = $1 AND status = 'EXAMINEE'", [exam_id]);
+      await pool.query(
+        "UPDATE exam_runs SET status = 'PAUSED', seconds_left = $1 WHERE exam_id = $2 AND batch_name = $3 AND status = 'STARTED'",
+        [currentSeconds, exam_id, batch_name]
+      );
+
+      await pool.query(`
+        UPDATE exam_sessions SET status = 'PAUSED' 
+        WHERE session_id IN (
+          SELECT es.session_id FROM exam_sessions es 
+          JOIN students s ON es.student_id = s.student_id 
+          WHERE es.exam_id = $1 AND s.batch = $2 AND es.status = 'EXAMINEE'
+        )
+      `, [exam_id, batch_name]);
       
-      io.to(`exam_${exam_id}`).emit('exam_paused');
-      io.to('teacher_dashboard').emit('exam_status_update', { exam_id, status: 'PAUSED' });
-      io.to('teacher_dashboard').emit('time_tick', { exam_id, seconds_left: currentSeconds });
-      io.to(`exam_${exam_id}`).emit('time_tick', { exam_id, seconds_left: currentSeconds });
-      await broadcastDashboardUpdate(exam_id);
+      io.to(`exam_${exam_id}_${batch_name}`).emit('exam_paused');
+      io.to('teacher_dashboard').emit('exam_status_update', { exam_id, batch_name, status: 'PAUSED' });
+      io.to('teacher_dashboard').emit('time_tick', { exam_id, batch_name, seconds_left: currentSeconds });
+      await broadcastDashboardUpdate(exam_id, batch_name);
     } catch (e) { console.error(e); }
   });
 
-  // Teacher Resume Exam
-  socket.on('teacher_resume_exam', async (data: { exam_id: string }) => {
+  // Teacher Resume Exam (Resumes only the selected Examination + Target Batch run)
+  socket.on('teacher_resume_exam', async (data: { exam_id: string, batch_name: string }) => {
     try {
-      const exam_id = data.exam_id;
-      const exRes = await pool.query("SELECT global_seconds_left, duration_minutes FROM exams WHERE exam_id = $1", [exam_id]);
-      const currentSeconds = exRes.rows[0]?.global_seconds_left ?? ((exRes.rows[0]?.duration_minutes || 30) * 60);
+      const { exam_id, batch_name } = data;
+      const runRes = await pool.query(
+        "SELECT seconds_left FROM exam_runs WHERE exam_id = $1 AND batch_name = $2 AND status = 'PAUSED' ORDER BY created_at DESC LIMIT 1",
+        [exam_id, batch_name]
+      );
+      const currentSeconds = runRes.rows[0]?.seconds_left ?? 1800;
 
-      await pool.query("UPDATE exams SET status = 'STARTED' WHERE exam_id = $1", [exam_id]);
-      await pool.query("UPDATE exam_sessions SET status = 'EXAMINEE' WHERE exam_id = $1 AND status = 'PAUSED'", [exam_id]);
+      await pool.query(
+        "UPDATE exam_runs SET status = 'STARTED' WHERE exam_id = $1 AND batch_name = $2 AND status = 'PAUSED'",
+        [exam_id, batch_name]
+      );
+
+      await pool.query(`
+        UPDATE exam_sessions SET status = 'EXAMINEE' 
+        WHERE session_id IN (
+          SELECT es.session_id FROM exam_sessions es 
+          JOIN students s ON es.student_id = s.student_id 
+          WHERE es.exam_id = $1 AND s.batch = $2 AND es.status = 'PAUSED'
+        )
+      `, [exam_id, batch_name]);
       
-      startExamTimerEngine(exam_id, currentSeconds);
+      startExamTimerEngine(exam_id, batch_name, currentSeconds);
 
-      io.to(`exam_${exam_id}`).emit('exam_resumed');
-      io.to('teacher_dashboard').emit('exam_status_update', { exam_id, status: 'STARTED' });
-      await broadcastDashboardUpdate(exam_id);
+      io.to(`exam_${exam_id}_${batch_name}`).emit('exam_resumed', { seconds_left: currentSeconds });
+      io.to('teacher_dashboard').emit('exam_status_update', { exam_id, batch_name, status: 'STARTED' });
+      await broadcastDashboardUpdate(exam_id, batch_name);
     } catch (e) { console.error(e); }
   });
 
-  // Teacher Safe Reset Exam (Resets exam state to CREATED without deleting historical runs/results)
-  socket.on('teacher_reset_exam', async (data: { exam_id: string }) => {
+  // Teacher Safe Reset Exam (Resets batch run without deleting historical runs/results)
+  socket.on('teacher_reset_exam', async (data: { exam_id: string, batch_name?: string }) => {
     try {
-      const exam_id = data.exam_id;
+      const { exam_id, batch_name } = data;
+      const timerKey = getTimerKey(exam_id, batch_name);
       
-      if (activeExamTimers.has(exam_id)) {
-        const t = activeExamTimers.get(exam_id)!;
+      if (activeExamTimers.has(timerKey)) {
+        const t = activeExamTimers.get(timerKey)!;
         if (t.timer) clearInterval(t.timer);
-        activeExamTimers.delete(exam_id);
+        activeExamTimers.delete(timerKey);
       }
 
-      // Close any active run
-      await pool.query("UPDATE exam_runs SET ended_at = CURRENT_TIMESTAMP, status = 'ENDED' WHERE exam_id = $1 AND status = 'ACTIVE'", [exam_id]);
-
-      // Set exam status to CREATED for a new run
-      await pool.query("UPDATE exams SET status = 'CREATED', actual_start_time = NULL, actual_end_time = NULL, global_seconds_left = NULL WHERE exam_id = $1", [exam_id]);
-      
-      io.to(`exam_${exam_id}`).emit('exam_ended', { message: 'The current exam session has ended.' });
-      io.to('teacher_dashboard').emit('exam_status_update', { exam_id, status: 'CREATED' });
-      await broadcastDashboardUpdate(exam_id);
+      if (batch_name) {
+        await pool.query(
+          "UPDATE exam_runs SET ended_at = CURRENT_TIMESTAMP, status = 'ENDED' WHERE exam_id = $1 AND batch_name = $2 AND status != 'ENDED'",
+          [exam_id, batch_name]
+        );
+        io.to(`exam_${exam_id}_${batch_name}`).emit('exam_ended', { message: 'The current exam session has ended.' });
+        io.to('teacher_dashboard').emit('exam_status_update', { exam_id, batch_name, status: 'CREATED' });
+        await broadcastDashboardUpdate(exam_id, batch_name);
+      } else {
+        await pool.query("UPDATE exam_runs SET ended_at = CURRENT_TIMESTAMP, status = 'ENDED' WHERE exam_id = $1 AND status = 'ACTIVE'", [exam_id]);
+        io.to(`exam_${exam_id}`).emit('exam_ended', { message: 'The current exam session has ended.' });
+        io.to('teacher_dashboard').emit('exam_status_update', { exam_id, status: 'CREATED' });
+        await broadcastDashboardUpdate(exam_id);
+      }
     } catch (e) { console.error('Error safely resetting exam:', e); }
   });
 
