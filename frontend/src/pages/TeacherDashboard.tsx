@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { socket, API_BASE } from '../App';
-import { Users, Play, Unlock, UserPlus, BookOpen, Plus, AlertTriangle, ArrowLeft, Trash2, Square, Award, Download, Lock, Edit, Eye, X, ChevronLeft, ChevronRight, RotateCcw, Search, Shuffle, Layers, ArrowRightLeft, FileText, List, LayoutGrid } from 'lucide-react';
-import { jsPDF } from 'jspdf';
-import { setupBengaliUnicodeFont } from '../utils/pdfFontHelper';
+import { Users, Play, Unlock, UserPlus, BookOpen, Plus, AlertTriangle, ArrowLeft, Trash2, Square, Award, Download, Lock, Edit, Eye, EyeOff, X, ChevronLeft, ChevronRight, RotateCcw, Search, Shuffle, Layers, ArrowRightLeft, FileText, List, LayoutGrid, Maximize2, Loader2 } from 'lucide-react';
+import { downloadTeacherQuestionPaperPdf } from '../utils/pdfGenerator';
 
 interface StudentSession {
   session_id: string;
@@ -56,6 +55,7 @@ interface Section {
   title: string;
   section_marks: number;
   section_type: string;
+  total_questions_expected?: number;
   questions: any[];
 }
 
@@ -116,6 +116,7 @@ const CLASSES = [
 export default function TeacherDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authPassword, setAuthPassword] = useState('');
+  const [showAuthPassword, setShowAuthPassword] = useState(false);
   const [authError, setAuthError] = useState('');
 
   useEffect(() => {
@@ -161,7 +162,23 @@ export default function TeacherDashboard() {
   
   // Section & Question Builder State
   const [builderSections, setBuilderSections] = useState<Section[]>([]);
-  const [newSectionForm, setNewSectionForm] = useState({ title: '', section_marks: 20, section_type: 'MCQ' });
+  const [newSectionForm, setNewSectionForm] = useState({
+    title: '',
+    section_marks: 20,
+    section_type: 'MCQ',
+    total_questions_expected: 10,
+    marks_per_question: 2
+  });
+  const [editingSection, setEditingSection] = useState<Section | null>(null);
+  const [editSectionForm, setEditSectionForm] = useState({
+    title: '',
+    section_marks: 20,
+    section_type: 'MCQ',
+    total_questions_expected: 10,
+    marks_per_question: 2
+  });
+  const [isUpdatingSection, setIsUpdatingSection] = useState(false);
+  const [confirmDeleteSection, setConfirmDeleteSection] = useState<Section | null>(null);
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
   const [questionForm, setQuestionForm] = useState({ 
     text_en: '', text_bn: '', 
@@ -202,6 +219,9 @@ export default function TeacherDashboard() {
   const [monitorBatchStatus, setMonitorBatchStatus] = useState<string>('CREATED');
   const [studentsSession, setStudentsSession] = useState<StudentSession[]>([]);
   const [examSecondsLeft, setExamSecondsLeft] = useState<number | null>(null);
+  const [fullscreenEnforced, setFullscreenEnforced] = useState<boolean>(true);
+  const [studentToEnd, setStudentToEnd] = useState<StudentSession | null>(null);
+  const [showGlobalEndConfirm, setShowGlobalEndConfirm] = useState<boolean>(false);
 
   useEffect(() => {
     selectedMonitorExamIdRef.current = selectedMonitorExamId;
@@ -215,6 +235,7 @@ export default function TeacherDashboard() {
   const [showInitModal, setShowInitModal] = useState(false);
   const [initExamName, setInitExamName] = useState('');
   const [initTargetStudentId, setInitTargetStudentId] = useState<string | null>(null);
+  const [isInitializingRun, setIsInitializingRun] = useState(false);
 
   // Results State (Paginated Runs)
   const [examRuns, setExamRuns] = useState<ExamRun[]>([]);
@@ -334,121 +355,13 @@ export default function TeacherDashboard() {
     }
   };
 
-  const handleDownloadTeacherQuestionPaper = async (exam_id: string, exam_title: string) => {
+  const handleDownloadTeacherQuestionPaper = async (exam_id: string, _exam_title: string) => {
     setIsDownloadingQuestionPaper(true);
     try {
       const res = await fetch(`${API_BASE}/api/exams/${exam_id}/teacher-question-paper`);
       if (!res.ok) throw new Error('Failed to fetch question paper data');
       const data = await res.json();
-      
-      const doc = new jsPDF('p', 'mm', 'a4');
-      await setupBengaliUnicodeFont(doc);
-
-      const pageWidth = doc.internal.pageSize.getWidth();
-      let y = 15;
-
-      // Header
-      doc.setFont('NotoSansBengali', 'bold');
-      doc.setFontSize(13);
-      doc.text("INSTITUTE OF COMPUTER SCIENCE & TECHNOLOGY CHOWBERIA", pageWidth / 2, y, { align: 'center' });
-      y += 7;
-      doc.setFontSize(11);
-      doc.setTextColor(50, 50, 50);
-      doc.text(`TEACHER QUESTION PAPER WITH ANSWER KEY: ${data.exam.title}`, pageWidth / 2, y, { align: 'center' });
-      y += 6;
-      doc.setFontSize(10);
-      doc.setFont('NotoSansBengali', 'normal');
-      doc.text(`Duration: ${data.exam.duration_minutes} Mins | Full Marks: ${data.exam.full_marks}`, pageWidth / 2, y, { align: 'center' });
-      y += 4;
-      doc.line(14, y, pageWidth - 14, y);
-      y += 7;
-
-      let qCounter = 1;
-      (data.sections || []).forEach((sec: any) => {
-        if (y > 260) { doc.addPage(); y = 15; }
-        doc.setFont('NotoSansBengali', 'bold');
-        doc.setFontSize(11);
-        doc.setFillColor(240, 243, 246);
-        doc.rect(14, y - 4, pageWidth - 28, 7, 'F');
-        doc.text(`${sec.title} (${sec.section_type}) - Section Marks: ${sec.section_marks}`, 16, y + 1);
-        y += 9;
-
-        (sec.questions || []).forEach((q: any) => {
-          if (y > 255) { doc.addPage(); y = 15; }
-          
-          doc.setFont('NotoSansBengali', 'bold');
-          doc.setFontSize(10);
-          const qEnLines = doc.splitTextToSize(`Q${qCounter}. ${q.question_text_en}`, pageWidth - 32);
-          if (y + (qEnLines.length * 5) > 275) { doc.addPage(); y = 15; }
-          doc.text(qEnLines, 16, y);
-          y += qEnLines.length * 5;
-
-          if (q.question_text_bn && q.question_text_bn.trim() !== '') {
-            doc.setFont('NotoSansBengali', 'normal');
-            const qBnLines = doc.splitTextToSize(`(Bengali): ${q.question_text_bn}`, pageWidth - 32);
-            if (y + (qBnLines.length * 4.5) > 275) { doc.addPage(); y = 15; }
-            doc.text(qBnLines, 20, y);
-            y += qBnLines.length * 4.5;
-          }
-
-          doc.setFont('NotoSansBengali', 'normal');
-          let parsedOpts: any[] = [];
-          try {
-            parsedOpts = typeof q.options_json === 'string' ? JSON.parse(q.options_json) : q.options_json;
-          } catch(e) { parsedOpts = []; }
-
-          if (q.question_type === 'MCQ' || q.question_type === 'TF') {
-            const opts = Array.isArray(parsedOpts) ? parsedOpts : (q.question_type === 'TF' ? ['True', 'False'] : []);
-            opts.forEach((opt: any, optIdx: number) => {
-              const optText = typeof opt === 'object' && opt !== null ? opt.text : opt;
-              const optId = typeof opt === 'object' && opt !== null ? opt.id : opt;
-              const isCorrect = q.correct_answer === optId || q.correct_answer === optText;
-              
-              if (isCorrect) {
-                doc.setFont('NotoSansBengali', 'bold');
-                doc.setTextColor(0, 130, 50);
-              } else {
-                doc.setFont('NotoSansBengali', 'normal');
-                doc.setTextColor(60, 60, 60);
-              }
-
-              const optLabel = String.fromCharCode(65 + optIdx);
-              const optLine = `${optLabel}. ${optText}${isCorrect ? '  [ CORRECT ANSWER ]' : ''}`;
-              const optLines = doc.splitTextToSize(optLine, pageWidth - 36);
-              if (y + (optLines.length * 4.5) > 275) { doc.addPage(); y = 15; }
-              doc.text(optLines, 22, y);
-              y += optLines.length * 4.5;
-            });
-            doc.setTextColor(0, 0, 0);
-          } else if (q.question_type === 'FITB') {
-            doc.setFont('NotoSansBengali', 'bold');
-            doc.setTextColor(0, 130, 50);
-            const fitbLines = doc.splitTextToSize(`Correct Blanks: ${q.correct_answer}`, pageWidth - 36);
-            if (y + (fitbLines.length * 5) > 275) { doc.addPage(); y = 15; }
-            doc.text(fitbLines, 22, y);
-            y += fitbLines.length * 5;
-            doc.setTextColor(0, 0, 0);
-          } else if (q.question_type === 'MATCH') {
-            doc.setFont('NotoSansBengali', 'bold');
-            doc.setTextColor(0, 130, 50);
-            const matchLines = doc.splitTextToSize(`Correct Matching: ${q.correct_answer}`, pageWidth - 36);
-            if (y + (matchLines.length * 5) > 275) { doc.addPage(); y = 15; }
-            doc.text(matchLines, 22, y);
-            y += matchLines.length * 5;
-            doc.setTextColor(0, 0, 0);
-          }
-
-          doc.setFont('NotoSansBengali', 'normal');
-          doc.setFontSize(8);
-          doc.setTextColor(120, 120, 120);
-          doc.text(`[ Marks: ${q.marks} ]`, pageWidth - 35, y);
-          doc.setTextColor(0, 0, 0);
-          y += 6;
-          qCounter++;
-        });
-      });
-
-      doc.save(`${exam_title.replace(/\s+/g, '_')}_Question_Paper_With_Answers.pdf`);
+      await downloadTeacherQuestionPaperPdf(data);
     } catch (e) {
       console.error('Error downloading question paper:', e);
       alert('Failed to generate Teacher Question Paper.');
@@ -503,7 +416,7 @@ export default function TeacherDashboard() {
     fetchBatches();
     checkRecovery();
     
-    socket.on('dashboard_update', (data: { exam_id?: string, target_batch?: string | null, students: StudentSession[], status: any, global_seconds_left?: number, assigned_batches?: string[] }) => {
+    socket.on('dashboard_update', (data: { exam_id?: string, target_batch?: string | null, students: StudentSession[], status: any, global_seconds_left?: number, assigned_batches?: string[], fullscreen_enforced?: boolean }) => {
       if (data.exam_id && data.exam_id !== selectedMonitorExamIdRef.current) return;
       if (data.target_batch && selectedMonitorBatchRef.current && data.target_batch !== selectedMonitorBatchRef.current) return;
 
@@ -523,17 +436,27 @@ export default function TeacherDashboard() {
         }
       });
       setStudentsSession(Array.from(uniqueMap.values()));
+      setIsInitializingRun(false);
       if (data.status) {
         setMonitorBatchStatus(data.status);
       }
       if (data.global_seconds_left !== undefined) {
         setExamSecondsLeft(data.global_seconds_left);
       }
+      if (data.fullscreen_enforced !== undefined) {
+        setFullscreenEnforced(data.fullscreen_enforced);
+      }
+    });
+
+    socket.on('fullscreen_policy_updated', (data: { exam_id?: string, batch_name?: string, fullscreen_enforced: boolean }) => {
+      if (data.exam_id && data.exam_id !== selectedMonitorExamIdRef.current) return;
+      if (data.batch_name && selectedMonitorBatchRef.current && data.batch_name !== selectedMonitorBatchRef.current) return;
+      setFullscreenEnforced(data.fullscreen_enforced);
     });
 
     socket.on('student_status_update', (data: { student_id: string, status: any, tab_violation_count?: number }) => {
       setStudentsSession(prev => prev.map(s => {
-        if (s.student_id === data.student_id) {
+        if (String(s.student_id) === String(data.student_id)) {
           return {
             ...s,
             status: data.status,
@@ -561,6 +484,7 @@ export default function TeacherDashboard() {
 
     return () => {
       socket.off('dashboard_update');
+      socket.off('fullscreen_policy_updated');
       socket.off('student_status_update');
       socket.off('exam_status_update');
       socket.off('time_tick');
@@ -847,14 +771,91 @@ export default function TeacherDashboard() {
           exam_id: selectedExamIdBuilder,
           title: newSectionForm.title,
           section_marks: newSectionForm.section_marks,
-          section_type: newSectionForm.section_type
+          section_type: newSectionForm.section_type,
+          total_questions_expected: newSectionForm.total_questions_expected
         })
       });
       if (res.ok) {
-        setNewSectionForm({ title: '', section_marks: 20, section_type: 'MCQ' });
+        setNewSectionForm({
+          title: '',
+          section_marks: 20,
+          section_type: 'MCQ',
+          total_questions_expected: 10,
+          marks_per_question: 2
+        });
         fetchSections(selectedExamIdBuilder);
+        fetchData();
       }
     } catch (e) { console.error(e); }
+  };
+
+  const handleOpenEditSection = (sec: Section, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setEditingSection(sec);
+    const totalQ = sec.total_questions_expected && sec.total_questions_expected > 0 
+      ? sec.total_questions_expected 
+      : (sec.questions && sec.questions.length > 0 ? sec.questions.length : 10);
+    const marks = sec.section_marks || 20;
+    const perQ = Math.round((marks / (totalQ || 1)) * 100) / 100;
+
+    setEditSectionForm({
+      title: sec.title,
+      section_marks: marks,
+      section_type: sec.section_type || 'MCQ',
+      total_questions_expected: totalQ,
+      marks_per_question: perQ
+    });
+  };
+
+  const handleUpdateSection = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSection || !selectedExamIdBuilder) return;
+    setIsUpdatingSection(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/sections/${editingSection.section_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editSectionForm.title,
+          section_marks: editSectionForm.section_marks,
+          section_type: editSectionForm.section_type,
+          total_questions_expected: editSectionForm.total_questions_expected
+        })
+      });
+      if (res.ok) {
+        setEditingSection(null);
+        fetchSections(selectedExamIdBuilder);
+        fetchData();
+      } else {
+        alert('Failed to update section details');
+      }
+    } catch(e) {
+      console.error('Error updating section:', e);
+      alert('Error updating section');
+    } finally {
+      setIsUpdatingSection(false);
+    }
+  };
+
+  const handleDeleteSection = async (section_id: string) => {
+    if (!selectedExamIdBuilder) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/sections/${section_id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setConfirmDeleteSection(null);
+        if (activeSectionId === section_id) {
+          setActiveSectionId(null);
+        }
+        fetchSections(selectedExamIdBuilder);
+      } else {
+        alert('Failed to delete section');
+      }
+    } catch(e) {
+      console.error('Error deleting section:', e);
+      alert('Error deleting section');
+    }
   };
 
   const handleSaveQuestion = async (e: React.FormEvent) => {
@@ -1022,6 +1023,18 @@ export default function TeacherDashboard() {
     setShowInitModal(true);
   };
 
+  const triggerNewAttempt = () => {
+    if (!selectedMonitorBatch) {
+      alert('Please select a Target Batch first.');
+      return;
+    }
+    const activeExam = examsList.find(e => e.exam_id === selectedMonitorExamId);
+    const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    setInitExamName(activeExam ? `${activeExam.title} - ${selectedMonitorBatch} (Retest - ${dateStr})` : `Exam Retest - ${dateStr}`);
+    setInitTargetStudentId(null);
+    setShowInitModal(true);
+  };
+
   const triggerInitializeStudent = (student_id: string) => {
     if (!selectedMonitorBatch) {
       alert('Please select a Target Batch first.');
@@ -1039,6 +1052,7 @@ export default function TeacherDashboard() {
       alert('Please select a Target Batch first.');
       return;
     }
+    setIsInitializingRun(true);
     if (initTargetStudentId) {
       socket.emit('teacher_initialize_student', {
         exam_id: selectedMonitorExamId,
@@ -1076,16 +1090,35 @@ export default function TeacherDashboard() {
 
   const handleStopExam = () => {
     if (!selectedMonitorBatch) return;
-    if (window.confirm(`Are you sure you want to stop the exam for ${selectedMonitorBatch}? All active examinee sessions in this batch will be automatically submitted.`)) {
-      socket.emit('teacher_stop_exam', { exam_id: selectedMonitorExamId, batch_name: selectedMonitorBatch });
-    }
+    setShowGlobalEndConfirm(true);
   };
 
-  const handleSafeResetExam = () => {
+  const handleConfirmGlobalEndExam = () => {
     if (!selectedMonitorBatch) return;
-    if (window.confirm(`Reset examination for ${selectedMonitorBatch} for a new run/attempt? Note: All previous completed scores and answer sheets will be safely preserved in Results.`)) {
-      socket.emit('teacher_reset_exam', { exam_id: selectedMonitorExamId, batch_name: selectedMonitorBatch });
-    }
+    socket.emit('teacher_stop_exam', { exam_id: selectedMonitorExamId, batch_name: selectedMonitorBatch });
+    setShowGlobalEndConfirm(false);
+  };
+
+  const handleConfirmEndStudentExam = () => {
+    if (!studentToEnd || !studentToEnd.session_id) return;
+    socket.emit('teacher_end_student_exam', {
+      exam_id: selectedMonitorExamId,
+      batch_name: selectedMonitorBatch,
+      session_id: studentToEnd.session_id,
+      student_id: studentToEnd.student_id
+    });
+    setStudentToEnd(null);
+  };
+
+  const handleToggleFullscreenPolicy = () => {
+    if (!selectedMonitorBatch || !selectedMonitorExamId) return;
+    const newPolicy = !fullscreenEnforced;
+    setFullscreenEnforced(newPolicy);
+    socket.emit('teacher_set_fullscreen_policy', {
+      exam_id: selectedMonitorExamId,
+      batch_name: selectedMonitorBatch,
+      fullscreen_enforced: newPolicy
+    });
   };
 
   const handleUnpauseStudent = (session_id: string) => {
@@ -1176,14 +1209,24 @@ export default function TeacherDashboard() {
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-2">Master Password</label>
-              <input
-                type="password"
-                required
-                value={authPassword}
-                onChange={(e) => setAuthPassword(e.target.value)}
-                placeholder="Enter password (e.g. ICST)"
-                className="block w-full px-4 py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-medium"
-              />
+              <div className="relative">
+                <input
+                  type={showAuthPassword ? "text" : "password"}
+                  required
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  placeholder="Enter password (e.g. ICST)"
+                  className="block w-full pl-4 pr-11 py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-medium"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAuthPassword(prev => !prev)}
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
+                  title={showAuthPassword ? "Hide password" : "Show password"}
+                >
+                  {showAuthPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+                </button>
+              </div>
             </div>
             <button
               type="submit"
@@ -1321,13 +1364,36 @@ export default function TeacherDashboard() {
                   </p>
                 </div>
 
+                {selectedMonitorBatch && (
+                  <button
+                    type="button"
+                    onClick={handleToggleFullscreenPolicy}
+                    title={fullscreenEnforced ? 'Disable fullscreen enforcement for this batch' : 'Enable fullscreen enforcement for this batch'}
+                    className={`px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-all border shadow-sm ${
+                      fullscreenEnforced
+                        ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
+                        : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    <Maximize2 size={15} />
+                    <span>Fullscreen:</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-black tracking-wide ${
+                      fullscreenEnforced ? 'bg-indigo-600 text-white' : 'bg-slate-300 text-slate-700'
+                    }`}>
+                      {fullscreenEnforced ? 'ON' : 'OFF'}
+                    </span>
+                  </button>
+                )}
+
                 {monitorBatchStatus === 'CREATED' && (
                   <>
                     <button
                       onClick={triggerInitializeExam}
-                      className="bg-primary-600 hover:bg-primary-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition-all"
+                      disabled={isInitializingRun}
+                      className="bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition-all"
                     >
-                      <RotateCcw size={16} /> Initialize Exam
+                      {isInitializingRun ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
+                      <span>{isInitializingRun ? 'Initializing...' : 'Initialize Exam'}</span>
                     </button>
                     <button
                       onClick={handleStartExam}
@@ -1374,10 +1440,12 @@ export default function TeacherDashboard() {
 
                 {monitorBatchStatus === 'ENDED' && (
                   <button
-                    onClick={handleSafeResetExam}
-                    className="bg-slate-800 hover:bg-black text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition-all"
+                    onClick={triggerNewAttempt}
+                    disabled={isInitializingRun}
+                    className="bg-slate-800 hover:bg-black disabled:opacity-60 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition-all"
                   >
-                    <RotateCcw size={16} /> New Attempt / Retest
+                    {isInitializingRun ? <Loader2 size={16} className="animate-spin text-primary-400" /> : <RotateCcw size={16} />}
+                    <span>{isInitializingRun ? 'Preparing New Attempt...' : 'New Attempt / Retest'}</span>
                   </button>
                 )}
               </div>
@@ -1385,7 +1453,16 @@ export default function TeacherDashboard() {
           </div>
 
           {/* Student Live Monitor Section */}
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 relative overflow-hidden">
+            {isInitializingRun && (
+              <div className="absolute inset-0 bg-white/85 backdrop-blur-[2px] z-30 flex flex-col items-center justify-center gap-3 animate-fadeIn">
+                <Loader2 size={44} className="animate-spin text-primary-600" />
+                <div className="text-center">
+                  <h4 className="text-base font-black text-slate-800">Preparing Fresh Attempt...</h4>
+                  <p className="text-xs font-semibold text-slate-500 mt-0.5">Generating student sessions & shuffled question sets for {selectedMonitorBatch}</p>
+                </div>
+              </div>
+            )}
             <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
               <div>
                 <h3 className="text-xl font-black text-slate-800">Student Live Monitor</h3>
@@ -1508,12 +1585,22 @@ export default function TeacherDashboard() {
                           </td>
                           <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
-                              {st.status === 'PAUSED' && st.session_id && (
+                              {st.session_id && st.status !== 'COMPLETED' && (st.status === 'PAUSED' || (st.tab_violation_count || 0) > 0) && (
                                 <button
                                   onClick={() => handleUnpauseStudent(st.session_id)}
+                                  title="Unlock student exam workspace"
                                   className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white font-bold text-[11px] rounded-lg flex items-center gap-1 shadow-sm transition-colors"
                                 >
                                   <Unlock size={12} /> Unlock
+                                </button>
+                              )}
+                              {st.session_id && st.status !== 'COMPLETED' && (
+                                <button
+                                  onClick={() => setStudentToEnd(st)}
+                                  title="End this student's examination"
+                                  className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-[11px] rounded-lg flex items-center gap-1 shadow-sm transition-colors"
+                                >
+                                  <Square size={12} /> End Exam
                                 </button>
                               )}
                               {!st.session_id && (
@@ -1576,12 +1663,22 @@ export default function TeacherDashboard() {
                         <span className="font-bold text-slate-500">Violations: <b className="text-red-500">{st.tab_violation_count || 0}</b></span>
                         
                         <div className="flex items-center gap-1.5">
-                          {st.status === 'PAUSED' && st.session_id && (
+                          {st.session_id && st.status !== 'COMPLETED' && (st.status === 'PAUSED' || (st.tab_violation_count || 0) > 0) && (
                             <button
                               onClick={() => handleUnpauseStudent(st.session_id)}
-                              className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white font-bold text-[11px] rounded-lg flex items-center gap-1 shadow-sm"
+                              title="Unlock student exam workspace"
+                              className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white font-bold text-[11px] rounded-lg flex items-center gap-1 shadow-sm transition-colors"
                             >
                               <Unlock size={12} /> Unlock
+                            </button>
+                          )}
+                          {st.session_id && st.status !== 'COMPLETED' && (
+                            <button
+                              onClick={() => setStudentToEnd(st)}
+                              title="End this student's examination"
+                              className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-[11px] rounded-lg flex items-center gap-1 shadow-sm transition-colors"
+                            >
+                              <Square size={12} /> End Exam
                             </button>
                           )}
                           {!st.session_id && (
@@ -2494,26 +2591,237 @@ export default function TeacherDashboard() {
                   <h4 className="text-sm font-black text-slate-400 uppercase tracking-wider">Examination Sections</h4>
                 </div>
 
-                <div className="flex flex-wrap gap-3 mb-6">
-                  {builderSections.map(sec => (
-                    <button
-                      key={sec.section_id}
-                      onClick={() => setActiveSectionId(sec.section_id)}
-                      className={`px-4 py-2.5 rounded-2xl font-bold text-sm transition-all flex items-center gap-2 ${
-                        activeSectionId === sec.section_id
-                          ? 'bg-primary-600 text-white shadow-md'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}
-                    >
-                      <span>{sec.title}</span>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-black/10">
-                        {sec.questions ? sec.questions.length : 0} Qs
-                      </span>
-                    </button>
-                  ))}
+                <div className="flex flex-wrap items-center gap-3 mb-6">
+                  {builderSections.map(sec => {
+                    const isActive = activeSectionId === sec.section_id;
+                    const totalQ = sec.total_questions_expected && sec.total_questions_expected > 0 
+                      ? sec.total_questions_expected 
+                      : (sec.questions?.length ? sec.questions.length : 1);
+                    const perQ = Math.round(((sec.section_marks || 20) / totalQ) * 100) / 100;
+
+                    return (
+                      <div
+                        key={sec.section_id}
+                        onClick={() => setActiveSectionId(sec.section_id)}
+                        className={`px-4 py-2.5 rounded-2xl font-bold text-sm transition-all flex items-center gap-2 cursor-pointer select-none ${
+                          isActive
+                            ? 'bg-primary-600 text-white shadow-md'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        <span>{sec.title}</span>
+                        <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${isActive ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                          {sec.questions ? sec.questions.length : 0}/{totalQ} Qs
+                        </span>
+                        <span className={`text-[10px] uppercase font-black px-1.5 py-0.5 rounded ${isActive ? 'bg-primary-700 text-primary-100' : 'bg-slate-200 text-slate-600'}`}>
+                          {sec.section_type}
+                        </span>
+                        <span className={`text-[11px] font-bold ${isActive ? 'text-primary-100' : 'text-slate-500'}`}>
+                          ({sec.section_marks} M • {perQ} M/Q)
+                        </span>
+
+                        {/* Edit Section Details Button */}
+                        <button
+                          type="button"
+                          onClick={(e) => handleOpenEditSection(sec, e)}
+                          title="Change Section Details & Marks Distribution"
+                          className={`p-1 rounded-lg transition-colors ml-1 ${
+                            isActive ? 'hover:bg-white/20 text-white' : 'hover:bg-slate-300 text-slate-500'
+                          }`}
+                        >
+                          <Edit size={14} />
+                        </button>
+
+                        {/* Delete Section Button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmDeleteSection(sec);
+                          }}
+                          title="Delete Section"
+                          className={`p-1 rounded-lg transition-colors ${
+                            isActive ? 'hover:bg-red-500 hover:text-white text-white/80' : 'hover:bg-red-100 hover:text-red-600 text-slate-400'
+                          }`}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
 
-                {/* Add Section Form */}
+                {/* Edit Section Details Modal */}
+                {editingSection && (
+                  <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-slate-100">
+                      <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-10 h-10 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center">
+                            <Edit size={20} />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-black text-slate-800">Change Section Details</h3>
+                            <p className="text-xs font-semibold text-slate-400">Set total questions & automatically distribute marks evenly</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditingSection(null)}
+                          className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                        >
+                          <X size={20} />
+                        </button>
+                      </div>
+
+                      <form onSubmit={handleUpdateSection} className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5">
+                            Section Title <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={editSectionForm.title}
+                            onChange={(e) => setEditSectionForm({ ...editSectionForm, title: e.target.value })}
+                            placeholder="e.g. Section 1: Multiple Choice Questions"
+                            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5">
+                            Question Type
+                          </label>
+                          <select
+                            value={editSectionForm.section_type}
+                            onChange={(e) => setEditSectionForm({ ...editSectionForm, section_type: e.target.value })}
+                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-bold bg-white focus:ring-2 focus:ring-primary-500"
+                          >
+                            <option value="MCQ">Multiple Choice (MCQ)</option>
+                            <option value="FITB">Fill in the Blanks (FITB)</option>
+                            <option value="TF">True / False</option>
+                            <option value="MATCH">Match the Following</option>
+                          </select>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                          <div>
+                            <label className="block text-[11px] font-black text-slate-600 uppercase tracking-wider mb-1">
+                              Total Questions
+                            </label>
+                            <input
+                              type="number"
+                              min="1"
+                              required
+                              value={editSectionForm.total_questions_expected}
+                              onChange={(e) => {
+                                const totalQ = parseInt(e.target.value) || 1;
+                                const marks = editSectionForm.section_marks || 20;
+                                const perQ = Math.round((marks / totalQ) * 100) / 100;
+                                setEditSectionForm({ ...editSectionForm, total_questions_expected: totalQ, marks_per_question: perQ });
+                              }}
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-bold bg-white focus:ring-2 focus:ring-primary-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-black text-slate-600 uppercase tracking-wider mb-1">
+                              Section Total Marks
+                            </label>
+                            <input
+                              type="number"
+                              min="1"
+                              required
+                              value={editSectionForm.section_marks}
+                              onChange={(e) => {
+                                const marks = parseFloat(e.target.value) || 0;
+                                const totalQ = editSectionForm.total_questions_expected || 1;
+                                const perQ = Math.round((marks / totalQ) * 100) / 100;
+                                setEditSectionForm({ ...editSectionForm, section_marks: marks, marks_per_question: perQ });
+                              }}
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-bold bg-white focus:ring-2 focus:ring-primary-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-black text-primary-700 uppercase tracking-wider mb-1">
+                              Marks / Question
+                            </label>
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0.1"
+                              required
+                              value={editSectionForm.marks_per_question}
+                              onChange={(e) => {
+                                const perQ = parseFloat(e.target.value) || 1;
+                                const totalQ = editSectionForm.total_questions_expected || 1;
+                                const totalMarks = Math.round(perQ * totalQ);
+                                setEditSectionForm({ ...editSectionForm, marks_per_question: perQ, section_marks: totalMarks });
+                              }}
+                              className="w-full px-3 py-2 border border-primary-300 rounded-xl text-sm font-extrabold text-primary-700 bg-primary-50/50 focus:ring-2 focus:ring-primary-500"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs font-bold text-emerald-800">
+                          ✨ <b>Auto Even Distribution:</b> All questions in this section will automatically receive <b>{editSectionForm.marks_per_question} Marks</b> each ({editSectionForm.section_marks} Marks ÷ {editSectionForm.total_questions_expected} Questions).
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
+                          <button
+                            type="button"
+                            onClick={() => setEditingSection(null)}
+                            className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-xs text-slate-600 hover:bg-slate-100"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={isUpdatingSection}
+                            className="px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-bold text-xs rounded-xl shadow-md disabled:opacity-50"
+                          >
+                            {isUpdatingSection ? 'Saving...' : 'Save & Distribute Marks'}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                )}
+
+                {/* Confirm Delete Section Modal */}
+                {confirmDeleteSection && (
+                  <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-100 text-center">
+                      <div className="w-14 h-14 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                        <Trash2 size={28} />
+                      </div>
+                      <h3 className="text-lg font-black text-slate-800 mb-1">Delete Section?</h3>
+                      <p className="text-xs text-slate-500 font-medium mb-4">
+                        Are you sure you want to delete <b className="text-slate-800">{confirmDeleteSection.title}</b>? All {confirmDeleteSection.questions?.length || 0} questions inside this section will also be removed.
+                      </p>
+                      <div className="flex gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteSection(null)}
+                          className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSection(confirmDeleteSection.section_id)}
+                          className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs shadow-md"
+                        >
+                          Yes, Delete Section
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Add Section Form with Auto Even Marks Distribution */}
                 <form onSubmit={handleAddSection} className="flex flex-wrap items-center gap-3 pt-4 border-t border-slate-100">
                   <input
                     type="text"
@@ -2533,13 +2841,45 @@ export default function TeacherDashboard() {
                     <option value="TF">True / False</option>
                     <option value="MATCH">Match the Following</option>
                   </select>
-                  <input
-                    type="number"
-                    value={newSectionForm.section_marks}
-                    onChange={(e) => setNewSectionForm({ ...newSectionForm, section_marks: parseInt(e.target.value) || 0 })}
-                    placeholder="Marks"
-                    className="w-24 px-3.5 py-2 border border-slate-200 rounded-xl text-sm font-bold"
-                  />
+
+                  <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-200">
+                    <span className="text-[11px] font-bold text-slate-500">Total Qs:</span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={newSectionForm.total_questions_expected}
+                      onChange={(e) => {
+                        const totalQ = parseInt(e.target.value) || 1;
+                        const marks = newSectionForm.section_marks || 20;
+                        const perQ = Math.round((marks / totalQ) * 100) / 100;
+                        setNewSectionForm({ ...newSectionForm, total_questions_expected: totalQ, marks_per_question: perQ });
+                      }}
+                      placeholder="Total Qs"
+                      className="w-16 px-2 py-1 border border-slate-200 rounded-lg text-xs font-bold bg-white text-center"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-200">
+                    <span className="text-[11px] font-bold text-slate-500">Total Marks:</span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={newSectionForm.section_marks}
+                      onChange={(e) => {
+                        const marks = parseFloat(e.target.value) || 0;
+                        const totalQ = newSectionForm.total_questions_expected || 1;
+                        const perQ = Math.round((marks / totalQ) * 100) / 100;
+                        setNewSectionForm({ ...newSectionForm, section_marks: marks, marks_per_question: perQ });
+                      }}
+                      placeholder="Marks"
+                      className="w-16 px-2 py-1 border border-slate-200 rounded-lg text-xs font-bold bg-white text-center"
+                    />
+                  </div>
+
+                  <span className="text-xs font-black text-primary-700 bg-primary-50 px-2.5 py-1.5 rounded-lg border border-primary-200">
+                    = {newSectionForm.marks_per_question || 2} M / Q
+                  </span>
+
                   <button
                     type="submit"
                     className="px-4 py-2 bg-slate-800 hover:bg-black text-white font-bold text-sm rounded-xl shadow-sm"
@@ -2554,9 +2894,21 @@ export default function TeacherDashboard() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Create / Edit Question Form */}
                   <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                    <h4 className="text-base font-black text-slate-800 mb-4">
-                      {editingQuestionId ? 'Edit Question' : 'Add Question to Section'}
-                    </h4>
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-base font-black text-slate-800">
+                        {editingQuestionId ? 'Edit Question' : 'Add Question to Section'}
+                      </h4>
+                      {(() => {
+                        const sec = builderSections.find(s => s.section_id === activeSectionId);
+                        const totalQ = sec?.total_questions_expected && sec.total_questions_expected > 0 ? sec.total_questions_expected : (sec?.questions?.length || 1);
+                        const autoPerQ = sec ? Math.round(((sec.section_marks || 20) / totalQ) * 100) / 100 : 1;
+                        return (
+                          <span className="text-xs font-bold bg-primary-50 text-primary-700 px-3 py-1 rounded-full border border-primary-100">
+                            Auto Marks: <b>{autoPerQ} M</b>/question
+                          </span>
+                        );
+                      })()}
+                    </div>
 
                     <form onSubmit={handleSaveQuestion} className="space-y-4">
                       <div>
@@ -2648,14 +3000,24 @@ export default function TeacherDashboard() {
                         return null;
                       })()}
 
-                      <div>
-                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Marks</label>
-                        <input
-                          type="number"
-                          value={questionForm.marks}
-                          onChange={(e) => setQuestionForm({ ...questionForm, marks: parseInt(e.target.value) || 1 })}
-                          className="w-24 px-3 py-1.5 border border-slate-200 rounded-xl text-sm font-bold"
-                        />
+                      {/* Auto Marks Indicator with Optional Override */}
+                      <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">Question Marks</span>
+                          <span className="text-xs font-bold text-slate-700">
+                            Auto-distributed from section ({builderSections.find(s => s.section_id === activeSectionId)?.section_marks || 20} Marks total)
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={questionForm.marks}
+                            onChange={(e) => setQuestionForm({ ...questionForm, marks: parseFloat(e.target.value) || 1 })}
+                            className="w-20 px-2.5 py-1 border border-slate-200 rounded-xl text-sm font-extrabold text-primary-700 bg-white text-center"
+                          />
+                          <span className="text-xs font-bold text-slate-500">Marks</span>
+                        </div>
                       </div>
 
                       <div className="flex gap-2 pt-2">
@@ -3459,6 +3821,168 @@ export default function TeacherDashboard() {
                   <>
                     <Trash2 size={16} />
                     <span>Delete Run</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Single Student End Exam Confirmation Modal */}
+      {studentToEnd && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-100 text-center animate-fadeIn">
+            <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-amber-600">
+              <AlertTriangle size={32} />
+            </div>
+            <h3 className="text-2xl font-black text-slate-800 mb-2">End Student Examination?</h3>
+            
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 my-4 text-left text-sm space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400 font-bold text-xs uppercase">Student:</span>
+                <span className="font-extrabold text-slate-800">{studentToEnd.name}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400 font-bold text-xs uppercase">Student ID:</span>
+                <span className="font-mono font-black text-slate-700">{studentToEnd.student_id}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400 font-bold text-xs uppercase">Batch:</span>
+                <span className="font-bold text-primary-700">{studentToEnd.batch || selectedMonitorBatch}</span>
+              </div>
+            </div>
+
+            <p className="text-slate-600 text-xs font-semibold mb-6 leading-relaxed">
+              This will submit and finalize this student&apos;s current examination. Other students in this batch will continue their examinations uninterrupted.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setStudentToEnd(null)}
+                className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmEndStudentExam}
+                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2"
+              >
+                <Square size={16} /> End Examination
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Global End Examination Confirmation Modal */}
+      {showGlobalEndConfirm && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-100 text-center animate-fadeIn">
+            <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-red-600">
+              <Square size={32} />
+            </div>
+            <h3 className="text-2xl font-black text-slate-800 mb-2">End Examination?</h3>
+            <p className="text-slate-600 text-sm font-semibold mb-4 leading-relaxed">
+              This will finalize all currently active student examinations for <b className="text-slate-900">{selectedMonitorBatch}</b> and calculate their results.
+            </p>
+
+            <div className="bg-amber-50 text-amber-800 text-xs font-bold p-3.5 rounded-xl border border-amber-200 mb-6 text-left space-y-1.5">
+              <p>• Students who have already completed will not be submitted again.</p>
+              <p>• This action cannot be undone.</p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowGlobalEndConfirm(false)}
+                className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmGlobalEndExam}
+                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2"
+              >
+                <Square size={16} /> End Examination
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Examination Run Initialization Modal (New Attempt / Retest) */}
+      {showInitModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-100 text-left animate-fadeIn relative">
+            <button
+              onClick={() => setShowInitModal(false)}
+              className="absolute right-5 top-5 text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+              aria-label="Close"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="w-14 h-14 rounded-2xl bg-primary-50 border border-primary-100 flex items-center justify-center text-primary-600 mb-4 shadow-sm">
+              <RotateCcw size={26} />
+            </div>
+
+            <h3 className="text-xl font-black text-slate-800 mb-1">
+              {initTargetStudentId ? 'Initialize Student Session' : 'Initialize Examination Attempt'}
+            </h3>
+            <p className="text-xs text-slate-500 font-medium mb-4 leading-relaxed">
+              {initTargetStudentId
+                ? `Initialize a clean examination session for student ID ${initTargetStudentId} in ${selectedMonitorBatch}.`
+                : `Create a clean examination attempt for ${selectedMonitorBatch}. Previous attempts and answer sheets will remain safely preserved in Results.`}
+            </p>
+
+            <div className="space-y-3 mb-5">
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                  Examination Run Name / Attempt Badge
+                </label>
+                <input
+                  type="text"
+                  value={initExamName}
+                  onChange={(e) => setInitExamName(e.target.value)}
+                  placeholder="e.g. DITA with AI Half Yearly - Retest 1"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 focus:ring-2 focus:ring-primary-500 bg-slate-50/50"
+                  autoFocus
+                />
+              </div>
+
+              <div className="bg-amber-50 text-amber-800 text-xs font-semibold p-3 rounded-xl border border-amber-200 space-y-1">
+                <p>• All student states (answers, score, timer, violations) will start completely fresh.</p>
+                <p>• Unique question shuffle order will be generated per examinee.</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowInitModal(false)}
+                className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isInitializingRun}
+                onClick={handleConfirmInitialize}
+                className="flex-1 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-bold rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2"
+              >
+                {isInitializingRun ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Initializing Run...</span>
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw size={15} />
+                    <span>Initialize Run</span>
                   </>
                 )}
               </button>

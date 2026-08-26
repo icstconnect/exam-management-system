@@ -1,9 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { socket, API_BASE } from '../App';
 import { Languages, AlertTriangle, Clock, CheckCircle2, ChevronRight, X, Download, BookOpen, User, HelpCircle, Check, Sparkles, Award } from 'lucide-react';
-import jsPDF from 'jspdf';
-import { setupBengaliUnicodeFont } from '../utils/pdfFontHelper';
+import { downloadStudentQuestionPaperPdf } from '../utils/pdfGenerator';
 import { MatchQuestionViewer } from '../components/MatchQuestionViewer';
 import QuestionTextRenderer, { cleanMathDollars } from '../components/QuestionTextRenderer';
 
@@ -40,8 +39,11 @@ interface WaitingInfo {
     title: string;
     section_type: string;
     section_marks: number;
+    total_section_marks?: number;
+    min_marks?: number;
+    max_marks?: number;
     question_count: number;
-    avg_marks_per_question: number;
+    avg_marks_per_question?: number;
   }>;
 }
 
@@ -53,10 +55,49 @@ export default function ExamWorkspace() {
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [lang, setLang] = useState<'en' | 'bn'>('en');
   const [waitingInfo, setWaitingInfo] = useState<WaitingInfo | null>(null);
+  const [fullscreenEnforced, setFullscreenEnforced] = useState<boolean>(true);
+  const [showFullscreenPrompt, setShowFullscreenPrompt] = useState<boolean>(false);
 
   useEffect(() => {
     document.title = "Examination Portal - ICST";
   }, []);
+
+  const enterFullscreen = () => {
+    try {
+      if (!document.fullscreenElement) {
+        const docEl = document.documentElement as any;
+        const requestMethod = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
+        if (requestMethod) {
+          requestMethod.call(docEl).then(() => {
+            setShowFullscreenPrompt(false);
+          }).catch((err: any) => {
+            console.warn('Fullscreen automatic request prevented by browser gesture policy:', err);
+            setShowFullscreenPrompt(true);
+          });
+        } else {
+          setShowFullscreenPrompt(false);
+        }
+      } else {
+        setShowFullscreenPrompt(false);
+      }
+    } catch(e) {
+      console.warn('Fullscreen error:', e);
+      setShowFullscreenPrompt(true);
+    }
+  };
+
+  const exitFullscreen = () => {
+    try {
+      if (document.fullscreenElement) {
+        const doc = document as any;
+        const exitMethod = doc.exitFullscreen || doc.webkitExitFullscreen || doc.mozCancelFullScreen || doc.msExitFullscreen;
+        if (exitMethod) {
+          exitMethod.call(doc).catch(() => {});
+        }
+      }
+    } catch(e) {}
+    setShowFullscreenPrompt(false);
+  };
   
   const [sections, setSections] = useState<Section[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -85,6 +126,20 @@ export default function ExamWorkspace() {
       .catch(console.error);
   }, [session_id]);
 
+  const fullscreenEnforcedRef = useRef(fullscreenEnforced);
+  fullscreenEnforcedRef.current = fullscreenEnforced;
+  const statusRef = useRef(status);
+  statusRef.current = status;
+
+  // Poll workspace_ready while in WAITING state to guarantee immediate transition when exam starts
+  useEffect(() => {
+    if (status !== 'WAITING' || !session_id) return;
+    const interval = setInterval(() => {
+      socket.emit('workspace_ready', { session_id });
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [status, session_id]);
+
   useEffect(() => {
     if (!session_id) {
       navigate('/');
@@ -95,14 +150,16 @@ export default function ExamWorkspace() {
 
     socket.on('exam_waiting', () => {
       setStatus('WAITING');
+      exitFullscreen();
     });
 
     socket.on('session_error', (data: { message: string }) => {
       setErrorMessage(data.message || 'Session error');
       setStatus('ERROR');
+      exitFullscreen();
     });
 
-    socket.on('exam_started', (data: { questions: Question[], sections: Section[], seconds_left: number, previous_answers: Record<string, string> }) => {
+    const handleExamStarted = (data: { questions: Question[], sections: Section[], seconds_left: number, previous_answers: Record<string, string>, fullscreen_enforced?: boolean }) => {
       let fetchedQuestions = data.questions || [];
       let fetchedSections = data.sections || [];
       
@@ -147,6 +204,9 @@ export default function ExamWorkspace() {
       setSections(fetchedSections);
       setSecondsLeft(data.seconds_left);
       
+      const isEnforced = data.fullscreen_enforced !== undefined ? !!data.fullscreen_enforced : true;
+      setFullscreenEnforced(isEnforced);
+
       const parsedFitb: Record<string, Record<number, string>> = {};
       const newAnswers = data.previous_answers || {};
       
@@ -165,36 +225,113 @@ export default function ExamWorkspace() {
       setFitbAnswers(parsedFitb);
       setAnswers(newAnswers);
       setStatus('STARTED');
+
+      if (isEnforced) {
+        if (!document.fullscreenElement) {
+          setShowFullscreenPrompt(true);
+        }
+      }
+    };
+
+    socket.on('exam_started', handleExamStarted);
+    socket.on('exam_start_signal', () => {
+      socket.emit('workspace_ready', { session_id });
     });
 
     socket.on('exam_paused', () => setStatus('PAUSED'));
-    socket.on('exam_resumed', () => setStatus('STARTED'));
-    socket.on('exam_completed', () => setStatus('COMPLETED'));
+    socket.on('exam_resumed', () => {
+      if (statusRef.current === 'WAITING' || statusRef.current === 'LOADING') {
+        socket.emit('workspace_ready', { session_id });
+      } else {
+        setStatus('STARTED');
+        if (fullscreenEnforcedRef.current && !document.fullscreenElement) {
+          setShowFullscreenPrompt(true);
+        }
+      }
+    });
+    socket.on('exam_completed', () => {
+      setStatus('COMPLETED');
+      exitFullscreen();
+    });
     socket.on('exam_ended', () => {
       setStatus('COMPLETED');
+      exitFullscreen();
+    });
+    socket.on('fullscreen_policy_updated', (data: { fullscreen_enforced: boolean }) => {
+      const enforced = !!data.fullscreen_enforced;
+      setFullscreenEnforced(enforced);
+      if (enforced && statusRef.current === 'STARTED') {
+        if (!document.fullscreenElement) {
+          setShowFullscreenPrompt(true);
+        }
+      } else if (!enforced) {
+        setShowFullscreenPrompt(false);
+      }
     });
     socket.on('time_tick', (data: { seconds_left: number }) => {
       if (typeof data.seconds_left === 'number') {
         const remaining = Math.max(0, data.seconds_left);
         setSecondsLeft(remaining);
         if (remaining === 0) {
-          socket.emit('student_submit_exam', { session_id });
-          setStatus('COMPLETED');
+          handleStudentFinalSubmit();
         }
       }
     });
 
     return () => {
       socket.off('exam_waiting');
-      socket.off('exam_started');
+      socket.off('exam_started', handleExamStarted);
+      socket.off('exam_start_signal');
       socket.off('exam_paused');
       socket.off('exam_resumed');
       socket.off('exam_completed');
       socket.off('exam_ended');
+      socket.off('fullscreen_policy_updated');
       socket.off('session_error');
       socket.off('time_tick');
     };
   }, [session_id, navigate]);
+
+  // Fullscreen exit detection & auto-restoration
+  useEffect(() => {
+    if (status !== 'STARTED') {
+      if (status === 'COMPLETED' || status === 'WAITING' || status === 'ERROR') {
+        exitFullscreen();
+      }
+      return;
+    }
+
+    if (!fullscreenEnforced) {
+      setShowFullscreenPrompt(false);
+      return;
+    }
+
+    if (!document.fullscreenElement) {
+      setShowFullscreenPrompt(true);
+    }
+
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        if (status === 'STARTED' && fullscreenEnforced) {
+          setShowFullscreenPrompt(true);
+        }
+      } else {
+        setShowFullscreenPrompt(false);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, [status, fullscreenEnforced]);
 
   // Build answer banks for FITB sections
   useEffect(() => {
@@ -396,6 +533,18 @@ export default function ExamWorkspace() {
     );
   };
 
+  const handleStudentFinalSubmit = async () => {
+    setShowSubmitConfirm(false);
+    setStatus('COMPLETED');
+    exitFullscreen();
+    if (session_id) {
+      socket.emit('student_submit_exam', { session_id });
+      try {
+        await fetch(`${API_BASE}/api/student-sessions/${session_id}/submit`, { method: 'POST' });
+      } catch(e) {}
+    }
+  };
+
   const handleDownloadStudentQuestionPaper = async () => {
     if (isDownloadingPdf || !session_id) return;
     setIsDownloadingPdf(true);
@@ -405,120 +554,7 @@ export default function ExamWorkspace() {
       if (!res.ok) throw new Error('Failed to fetch student question paper data');
       const data = await res.json();
 
-      const doc = new jsPDF('p', 'mm', 'a4');
-      await setupBengaliUnicodeFont(doc);
-
-      const pageWidth = doc.internal.pageSize.getWidth();
-      let y = 15;
-
-      // Header
-      doc.setFont('NotoSansBengali', 'bold');
-      doc.setFontSize(13);
-      doc.text("INSTITUTE OF COMPUTER SCIENCE AND TECHNOLOGY CHOWBERIA", pageWidth / 2, y, { align: 'center' });
-      y += 7;
-      doc.setFontSize(11);
-      doc.setTextColor(50, 50, 50);
-      doc.text(`STUDENT EXAMINATION COPY & SUBMITTED ANSWERS`, pageWidth / 2, y, { align: 'center' });
-      y += 6;
-
-      // Student Meta Box
-      doc.setFontSize(9);
-      doc.setFont('NotoSansBengali', 'bold');
-      doc.setFillColor(248, 250, 252);
-      doc.rect(14, y, pageWidth - 28, 20, 'FD');
-      
-      doc.text(`Student Name: ${data.student.name}`, 18, y + 6);
-      doc.text(`Exam Roll: NYSDB01400${String(data.student.student_id).padStart(3, '0')}`, 18, y + 12);
-      doc.text(`Batch: ${data.student.batch || 'Standard'}`, 18, y + 17);
-
-      doc.text(`Examination: ${data.student.exam_title}`, pageWidth / 2 + 5, y + 6);
-      doc.text(`Class: ${data.student.class}`, pageWidth / 2 + 5, y + 12);
-      doc.text(`Full Marks: ${data.student.full_marks || '100'}`, pageWidth / 2 + 5, y + 17);
-      y += 26;
-
-      let currentSecTitle = '';
-      (data.questions || []).forEach((q: any, idx: number) => {
-        if (y > 260) { doc.addPage(); y = 15; }
-
-        if (q.section_title && q.section_title !== currentSecTitle) {
-          currentSecTitle = q.section_title;
-          doc.setFont('NotoSansBengali', 'bold');
-          doc.setFontSize(10);
-          doc.setFillColor(241, 245, 249);
-          doc.rect(14, y - 3, pageWidth - 28, 6, 'F');
-          doc.text(`SECTION: ${currentSecTitle.toUpperCase()}`, 16, y + 1.5);
-          y += 8;
-        }
-
-        doc.setFont('NotoSansBengali', 'bold');
-        doc.setFontSize(9.5);
-        const qLines = doc.splitTextToSize(`${idx + 1}. ${q.question_text_en}`, pageWidth - 32);
-        if (y + (qLines.length * 4.5) > 275) { doc.addPage(); y = 15; }
-        doc.text(qLines, 16, y);
-        y += qLines.length * 4.5;
-
-        if (q.question_text_bn && q.question_text_bn.trim() !== '') {
-          doc.setFont('NotoSansBengali', 'normal');
-          const qBnLines = doc.splitTextToSize(`(Bengali): ${q.question_text_bn}`, pageWidth - 32);
-          if (y + (qBnLines.length * 4.5) > 275) { doc.addPage(); y = 15; }
-          doc.text(qBnLines, 20, y);
-          y += qBnLines.length * 4.5;
-        }
-
-        // Display Options
-        let parsedOpts: any[] = [];
-        try {
-          parsedOpts = typeof q.options_json === 'string' ? JSON.parse(q.options_json) : q.options_json;
-        } catch(e) { parsedOpts = []; }
-
-        if (q.question_type === 'MCQ' || q.question_type === 'TF') {
-          doc.setFont('NotoSansBengali', 'normal');
-          doc.setFontSize(8.5);
-          const opts = Array.isArray(parsedOpts) ? parsedOpts : (q.question_type === 'TF' ? ['True', 'False'] : []);
-          opts.forEach((opt: any, optIdx: number) => {
-            const optText = typeof opt === 'object' && opt !== null ? opt.text : opt;
-            const optId = typeof opt === 'object' && opt !== null ? opt.id : opt;
-            const isStudentChosen = q.student_answer === optId || q.student_answer === optText;
-            
-            if (isStudentChosen) {
-              doc.setFont('NotoSansBengali', 'bold');
-              doc.setTextColor(30, 64, 175);
-            } else {
-              doc.setFont('NotoSansBengali', 'normal');
-              doc.setTextColor(80, 80, 80);
-            }
-            const label = String.fromCharCode(65 + optIdx);
-            const optLine = `(${label}) ${optText}${isStudentChosen ? ' [ YOUR ANSWER ]' : ''}`;
-            const optLines = doc.splitTextToSize(optLine, pageWidth - 36);
-            if (y + (optLines.length * 4) > 275) { doc.addPage(); y = 15; }
-            doc.text(optLines, 22, y);
-            y += optLines.length * 4;
-          });
-          doc.setTextColor(0, 0, 0);
-        } else if (q.question_type === 'FITB') {
-          doc.setFont('NotoSansBengali', 'bold');
-          doc.setFontSize(8.5);
-          doc.setTextColor(30, 64, 175);
-          const fitbLines = doc.splitTextToSize(`Your Submitted Blanks: ${q.student_answer || '(Left Blank)'}`, pageWidth - 36);
-          if (y + (fitbLines.length * 4.5) > 275) { doc.addPage(); y = 15; }
-          doc.text(fitbLines, 22, y);
-          y += fitbLines.length * 4.5;
-          doc.setTextColor(0, 0, 0);
-        } else if (q.question_type === 'MATCH') {
-          doc.setFont('NotoSansBengali', 'bold');
-          doc.setFontSize(8.5);
-          doc.setTextColor(30, 64, 175);
-          const matchLines = doc.splitTextToSize(`Your Matching Pairs: ${q.student_answer || '(No match)'}`, pageWidth - 36);
-          if (y + (matchLines.length * 4.5) > 275) { doc.addPage(); y = 15; }
-          doc.text(matchLines, 22, y);
-          y += matchLines.length * 4.5;
-          doc.setTextColor(0, 0, 0);
-        }
-
-        y += 4;
-      });
-
-      doc.save(`${data.student.name.replace(/\s+/g, '_')}_Question_Paper.pdf`);
+      await downloadStudentQuestionPaperPdf(data);
 
       // Audit download log
       fetch(`${API_BASE}/api/student-sessions/${session_id}/audit-log`, { method: 'POST' }).catch(() => {});
@@ -656,27 +692,55 @@ export default function ExamWorkspace() {
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
                 {waitingInfo?.sections && waitingInfo.sections.length > 0 ? (
-                  waitingInfo.sections.map((sec, idx) => (
-                    <tr key={sec.section_id || idx} className="hover:bg-slate-50/80">
-                      <td className="py-3.5 px-4 font-bold text-slate-800">{sec.title}</td>
-                      <td className="py-3.5 px-4">
-                        <span className="px-2.5 py-0.5 bg-slate-100 text-slate-700 text-xs font-bold rounded-md">
-                          {sec.section_type}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-center font-extrabold text-slate-700">{sec.question_count}</td>
-                      <td className="py-3.5 px-4 text-center text-slate-600">
-                        {sec.question_count > 0 ? (sec.section_marks / sec.question_count).toFixed(0) : '1'} Mark(s)
-                      </td>
-                      <td className="py-3.5 px-4 text-right font-black text-primary-600">{sec.section_marks} Marks</td>
-                    </tr>
-                  ))
+                  waitingInfo.sections.map((sec, idx) => {
+                    const minM = sec.min_marks !== undefined ? sec.min_marks : (sec.question_count > 0 ? sec.section_marks / sec.question_count : 1);
+                    const maxM = sec.max_marks !== undefined ? sec.max_marks : minM;
+                    const secTotal = sec.total_section_marks && sec.total_section_marks > 0 ? sec.total_section_marks : (sec.section_marks || 0);
+
+                    return (
+                      <tr key={sec.section_id || idx} className="hover:bg-slate-50/80">
+                        <td className="py-3.5 px-4 font-bold text-slate-800">{sec.title}</td>
+                        <td className="py-3.5 px-4">
+                          <span className="px-2.5 py-0.5 bg-slate-100 text-slate-700 text-xs font-bold rounded-md">
+                            {sec.section_type}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-center font-extrabold text-slate-700">{sec.question_count}</td>
+                        <td className="py-3.5 px-4 text-center text-slate-600 font-semibold">
+                          {sec.question_count === 0 
+                            ? '—' 
+                            : minM === maxM 
+                              ? `${minM} Mark${minM > 1 ? 's' : ''}` 
+                              : `${minM} – ${maxM} Marks (Varying)`}
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-black text-primary-600">{secTotal} Marks</td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
                     <td colSpan={5} className="py-4 text-center text-slate-400 font-bold">Standard configuration active.</td>
                   </tr>
                 )}
               </tbody>
+              {waitingInfo && (
+                <tfoot>
+                  <tr className="border-t-2 border-slate-200 bg-slate-50/70 font-black text-slate-800 text-xs uppercase tracking-wider">
+                    <td colSpan={2} className="py-3 px-4 text-slate-500">
+                      Total ({waitingInfo.total_sections || waitingInfo.sections?.length || 0} Sections)
+                    </td>
+                    <td className="py-3 px-4 text-center text-slate-800 font-extrabold text-sm">
+                      {waitingInfo.total_questions || 0}
+                    </td>
+                    <td className="py-3 px-4 text-center text-slate-400 font-semibold text-[11px]">
+                      Varying Marks
+                    </td>
+                    <td className="py-3 px-4 text-right text-primary-700 font-black text-sm">
+                      {waitingInfo.full_marks || 100} Marks
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         </div>
@@ -1071,16 +1135,33 @@ export default function ExamWorkspace() {
                 Cancel
               </button>
               <button 
-                onClick={() => {
-                  setShowSubmitConfirm(false);
-                  socket.emit('student_submit_exam', { session_id });
-                  setStatus('COMPLETED');
-                }} 
+                onClick={handleStudentFinalSubmit} 
                 className="flex-1 px-4 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl text-sm shadow-md"
               >
                 Yes, Submit
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Re-enter Fullscreen Prompt Overlay */}
+      {showFullscreenPrompt && fullscreenEnforced && status === 'STARTED' && (
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-200 text-center space-y-4">
+            <div className="w-16 h-16 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto text-primary-600">
+              <AlertTriangle size={32} />
+            </div>
+            <h3 className="text-2xl font-black text-slate-800">Fullscreen Mode Required</h3>
+            <p className="text-slate-600 text-sm font-semibold leading-relaxed">
+              This examination requires full-screen mode to continue. Please click the button below to resume full-screen exam mode.
+            </p>
+            <button
+              onClick={enterFullscreen}
+              className="w-full bg-primary-600 hover:bg-primary-700 text-white font-black py-4 px-6 rounded-2xl text-base shadow-xl transition-all transform hover:scale-105"
+            >
+              Resume Fullscreen Exam
+            </button>
           </div>
         </div>
       )}

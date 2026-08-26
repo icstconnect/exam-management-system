@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS exam_runs (
   started_at TIMESTAMP,
   ended_at TIMESTAMP,
   seconds_left INTEGER,
+  fullscreen_enforced BOOLEAN NOT NULL DEFAULT TRUE,
   status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'
 );
 

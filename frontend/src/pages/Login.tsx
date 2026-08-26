@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { socket } from '../App';
-import { UserCircle, KeyRound, ArrowRight } from 'lucide-react';
+import { UserCircle, KeyRound, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 export default function Login() {
   const [studentId, setStudentId] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [examId] = useState('00000000-0000-0000-0000-000000000000'); // Default or fetched from active exams
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -75,13 +76,21 @@ export default function Login() {
                   <KeyRound size={20} />
                 </div>
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all font-medium"
+                  className="block w-full pl-10 pr-11 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all font-medium"
                   placeholder="e.g. ISHIKA@030"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(prev => !prev)}
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
+                  title={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+                </button>
               </div>
             </div>
             
