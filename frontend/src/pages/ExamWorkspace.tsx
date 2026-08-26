@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { socket, API_BASE } from '../App';
 import { Languages, AlertTriangle, Clock, CheckCircle2, ChevronRight, X, Download, BookOpen, User, HelpCircle, Check, Sparkles, Award } from 'lucide-react';
 import jsPDF from 'jspdf';
+import { setupBengaliUnicodeFont } from '../utils/pdfFontHelper';
 import { MatchQuestionViewer } from '../components/MatchQuestionViewer';
 import QuestionTextRenderer, { cleanMathDollars } from '../components/QuestionTextRenderer';
 
@@ -405,12 +406,14 @@ export default function ExamWorkspace() {
       const data = await res.json();
 
       const doc = new jsPDF('p', 'mm', 'a4');
+      await setupBengaliUnicodeFont(doc);
+
       const pageWidth = doc.internal.pageSize.getWidth();
       let y = 15;
 
       // Header
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(14);
+      doc.setFont('NotoSansBengali', 'bold');
+      doc.setFontSize(13);
       doc.text("INSTITUTE OF COMPUTER SCIENCE AND TECHNOLOGY CHOWBERIA", pageWidth / 2, y, { align: 'center' });
       y += 7;
       doc.setFontSize(11);
@@ -420,7 +423,7 @@ export default function ExamWorkspace() {
 
       // Student Meta Box
       doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('NotoSansBengali', 'bold');
       doc.setFillColor(248, 250, 252);
       doc.rect(14, y, pageWidth - 28, 20, 'FD');
       
@@ -439,7 +442,7 @@ export default function ExamWorkspace() {
 
         if (q.section_title && q.section_title !== currentSecTitle) {
           currentSecTitle = q.section_title;
-          doc.setFont('helvetica', 'bold');
+          doc.setFont('NotoSansBengali', 'bold');
           doc.setFontSize(10);
           doc.setFillColor(241, 245, 249);
           doc.rect(14, y - 3, pageWidth - 28, 6, 'F');
@@ -447,11 +450,20 @@ export default function ExamWorkspace() {
           y += 8;
         }
 
-        doc.setFont('helvetica', 'bold');
+        doc.setFont('NotoSansBengali', 'bold');
         doc.setFontSize(9.5);
         const qLines = doc.splitTextToSize(`${idx + 1}. ${q.question_text_en}`, pageWidth - 32);
+        if (y + (qLines.length * 4.5) > 275) { doc.addPage(); y = 15; }
         doc.text(qLines, 16, y);
         y += qLines.length * 4.5;
+
+        if (q.question_text_bn && q.question_text_bn.trim() !== '') {
+          doc.setFont('NotoSansBengali', 'normal');
+          const qBnLines = doc.splitTextToSize(`(Bengali): ${q.question_text_bn}`, pageWidth - 32);
+          if (y + (qBnLines.length * 4.5) > 275) { doc.addPage(); y = 15; }
+          doc.text(qBnLines, 20, y);
+          y += qBnLines.length * 4.5;
+        }
 
         // Display Options
         let parsedOpts: any[] = [];
@@ -460,7 +472,7 @@ export default function ExamWorkspace() {
         } catch(e) { parsedOpts = []; }
 
         if (q.question_type === 'MCQ' || q.question_type === 'TF') {
-          doc.setFont('helvetica', 'normal');
+          doc.setFont('NotoSansBengali', 'normal');
           doc.setFontSize(8.5);
           const opts = Array.isArray(parsedOpts) ? parsedOpts : (q.question_type === 'TF' ? ['True', 'False'] : []);
           opts.forEach((opt: any, optIdx: number) => {
@@ -469,30 +481,37 @@ export default function ExamWorkspace() {
             const isStudentChosen = q.student_answer === optId || q.student_answer === optText;
             
             if (isStudentChosen) {
-              doc.setFont('helvetica', 'bold');
+              doc.setFont('NotoSansBengali', 'bold');
               doc.setTextColor(30, 64, 175);
             } else {
-              doc.setFont('helvetica', 'normal');
+              doc.setFont('NotoSansBengali', 'normal');
               doc.setTextColor(80, 80, 80);
             }
             const label = String.fromCharCode(65 + optIdx);
-            doc.text(`(${label}) ${optText} ${isStudentChosen ? ' [ YOUR ANSWER ]' : ''}`, 22, y);
-            y += 4;
+            const optLine = `(${label}) ${optText}${isStudentChosen ? ' [ YOUR ANSWER ]' : ''}`;
+            const optLines = doc.splitTextToSize(optLine, pageWidth - 36);
+            if (y + (optLines.length * 4) > 275) { doc.addPage(); y = 15; }
+            doc.text(optLines, 22, y);
+            y += optLines.length * 4;
           });
           doc.setTextColor(0, 0, 0);
         } else if (q.question_type === 'FITB') {
-          doc.setFont('helvetica', 'bold');
+          doc.setFont('NotoSansBengali', 'bold');
           doc.setFontSize(8.5);
           doc.setTextColor(30, 64, 175);
-          doc.text(`Your Submitted Blanks: ${q.student_answer || '(Left Blank)'}`, 22, y);
-          y += 4.5;
+          const fitbLines = doc.splitTextToSize(`Your Submitted Blanks: ${q.student_answer || '(Left Blank)'}`, pageWidth - 36);
+          if (y + (fitbLines.length * 4.5) > 275) { doc.addPage(); y = 15; }
+          doc.text(fitbLines, 22, y);
+          y += fitbLines.length * 4.5;
           doc.setTextColor(0, 0, 0);
         } else if (q.question_type === 'MATCH') {
-          doc.setFont('helvetica', 'bold');
+          doc.setFont('NotoSansBengali', 'bold');
           doc.setFontSize(8.5);
           doc.setTextColor(30, 64, 175);
-          doc.text(`Your Matching Pairs: ${q.student_answer || '(No match)'}`, 22, y);
-          y += 4.5;
+          const matchLines = doc.splitTextToSize(`Your Matching Pairs: ${q.student_answer || '(No match)'}`, pageWidth - 36);
+          if (y + (matchLines.length * 4.5) > 275) { doc.addPage(); y = 15; }
+          doc.text(matchLines, 22, y);
+          y += matchLines.length * 4.5;
           doc.setTextColor(0, 0, 0);
         }
 

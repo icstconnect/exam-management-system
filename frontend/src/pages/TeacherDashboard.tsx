@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { socket, API_BASE } from '../App';
 import { Users, Play, Unlock, UserPlus, BookOpen, Plus, AlertTriangle, ArrowLeft, Trash2, Square, Award, Download, Lock, Edit, Eye, X, ChevronLeft, ChevronRight, RotateCcw, Search, Shuffle, Layers, ArrowRightLeft, FileText, List, LayoutGrid } from 'lucide-react';
 import { jsPDF } from 'jspdf';
+import { setupBengaliUnicodeFont } from '../utils/pdfFontHelper';
 
 interface StudentSession {
   session_id: string;
@@ -341,20 +342,22 @@ export default function TeacherDashboard() {
       const data = await res.json();
       
       const doc = new jsPDF('p', 'mm', 'a4');
+      await setupBengaliUnicodeFont(doc);
+
       const pageWidth = doc.internal.pageSize.getWidth();
       let y = 15;
 
       // Header
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(14);
+      doc.setFont('NotoSansBengali', 'bold');
+      doc.setFontSize(13);
       doc.text("INSTITUTE OF COMPUTER SCIENCE & TECHNOLOGY CHOWBERIA", pageWidth / 2, y, { align: 'center' });
       y += 7;
-      doc.setFontSize(12);
+      doc.setFontSize(11);
       doc.setTextColor(50, 50, 50);
       doc.text(`TEACHER QUESTION PAPER WITH ANSWER KEY: ${data.exam.title}`, pageWidth / 2, y, { align: 'center' });
       y += 6;
       doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
+      doc.setFont('NotoSansBengali', 'normal');
       doc.text(`Duration: ${data.exam.duration_minutes} Mins | Full Marks: ${data.exam.full_marks}`, pageWidth / 2, y, { align: 'center' });
       y += 4;
       doc.line(14, y, pageWidth - 14, y);
@@ -363,7 +366,7 @@ export default function TeacherDashboard() {
       let qCounter = 1;
       (data.sections || []).forEach((sec: any) => {
         if (y > 260) { doc.addPage(); y = 15; }
-        doc.setFont('helvetica', 'bold');
+        doc.setFont('NotoSansBengali', 'bold');
         doc.setFontSize(11);
         doc.setFillColor(240, 243, 246);
         doc.rect(14, y - 4, pageWidth - 28, 7, 'F');
@@ -373,20 +376,22 @@ export default function TeacherDashboard() {
         (sec.questions || []).forEach((q: any) => {
           if (y > 255) { doc.addPage(); y = 15; }
           
-          doc.setFont('helvetica', 'bold');
+          doc.setFont('NotoSansBengali', 'bold');
           doc.setFontSize(10);
           const qEnLines = doc.splitTextToSize(`Q${qCounter}. ${q.question_text_en}`, pageWidth - 32);
+          if (y + (qEnLines.length * 5) > 275) { doc.addPage(); y = 15; }
           doc.text(qEnLines, 16, y);
           y += qEnLines.length * 5;
 
           if (q.question_text_bn && q.question_text_bn.trim() !== '') {
-            doc.setFont('helvetica', 'italic');
+            doc.setFont('NotoSansBengali', 'normal');
             const qBnLines = doc.splitTextToSize(`(Bengali): ${q.question_text_bn}`, pageWidth - 32);
+            if (y + (qBnLines.length * 4.5) > 275) { doc.addPage(); y = 15; }
             doc.text(qBnLines, 20, y);
             y += qBnLines.length * 4.5;
           }
 
-          doc.setFont('helvetica', 'normal');
+          doc.setFont('NotoSansBengali', 'normal');
           let parsedOpts: any[] = [];
           try {
             parsedOpts = typeof q.options_json === 'string' ? JSON.parse(q.options_json) : q.options_json;
@@ -400,34 +405,40 @@ export default function TeacherDashboard() {
               const isCorrect = q.correct_answer === optId || q.correct_answer === optText;
               
               if (isCorrect) {
-                doc.setFont('helvetica', 'bold');
+                doc.setFont('NotoSansBengali', 'bold');
                 doc.setTextColor(0, 130, 50);
               } else {
-                doc.setFont('helvetica', 'normal');
+                doc.setFont('NotoSansBengali', 'normal');
                 doc.setTextColor(60, 60, 60);
               }
 
               const optLabel = String.fromCharCode(65 + optIdx);
-              const optLine = `${optLabel}. ${optText} ${isCorrect ? ' [ CORRECT ANSWER ]' : ''}`;
-              doc.text(optLine, 22, y);
-              y += 4.5;
+              const optLine = `${optLabel}. ${optText}${isCorrect ? '  [ CORRECT ANSWER ]' : ''}`;
+              const optLines = doc.splitTextToSize(optLine, pageWidth - 36);
+              if (y + (optLines.length * 4.5) > 275) { doc.addPage(); y = 15; }
+              doc.text(optLines, 22, y);
+              y += optLines.length * 4.5;
             });
             doc.setTextColor(0, 0, 0);
           } else if (q.question_type === 'FITB') {
-            doc.setFont('helvetica', 'bold');
+            doc.setFont('NotoSansBengali', 'bold');
             doc.setTextColor(0, 130, 50);
-            doc.text(`Correct Blanks: ${q.correct_answer}`, 22, y);
-            y += 5;
+            const fitbLines = doc.splitTextToSize(`Correct Blanks: ${q.correct_answer}`, pageWidth - 36);
+            if (y + (fitbLines.length * 5) > 275) { doc.addPage(); y = 15; }
+            doc.text(fitbLines, 22, y);
+            y += fitbLines.length * 5;
             doc.setTextColor(0, 0, 0);
           } else if (q.question_type === 'MATCH') {
-            doc.setFont('helvetica', 'bold');
+            doc.setFont('NotoSansBengali', 'bold');
             doc.setTextColor(0, 130, 50);
-            doc.text(`Correct Matching: ${q.correct_answer}`, 22, y);
-            y += 5;
+            const matchLines = doc.splitTextToSize(`Correct Matching: ${q.correct_answer}`, pageWidth - 36);
+            if (y + (matchLines.length * 5) > 275) { doc.addPage(); y = 15; }
+            doc.text(matchLines, 22, y);
+            y += matchLines.length * 5;
             doc.setTextColor(0, 0, 0);
           }
 
-          doc.setFont('helvetica', 'normal');
+          doc.setFont('NotoSansBengali', 'normal');
           doc.setFontSize(8);
           doc.setTextColor(120, 120, 120);
           doc.text(`[ Marks: ${q.marks} ]`, pageWidth - 35, y);
