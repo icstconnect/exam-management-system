@@ -241,7 +241,7 @@ export const QuestionTextRenderer: React.FC<QuestionTextRendererProps> = ({
         return (
           <div
             key={idx}
-            className={`${textSize} font-semibold text-slate-800 leading-relaxed whitespace-pre-wrap my-2`}
+            className={`${textSize} font-semibold text-slate-900 dark:text-slate-100 leading-relaxed whitespace-pre-wrap my-2`}
           >
             {cleanMathDollars(block.content)}
           </div>

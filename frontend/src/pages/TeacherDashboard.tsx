@@ -1190,38 +1190,38 @@ export default function TeacherDashboard() {
 
   if (!isAuthenticated) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh]">
-        <div className="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100 p-8">
+      <div className="flex flex-col items-center justify-center min-h-[70vh] px-4">
+        <div className="w-full max-w-md bg-white dark:bg-[#111827] rounded-3xl shadow-xl dark:shadow-2xl dark:shadow-blue-950/20 overflow-hidden border border-slate-200/80 dark:border-slate-800 p-8 transition-colors">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-primary-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-primary-600">
+            <div className="w-16 h-16 bg-primary-50 dark:bg-primary-950/60 rounded-2xl flex items-center justify-center mx-auto mb-4 text-primary-600 dark:text-primary-400 border border-primary-100 dark:border-primary-900/60">
               <Lock size={32} />
             </div>
-            <h2 className="text-2xl font-black text-slate-800 tracking-tight">Teacher Control Panel</h2>
-            <p className="text-slate-500 text-sm font-medium mt-1">Please enter the teacher master password to proceed</p>
+            <h2 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Teacher Control Panel</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mt-1">Please enter the teacher master password to proceed</p>
           </div>
 
           {authError && (
-            <div className="bg-red-50 text-red-600 p-3.5 rounded-xl text-sm font-bold mb-6 text-center border border-red-100 flex items-center justify-center gap-2">
-              <AlertTriangle size={18} /> {authError}
+            <div className="bg-red-50 dark:bg-red-950/60 text-red-600 dark:text-red-400 p-3.5 rounded-2xl text-xs font-bold mb-6 text-center border border-red-200 dark:border-red-900/60 flex items-center justify-center gap-2">
+              <AlertTriangle size={16} /> {authError}
             </div>
           )}
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">Master Password</label>
+              <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">Master Password</label>
               <div className="relative">
                 <input
                   type={showAuthPassword ? "text" : "password"}
                   required
                   value={authPassword}
                   onChange={(e) => setAuthPassword(e.target.value)}
-                  placeholder="Enter password (e.g. ICST)"
-                  className="block w-full pl-4 pr-11 py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-medium"
+                  placeholder="Enter master password (e.g. ICST)"
+                  className="block w-full pl-4 pr-11 py-3.5 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-bold text-sm"
                 />
                 <button
                   type="button"
                   onClick={() => setShowAuthPassword(prev => !prev)}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 focus:outline-none transition-colors"
                   title={showAuthPassword ? "Hide password" : "Show password"}
                 >
                   {showAuthPassword ? <EyeOff size={19} /> : <Eye size={19} />}
@@ -1230,7 +1230,7 @@ export default function TeacherDashboard() {
             </div>
             <button
               type="submit"
-              className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-md mt-4"
+              className="w-full bg-primary-600 hover:bg-primary-700 text-white font-extrabold py-3.5 px-4 rounded-2xl transition-all shadow-md shadow-primary-500/20 mt-4 text-sm"
             >
               Access Dashboard
             </button>
@@ -1245,12 +1245,12 @@ export default function TeacherDashboard() {
   return (
     <div className="space-y-6 pb-20">
       {/* Top Navbar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-[#111827] p-4 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 transition-colors">
         <div className="flex items-center gap-2 overflow-x-auto">
           <button
             onClick={() => setActiveTab('MONITOR')}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-sm transition-all ${
-              activeTab === 'MONITOR' ? 'bg-primary-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
+              activeTab === 'MONITOR' ? 'bg-primary-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
           >
             <Play size={18} /> Monitor
@@ -1258,7 +1258,7 @@ export default function TeacherDashboard() {
           <button
             onClick={() => setActiveTab('REGISTRATION')}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-sm transition-all ${
-              activeTab === 'REGISTRATION' ? 'bg-primary-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
+              activeTab === 'REGISTRATION' ? 'bg-primary-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
           >
             <UserPlus size={18} /> Registration
@@ -1266,7 +1266,7 @@ export default function TeacherDashboard() {
           <button
             onClick={() => setActiveTab('BATCHES')}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-sm transition-all ${
-              activeTab === 'BATCHES' ? 'bg-primary-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
+              activeTab === 'BATCHES' ? 'bg-primary-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
           >
             <Layers size={18} /> Batches
@@ -1274,7 +1274,7 @@ export default function TeacherDashboard() {
           <button
             onClick={() => setActiveTab('EXAMS')}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-sm transition-all ${
-              activeTab === 'EXAMS' ? 'bg-primary-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
+              activeTab === 'EXAMS' ? 'bg-primary-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
           >
             <BookOpen size={18} /> Exams
@@ -1282,7 +1282,7 @@ export default function TeacherDashboard() {
           <button
             onClick={() => setActiveTab('RESULTS')}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-sm transition-all ${
-              activeTab === 'RESULTS' ? 'bg-primary-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
+              activeTab === 'RESULTS' ? 'bg-primary-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
           >
             <Award size={18} /> Results
@@ -1290,12 +1290,12 @@ export default function TeacherDashboard() {
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-700 text-xs font-bold rounded-full border border-green-200">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-50 dark:bg-green-950/50 text-green-700 dark:text-green-400 text-xs font-bold rounded-full border border-green-200 dark:border-green-800/60">
             <span className="w-2 h-2 rounded-full bg-green-500 animate-ping"></span> LAN Online
           </span>
           <button
             onClick={() => setIsAuthenticated(false)}
-            className="text-xs font-bold text-slate-500 hover:text-red-600 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-red-50"
+            className="text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
           >
             Lock Panel
           </button>
@@ -1308,20 +1308,20 @@ export default function TeacherDashboard() {
       {activeTab === 'MONITOR' && (
         <div className="space-y-6">
           {/* Exam Selector & Controls */}
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-wrap items-center justify-between gap-6">
+          <div className="bg-white dark:bg-[#111827] p-6 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 flex flex-wrap items-center justify-between gap-6 transition-colors">
             <div className="flex flex-wrap items-center gap-4 flex-1 min-w-[320px]">
               {/* Examination Selector */}
               <div className="flex-1 min-w-[240px]">
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
                   Select Active Exam to Monitor
                 </label>
                 <select
                   value={selectedMonitorExamId}
                   onChange={(e) => handleSelectMonitorExam(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 text-sm focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-800 dark:text-slate-100 text-sm focus:ring-2 focus:ring-primary-500"
                 >
                   {examsList.map(e => (
-                    <option key={e.exam_id} value={e.exam_id}>
+                    <option key={e.exam_id} value={e.exam_id} className="dark:bg-[#111827]">
                       {e.title}
                     </option>
                   ))}
@@ -1330,26 +1330,28 @@ export default function TeacherDashboard() {
 
               {/* Target Batch Selector */}
               <div className="flex-1 min-w-[200px]">
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
                   Target Batch <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={selectedMonitorBatch}
                   onChange={(e) => handleSelectMonitorBatch(e.target.value)}
-                  className={`w-full px-4 py-3 bg-slate-50 border rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary-500 ${
-                    !selectedMonitorBatch ? 'border-amber-300 text-amber-800 bg-amber-50/40' : 'border-slate-200 text-slate-800'
+                  className={`w-full px-4 py-3 bg-slate-50 dark:bg-[#1e293b]/70 border rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary-500 ${
+                    !selectedMonitorBatch 
+                      ? 'border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-400 bg-amber-50/40 dark:bg-amber-950/20' 
+                      : 'border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100'
                   }`}
                 >
                   {currentExamAssignedBatches.length > 1 && (
-                    <option value="">-- Select Target Batch --</option>
+                    <option value="" className="dark:bg-[#111827]">-- Select Target Batch --</option>
                   )}
                   {currentExamAssignedBatches.map(b => (
-                    <option key={b} value={b}>
+                    <option key={b} value={b} className="dark:bg-[#111827]">
                       {b}
                     </option>
                   ))}
                   {currentExamAssignedBatches.length === 0 && (
-                    <option value="">No batches assigned</option>
+                    <option value="" className="dark:bg-[#111827]">No batches assigned</option>
                   )}
                 </select>
               </div>
@@ -1357,9 +1359,9 @@ export default function TeacherDashboard() {
 
             {selectedMonitorExam && (
               <div className="flex flex-wrap items-center gap-3">
-                <div className="bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200 text-center">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Remaining Time</p>
-                  <p className="text-xl font-black text-slate-800">
+                <div className="bg-slate-50 dark:bg-[#1e293b]/70 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-center">
+                  <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Remaining Time</p>
+                  <p className="text-xl font-black text-slate-800 dark:text-white">
                     {!selectedMonitorBatch ? '--:--' : formatTimer(examSecondsLeft, monitorBatchStatus)}
                   </p>
                 </div>
@@ -1371,14 +1373,14 @@ export default function TeacherDashboard() {
                     title={fullscreenEnforced ? 'Disable fullscreen enforcement for this batch' : 'Enable fullscreen enforcement for this batch'}
                     className={`px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-all border shadow-sm ${
                       fullscreenEnforced
-                        ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
-                        : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'
+                        ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100'
+                        : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
                     }`}
                   >
                     <Maximize2 size={15} />
                     <span>Fullscreen:</span>
                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-black tracking-wide ${
-                      fullscreenEnforced ? 'bg-indigo-600 text-white' : 'bg-slate-300 text-slate-700'
+                      fullscreenEnforced ? 'bg-indigo-600 text-white' : 'bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
                     }`}>
                       {fullscreenEnforced ? 'ON' : 'OFF'}
                     </span>
@@ -1442,7 +1444,7 @@ export default function TeacherDashboard() {
                   <button
                     onClick={triggerNewAttempt}
                     disabled={isInitializingRun}
-                    className="bg-slate-800 hover:bg-black disabled:opacity-60 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition-all"
+                    className="bg-slate-800 dark:bg-slate-700 hover:bg-black dark:hover:bg-slate-600 disabled:opacity-60 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition-all"
                   >
                     {isInitializingRun ? <Loader2 size={16} className="animate-spin text-primary-400" /> : <RotateCcw size={16} />}
                     <span>{isInitializingRun ? 'Preparing New Attempt...' : 'New Attempt / Retest'}</span>
@@ -1453,36 +1455,36 @@ export default function TeacherDashboard() {
           </div>
 
           {/* Student Live Monitor Section */}
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 relative overflow-hidden">
+          <div className="bg-white dark:bg-[#111827] p-6 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 relative overflow-hidden transition-colors">
             {isInitializingRun && (
-              <div className="absolute inset-0 bg-white/85 backdrop-blur-[2px] z-30 flex flex-col items-center justify-center gap-3 animate-fadeIn">
-                <Loader2 size={44} className="animate-spin text-primary-600" />
+              <div className="absolute inset-0 bg-white/85 dark:bg-[#111827]/85 backdrop-blur-[2px] z-30 flex flex-col items-center justify-center gap-3 animate-fadeIn">
+                <Loader2 size={44} className="animate-spin text-primary-600 dark:text-primary-400" />
                 <div className="text-center">
-                  <h4 className="text-base font-black text-slate-800">Preparing Fresh Attempt...</h4>
-                  <p className="text-xs font-semibold text-slate-500 mt-0.5">Generating student sessions & shuffled question sets for {selectedMonitorBatch}</p>
+                  <h4 className="text-base font-black text-slate-800 dark:text-white">Preparing Fresh Attempt...</h4>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Generating student sessions & shuffled question sets for {selectedMonitorBatch}</p>
                 </div>
               </div>
             )}
             <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
               <div>
-                <h3 className="text-xl font-black text-slate-800">Student Live Monitor</h3>
-                <p className="text-xs font-semibold text-slate-400 mt-0.5">
-                  {selectedMonitorExam ? selectedMonitorExam.title : 'No exam selected'} • Target Batch: <span className="text-primary-600 font-bold">{selectedMonitorBatch || 'None Selected'}</span> • Status: <span className="font-bold text-slate-700">{monitorBatchStatus}</span>
+                <h3 className="text-xl font-black text-slate-800 dark:text-white">Student Live Monitor</h3>
+                <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mt-0.5">
+                  {selectedMonitorExam ? selectedMonitorExam.title : 'No exam selected'} • Target Batch: <span className="text-primary-600 dark:text-primary-400 font-bold">{selectedMonitorBatch || 'None Selected'}</span> • Status: <span className="font-bold text-slate-700 dark:text-slate-300">{monitorBatchStatus}</span>
                 </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-4">
                 {/* Status Legend */}
                 <div className="flex items-center gap-3 text-xs font-bold">
-                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-300"></span> Ready</span>
-                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Logged In</span>
-                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-500"></span> Examinee</span>
-                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Paused</span>
-                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-purple-500"></span> Completed</span>
+                  <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400"><span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600"></span> Ready</span>
+                  <span className="flex items-center gap-1.5 text-blue-700 dark:text-blue-400"><span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Logged In</span>
+                  <span className="flex items-center gap-1.5 text-green-700 dark:text-green-400"><span className="w-2.5 h-2.5 rounded-full bg-green-500"></span> Examinee</span>
+                  <span className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400"><span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Paused</span>
+                  <span className="flex items-center gap-1.5 text-purple-700 dark:text-purple-400"><span className="w-2.5 h-2.5 rounded-full bg-purple-500"></span> Completed</span>
                 </div>
 
                 {/* View Toggle (Icons only: Card View / List View) */}
-                <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
                   <button
                     type="button"
                     onClick={() => handleSetMonitorViewMode('card')}
@@ -1490,8 +1492,8 @@ export default function TeacherDashboard() {
                     aria-label="Card View"
                     className={`p-1.5 rounded-lg transition-all ${
                       monitorViewMode === 'card'
-                        ? 'bg-white text-primary-600 shadow-sm'
-                        : 'text-slate-400 hover:text-slate-700'
+                        ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm'
+                        : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                     }`}
                   >
                     <LayoutGrid size={18} />
@@ -1503,8 +1505,8 @@ export default function TeacherDashboard() {
                     aria-label="List View"
                     className={`p-1.5 rounded-lg transition-all ${
                       monitorViewMode === 'list'
-                        ? 'bg-white text-primary-600 shadow-sm'
-                        : 'text-slate-400 hover:text-slate-700'
+                        ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm'
+                        : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                     }`}
                   >
                     <List size={18} />
@@ -1514,19 +1516,19 @@ export default function TeacherDashboard() {
             </div>
 
             {!selectedMonitorBatch ? (
-              <div className="p-12 text-center text-amber-800 bg-amber-50/60 rounded-2xl border border-dashed border-amber-200 font-bold">
+              <div className="p-12 text-center text-amber-800 dark:text-amber-300 bg-amber-50/60 dark:bg-amber-950/30 rounded-2xl border border-dashed border-amber-200 dark:border-amber-800 font-bold">
                 Please select a <span className="underline">Target Batch</span> from the dropdown above to view and control examinees.
               </div>
             ) : studentsSession.length === 0 ? (
-              <div className="p-12 text-center text-slate-400 font-bold bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+              <div className="p-12 text-center text-slate-400 dark:text-slate-500 font-bold bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
                 No examinees initialized for {selectedMonitorBatch} yet. Click &quot;Initialize Exam&quot; to assign passwords and prepare sessions.
               </div>
             ) : monitorViewMode === 'list' ? (
               /* ================= LIST VIEW ================= */
-              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
                 <table className="w-full text-left text-sm">
                   <thead>
-                    <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-black text-slate-400 uppercase tracking-wider">
+                    <tr className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                       <th className="py-3.5 px-4">Student ID</th>
                       <th className="py-3.5 px-4">Student Name</th>
                       <th className="py-3.5 px-4">Batch</th>
@@ -1536,29 +1538,29 @@ export default function TeacherDashboard() {
                       <th className="py-3.5 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 bg-white font-medium">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 bg-white dark:bg-[#111827] font-medium">
                     {studentsSession.map((st) => {
-                      let statusBadge = 'bg-slate-100 text-slate-700 border-slate-200';
+                      let statusBadge = 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700';
                       if (st.status === 'LOGGED_IN') {
-                        statusBadge = 'bg-blue-50 text-blue-700 border-blue-200';
+                        statusBadge = 'bg-blue-100 dark:bg-blue-950/80 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-700';
                       } else if (st.status === 'EXAMINEE') {
-                        statusBadge = 'bg-green-50 text-green-700 border-green-200';
+                        statusBadge = 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700';
                       } else if (st.status === 'PAUSED') {
-                        statusBadge = 'bg-amber-50 text-amber-800 border-amber-300 animate-pulse';
+                        statusBadge = 'bg-amber-100 dark:bg-amber-950/80 text-amber-900 dark:text-amber-300 border-amber-300 dark:border-amber-700 animate-pulse';
                       } else if (st.status === 'COMPLETED') {
-                        statusBadge = 'bg-purple-50 text-purple-700 border-purple-200';
+                        statusBadge = 'bg-purple-100 dark:bg-purple-950/80 text-purple-800 dark:text-purple-300 border-purple-300 dark:border-purple-700';
                       }
 
                       return (
-                        <tr key={st.session_id ? `${st.student_id}-${st.session_id}` : st.student_id} className="hover:bg-slate-50/70 transition-colors">
-                          <td className="py-3.5 px-4 font-mono font-bold text-slate-500 text-xs">
+                        <tr key={st.session_id ? `${st.student_id}-${st.session_id}` : st.student_id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="py-3.5 px-4 font-mono font-bold text-slate-500 dark:text-slate-400 text-xs">
                             {st.student_id}
                           </td>
-                          <td className="py-3.5 px-4 font-extrabold text-slate-800">
+                          <td className="py-3.5 px-4 font-extrabold text-slate-800 dark:text-slate-100">
                             {st.name}
                           </td>
                           <td className="py-3.5 px-4">
-                            <span className="text-[11px] font-bold bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full">
+                            <span className="text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-700">
                               {st.batch || selectedMonitorBatch || '-'}
                             </span>
                           </td>
@@ -1569,18 +1571,18 @@ export default function TeacherDashboard() {
                           </td>
                           <td className="py-3.5 px-4 text-center">
                             <span className={`font-extrabold text-xs px-2 py-0.5 rounded-md ${
-                              (st.tab_violation_count || 0) > 0 ? 'bg-red-50 text-red-600 font-black' : 'text-slate-400'
+                              (st.tab_violation_count || 0) > 0 ? 'bg-red-50 dark:bg-red-950/60 text-red-600 dark:text-red-400 font-black' : 'text-slate-400 dark:text-slate-500'
                             }`}>
                               {st.tab_violation_count || 0}
                             </span>
                           </td>
                           <td className="py-3.5 px-4">
                             {st.password_provided ? (
-                              <span className="font-mono font-black text-slate-700 text-xs bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/60">
+                              <span className="font-mono font-black text-slate-700 dark:text-slate-200 text-xs bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200/60 dark:border-slate-700">
                                 {st.password_provided}
                               </span>
                             ) : (
-                              <span className="text-slate-400 text-xs italic">Not generated</span>
+                              <span className="text-slate-400 dark:text-slate-500 text-xs italic">Not generated</span>
                             )}
                           </td>
                           <td className="py-3.5 px-4 text-right">
@@ -1598,7 +1600,7 @@ export default function TeacherDashboard() {
                                 <button
                                   onClick={() => setStudentToEnd(st)}
                                   title="End this student's examination"
-                                  className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-[11px] rounded-lg flex items-center gap-1 shadow-sm transition-colors"
+                                  className="px-2.5 py-1 bg-red-50 dark:bg-red-950/50 hover:bg-red-100 dark:hover:bg-red-900/60 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 font-bold text-[11px] rounded-lg flex items-center gap-1 shadow-sm transition-colors"
                                 >
                                   <Square size={12} /> End Exam
                                 </button>
@@ -1623,29 +1625,30 @@ export default function TeacherDashboard() {
               /* ================= CARD VIEW (DEFAULT) ================= */
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {studentsSession.map((st) => {
-                  let statusBg = 'bg-slate-50 border-slate-200 text-slate-600';
-                  let statusBadge = 'bg-slate-200 text-slate-700';
+                  let statusBg = 'bg-slate-50/50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800';
+                  let statusBadge = 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700';
+
                   if (st.status === 'LOGGED_IN') {
-                    statusBg = 'bg-blue-50/50 border-blue-200';
-                    statusBadge = 'bg-blue-500 text-white';
+                    statusBg = 'bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800/80';
+                    statusBadge = 'bg-blue-100 dark:bg-blue-950/80 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-700';
                   } else if (st.status === 'EXAMINEE') {
-                    statusBg = 'bg-green-50/50 border-green-200';
-                    statusBadge = 'bg-green-500 text-white';
+                    statusBg = 'bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-800/80';
+                    statusBadge = 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700';
                   } else if (st.status === 'PAUSED') {
-                    statusBg = 'bg-amber-50/50 border-amber-300';
-                    statusBadge = 'bg-amber-500 text-white animate-pulse';
+                    statusBg = 'bg-amber-50/50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700/80';
+                    statusBadge = 'bg-amber-100 dark:bg-amber-950/80 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700 animate-pulse';
                   } else if (st.status === 'COMPLETED') {
-                    statusBg = 'bg-purple-50/50 border-purple-200';
-                    statusBadge = 'bg-purple-500 text-white';
+                    statusBg = 'bg-purple-50/50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800/80';
+                    statusBadge = 'bg-purple-100 dark:bg-purple-950/80 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-700';
                   }
 
                   return (
                     <div key={st.session_id ? `${st.student_id}-${st.session_id}` : st.student_id} className={`p-4 rounded-2xl border transition-all ${statusBg}`}>
                       <div className="flex items-start justify-between mb-2">
                         <div>
-                          <span className="text-xs font-black text-slate-400">ID: {st.student_id}</span>
-                          <h4 className="font-extrabold text-slate-800 text-base leading-snug">{st.name}</h4>
-                          {st.batch && <span className="text-[10px] font-bold bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full">{st.batch}</span>}
+                          <span className="text-xs font-black text-slate-400 dark:text-slate-500">ID: {st.student_id}</span>
+                          <h4 className="font-extrabold text-slate-800 dark:text-white text-base leading-snug">{st.name}</h4>
+                          {st.batch && <span className="text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-full">{st.batch}</span>}
                         </div>
                         <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${statusBadge}`}>
                           {st.status || 'READY'}
@@ -1653,14 +1656,14 @@ export default function TeacherDashboard() {
                       </div>
 
                       {st.password_provided && (
-                        <div className="bg-white/80 p-2 rounded-xl border border-slate-200/60 my-2 text-xs">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase block">Password</span>
-                          <span className="font-mono font-black text-slate-700">{st.password_provided}</span>
+                        <div className="bg-white/80 dark:bg-[#1e293b] p-2 rounded-xl border border-slate-200/60 dark:border-slate-700 my-2 text-xs">
+                          <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase block">Password</span>
+                          <span className="font-mono font-black text-slate-700 dark:text-slate-200">{st.password_provided}</span>
                         </div>
                       )}
 
-                      <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-200/50 text-xs">
-                        <span className="font-bold text-slate-500">Violations: <b className="text-red-500">{st.tab_violation_count || 0}</b></span>
+                      <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-200/50 dark:border-slate-700/50 text-xs">
+                        <span className="font-bold text-slate-500 dark:text-slate-400">Violations: <b className="text-red-500">{st.tab_violation_count || 0}</b></span>
                         
                         <div className="flex items-center gap-1.5">
                           {st.session_id && st.status !== 'COMPLETED' && (st.status === 'PAUSED' || (st.tab_violation_count || 0) > 0) && (
@@ -1676,7 +1679,7 @@ export default function TeacherDashboard() {
                             <button
                               onClick={() => setStudentToEnd(st)}
                               title="End this student's examination"
-                              className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-[11px] rounded-lg flex items-center gap-1 shadow-sm transition-colors"
+                              className="px-2.5 py-1 bg-red-50 dark:bg-red-950/50 hover:bg-red-100 dark:hover:bg-red-900/60 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 font-bold text-[11px] rounded-lg flex items-center gap-1 shadow-sm transition-colors"
                             >
                               <Square size={12} /> End Exam
                             </button>
@@ -1706,68 +1709,68 @@ export default function TeacherDashboard() {
       {activeTab === 'REGISTRATION' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Add / Edit Student Form */}
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 h-fit">
-            <h3 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">
-              <UserPlus className="text-primary-600" size={20} />
+          <div className="bg-white dark:bg-[#111827] p-6 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 h-fit transition-colors">
+            <h3 className="text-lg font-black text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+              <UserPlus className="text-primary-600 dark:text-primary-400" size={20} />
               {isEditingStudent ? 'Edit Student Details' : 'Register New Student'}
             </h3>
 
             <form onSubmit={handleCreateStudent} className="space-y-4">
               <div>
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Student ID (3-Digit)</label>
+                <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Student ID (3-Digit)</label>
                 <input
                   type="text"
                   required
                   value={newStudent.student_id}
                   onChange={(e) => setNewStudent({ ...newStudent, student_id: e.target.value })}
                   placeholder="e.g. 001, 067"
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Student Full Name</label>
+                <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Student Full Name</label>
                 <input
                   type="text"
                   required
                   value={newStudent.name}
                   onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
                   placeholder="e.g. Rahul Sharma"
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Phone Number</label>
+                <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Phone Number</label>
                 <input
                   type="text"
                   required
                   value={newStudent.phone_no}
                   onChange={(e) => setNewStudent({ ...newStudent, phone_no: e.target.value })}
                   placeholder="e.g. 9876543210"
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Class / Standard</label>
+                <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Class / Standard</label>
                 <select
                   value={newStudent.student_class}
                   onChange={(e) => setNewStudent({ ...newStudent, student_class: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500 bg-white"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary-500"
                 >
-                  {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                  {CLASSES.map(c => <option key={c} value={c} className="dark:bg-[#111827]">{c}</option>)}
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Assigned Batch</label>
+                <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Assigned Batch</label>
                 <select
                   value={newStudent.batch}
                   onChange={(e) => setNewStudent({ ...newStudent, batch: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500 bg-white"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary-500"
                 >
-                  {batchesList.map(b => <option key={b.batch_id} value={b.name}>{b.name}</option>)}
+                  {batchesList.map(b => <option key={b.batch_id} value={b.name} className="dark:bg-[#111827]">{b.name}</option>)}
                 </select>
               </div>
 
@@ -1779,7 +1782,7 @@ export default function TeacherDashboard() {
                       setIsEditingStudent(false);
                       setNewStudent({ student_id: '', name: '', phone_no: '', student_class: 'Class 5', batch: batchesList[0]?.name || DEFAULT_BATCHES[0] });
                     }}
-                    className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm"
+                    className="flex-1 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-sm transition-colors"
                   >
                     Cancel
                   </button>
@@ -1795,20 +1798,20 @@ export default function TeacherDashboard() {
           </div>
 
           {/* Student List */}
-          <div className="lg:col-span-2 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+          <div className="lg:col-span-2 bg-white dark:bg-[#111827] p-6 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 transition-colors">
             <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
               <div>
-                <h3 className="text-lg font-black text-slate-800">All Registered Students</h3>
-                <p className="text-xs font-bold text-slate-400">Total: {students.length} students</p>
+                <h3 className="text-lg font-black text-slate-800 dark:text-white">All Registered Students</h3>
+                <p className="text-xs font-bold text-slate-400 dark:text-slate-500">Total: {students.length} students</p>
               </div>
               <div className="flex items-center gap-3">
-                {/* View Mode Toggle (Icon Only) */}
-                <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                {/* View Mode Toggle */}
+                <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
                   <button
                     onClick={() => setStudentsViewMode('list')}
                     title="List View"
                     className={`p-1.5 rounded-lg transition-all ${
-                      studentsViewMode === 'list' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                      studentsViewMode === 'list' ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
                     }`}
                   >
                     <List size={18} />
@@ -1817,7 +1820,7 @@ export default function TeacherDashboard() {
                     onClick={() => setStudentsViewMode('card')}
                     title="Card View"
                     className={`p-1.5 rounded-lg transition-all ${
-                      studentsViewMode === 'card' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                      studentsViewMode === 'card' ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
                     }`}
                   >
                     <LayoutGrid size={18} />
@@ -1825,13 +1828,13 @@ export default function TeacherDashboard() {
                 </div>
 
                 <div className="relative w-56 sm:w-64">
-                  <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                  <Search className="absolute left-3 top-2.5 text-slate-400 dark:text-slate-500" size={16} />
                   <input
                     type="text"
                     placeholder="Search name, ID or batch..."
                     value={searchStudentQuery}
                     onChange={(e) => setSearchStudentQuery(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary-500"
+                    className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
               </div>
@@ -1841,7 +1844,7 @@ export default function TeacherDashboard() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
-                    <tr className="border-b border-slate-100 text-[11px] font-black text-slate-400 uppercase tracking-wider">
+                    <tr className="border-b border-slate-100 dark:border-slate-800 text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                       <th className="pb-3 px-3">Roll ID</th>
                       <th className="pb-3 px-3">Name</th>
                       <th className="pb-3 px-3">Batch</th>
@@ -1850,7 +1853,7 @@ export default function TeacherDashboard() {
                       <th className="pb-3 px-3 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
                     {students
                       .filter(s => 
                         s.name.toLowerCase().includes(searchStudentQuery.toLowerCase()) ||
@@ -1858,16 +1861,16 @@ export default function TeacherDashboard() {
                         (s.batch && s.batch.toLowerCase().includes(searchStudentQuery.toLowerCase()))
                       )
                       .map(s => (
-                        <tr key={s.student_id} className="hover:bg-slate-50/80">
-                          <td className="py-3 px-3 font-mono font-black text-slate-800">{s.student_id}</td>
-                          <td className="py-3 px-3 font-bold text-slate-800">{s.name}</td>
+                        <tr key={s.student_id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="py-3 px-3 font-mono font-black text-slate-800 dark:text-slate-100">{s.student_id}</td>
+                          <td className="py-3 px-3 font-bold text-slate-800 dark:text-slate-100">{s.name}</td>
                           <td className="py-3 px-3">
-                            <span className="px-2.5 py-0.5 bg-slate-100 text-slate-700 text-xs font-bold rounded-md">
+                            <span className="px-2.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-md border border-slate-200 dark:border-slate-700">
                               {s.batch}
                             </span>
                           </td>
-                          <td className="py-3 px-3 text-slate-600 font-medium">{s.class}</td>
-                          <td className="py-3 px-3 text-slate-500 font-mono text-xs">{s.phone_no}</td>
+                          <td className="py-3 px-3 text-slate-600 dark:text-slate-400 font-medium">{s.class}</td>
+                          <td className="py-3 px-3 text-slate-500 dark:text-slate-400 font-mono text-xs">{s.phone_no}</td>
                           <td className="py-3 px-3 text-right">
                             <div className="flex items-center justify-end gap-1.5">
                               <button
@@ -1882,14 +1885,14 @@ export default function TeacherDashboard() {
                                   setIsEditingStudent(true);
                                 }}
                                 title="Edit Student"
-                                className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                                className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
                               >
                                 <Edit size={16} />
                               </button>
                               <button
                                 onClick={() => handleDeleteStudent(s.student_id)}
                                 title="Delete Student"
-                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors"
                               >
                                 <Trash2 size={16} />
                               </button>
@@ -1910,14 +1913,14 @@ export default function TeacherDashboard() {
                     (s.batch && s.batch.toLowerCase().includes(searchStudentQuery.toLowerCase()))
                   )
                   .map(s => (
-                    <div key={s.student_id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/60 hover:bg-slate-50 transition-all flex flex-col justify-between">
+                    <div key={s.student_id} className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-[#151f32] hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all flex flex-col justify-between">
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <div>
-                          <span className="font-mono text-[11px] font-black bg-primary-50 text-primary-700 px-2 py-0.5 rounded-md border border-primary-100 inline-block mb-1">
+                          <span className="font-mono text-[11px] font-black bg-primary-50 dark:bg-primary-950/60 text-primary-700 dark:text-primary-400 px-2 py-0.5 rounded-md border border-primary-100 dark:border-primary-900/60 inline-block mb-1">
                             ID: {s.student_id}
                           </span>
-                          <h4 className="font-extrabold text-slate-800 text-sm leading-tight">{s.name}</h4>
-                          <p className="text-xs font-semibold text-slate-400 font-mono mt-0.5">{s.phone_no}</p>
+                          <h4 className="font-extrabold text-slate-800 dark:text-white text-sm leading-tight">{s.name}</h4>
+                          <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 font-mono mt-0.5">{s.phone_no}</p>
                         </div>
                         <div className="flex items-center gap-1">
                           <button
@@ -1932,22 +1935,22 @@ export default function TeacherDashboard() {
                               setIsEditingStudent(true);
                             }}
                             title="Edit Student"
-                            className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-white rounded-lg transition-colors"
+                            className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-colors"
                           >
                             <Edit size={16} />
                           </button>
                           <button
                             onClick={() => handleDeleteStudent(s.student_id)}
                             title="Delete Student"
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-white rounded-lg transition-colors"
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-colors"
                           >
                             <Trash2 size={16} />
                           </button>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-xs font-bold mt-1">
-                        <span className="text-slate-500">{s.class}</span>
-                        <span className="bg-slate-200/70 text-slate-700 px-2.5 py-0.5 rounded-full text-[10px] font-black">
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-800 text-xs font-bold mt-1">
+                        <span className="text-slate-500 dark:text-slate-400">{s.class}</span>
+                        <span className="bg-slate-200/70 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-0.5 rounded-full text-[10px] font-black border border-slate-200 dark:border-slate-700">
                           {s.batch}
                         </span>
                       </div>
@@ -1964,19 +1967,19 @@ export default function TeacherDashboard() {
       {/* ========================================================================= */}
       {activeTab === 'BATCHES' && (
         <div className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+          <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-[#111827] p-6 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 transition-colors">
             <div>
-              <h3 className="text-xl font-black text-slate-800">Batch Management</h3>
-              <p className="text-xs font-semibold text-slate-400 mt-0.5">Create, edit, rename batches and organize students</p>
+              <h3 className="text-xl font-black text-slate-800 dark:text-white">Batch Management</h3>
+              <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mt-0.5">Create, edit, rename batches and organize students</p>
             </div>
             <div className="flex items-center gap-3">
-              {/* View Mode Toggle (Icon Only) */}
-              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+              {/* View Mode Toggle */}
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
                 <button
                   onClick={() => setBatchesViewMode('list')}
                   title="List View"
                   className={`p-1.5 rounded-lg transition-all ${
-                    batchesViewMode === 'list' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                    batchesViewMode === 'list' ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
                   }`}
                 >
                   <List size={18} />
@@ -1985,7 +1988,7 @@ export default function TeacherDashboard() {
                   onClick={() => setBatchesViewMode('card')}
                   title="Card View"
                   className={`p-1.5 rounded-lg transition-all ${
-                    batchesViewMode === 'card' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                    batchesViewMode === 'card' ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
                   }`}
                 >
                   <LayoutGrid size={18} />
@@ -1993,13 +1996,13 @@ export default function TeacherDashboard() {
               </div>
 
               <div className="relative w-56 sm:w-64">
-                <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                <Search className="absolute left-3 top-2.5 text-slate-400 dark:text-slate-500" size={16} />
                 <input
                   type="text"
                   placeholder="Search batch..."
                   value={batchSearchQuery}
                   onChange={(e) => setBatchSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary-500"
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary-500"
                 />
               </div>
               <button
@@ -2017,47 +2020,47 @@ export default function TeacherDashboard() {
               {batchesList
                 .filter(b => b.name.toLowerCase().includes(batchSearchQuery.toLowerCase()))
                 .map(batch => (
-                  <div key={batch.batch_id} className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between hover:shadow-md transition-all">
+                  <div key={batch.batch_id} className="bg-white dark:bg-[#111827] p-6 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between hover:shadow-md transition-all">
                     <div>
                       <div className="flex items-start justify-between mb-3">
                         <div>
-                          <h4 className="text-lg font-black text-slate-800">{batch.name}</h4>
-                          <span className="text-xs font-bold text-slate-400">{batch.course_class || 'Class Standard'} • Session {batch.session || '2026'}</span>
+                          <h4 className="text-lg font-black text-slate-800 dark:text-white">{batch.name}</h4>
+                          <span className="text-xs font-bold text-slate-400 dark:text-slate-500">{batch.course_class || 'Class Standard'} • Session {batch.session || '2026'}</span>
                         </div>
                         <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full ${
-                          batch.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
+                          batch.status === 'ACTIVE' ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
                         }`}>
                           {batch.status}
                         </span>
                       </div>
 
                       {batch.description && (
-                        <p className="text-xs text-slate-500 font-medium line-clamp-2 mb-4">{batch.description}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium line-clamp-2 mb-4">{batch.description}</p>
                       )}
 
-                      <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-2xl mb-4 border border-slate-100">
-                        <Users size={18} className="text-primary-600" />
-                        <span className="text-sm font-extrabold text-slate-700">{batch.student_count || 0} Students Assigned</span>
+                      <div className="flex items-center gap-2 bg-slate-50 dark:bg-[#1e293b]/70 p-3 rounded-2xl mb-4 border border-slate-100 dark:border-slate-700">
+                        <Users size={18} className="text-primary-600 dark:text-primary-400" />
+                        <span className="text-sm font-extrabold text-slate-700 dark:text-slate-200">{batch.student_count || 0} Students Assigned</span>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                    <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
                       <button
                         onClick={() => openViewBatchStudents(batch)}
-                        className="text-xs font-bold text-primary-600 hover:text-primary-700 flex items-center gap-1"
+                        className="text-xs font-bold text-primary-600 dark:text-primary-400 hover:text-primary-700 flex items-center gap-1"
                       >
                         <Eye size={14} /> View Students
                       </button>
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => setEditingBatch(batch)}
-                          className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg"
+                          className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
                         >
                           <Edit size={16} />
                         </button>
                         <button
                           onClick={() => handleDeleteBatch(batch.batch_id)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors"
                         >
                           <Trash2 size={16} />
                         </button>
@@ -2068,10 +2071,10 @@ export default function TeacherDashboard() {
             </div>
           ) : (
             /* Batches Table View */
-            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 overflow-x-auto">
+            <div className="bg-white dark:bg-[#111827] p-6 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 overflow-x-auto transition-colors">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-slate-100 text-[11px] font-black text-slate-400 uppercase tracking-wider">
+                  <tr className="border-b border-slate-100 dark:border-slate-800 text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                     <th className="pb-3 px-3">Batch Name</th>
                     <th className="pb-3 px-3">Class / Course</th>
                     <th className="pb-3 px-3">Session</th>
@@ -2080,25 +2083,25 @@ export default function TeacherDashboard() {
                     <th className="pb-3 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
                   {batchesList
                     .filter(b => b.name.toLowerCase().includes(batchSearchQuery.toLowerCase()))
                     .map(batch => (
-                      <tr key={batch.batch_id} className="hover:bg-slate-50/80">
-                        <td className="py-3.5 px-3 font-bold text-slate-800">
+                      <tr key={batch.batch_id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="py-3.5 px-3 font-bold text-slate-800 dark:text-slate-100">
                           {batch.name}
-                          {batch.description && <p className="text-xs text-slate-400 font-normal line-clamp-1">{batch.description}</p>}
+                          {batch.description && <p className="text-xs text-slate-400 dark:text-slate-500 font-normal line-clamp-1">{batch.description}</p>}
                         </td>
-                        <td className="py-3.5 px-3 text-slate-600 font-medium">{batch.course_class || 'Class 5'}</td>
-                        <td className="py-3.5 px-3 text-slate-600 font-medium">{batch.session || '2026'}</td>
+                        <td className="py-3.5 px-3 text-slate-600 dark:text-slate-400 font-medium">{batch.course_class || 'Class 5'}</td>
+                        <td className="py-3.5 px-3 text-slate-600 dark:text-slate-400 font-medium">{batch.session || '2026'}</td>
                         <td className="py-3.5 px-3">
-                          <span className="px-2.5 py-0.5 bg-primary-50 text-primary-700 text-xs font-black rounded-md">
+                          <span className="px-2.5 py-0.5 bg-primary-50 dark:bg-primary-950/60 text-primary-700 dark:text-primary-400 text-xs font-black rounded-md border border-primary-100 dark:border-primary-900/60">
                             {batch.student_count || 0} students
                           </span>
                         </td>
                         <td className="py-3.5 px-3">
                           <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full ${
-                            batch.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
+                            batch.status === 'ACTIVE' ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
                           }`}>
                             {batch.status}
                           </span>
@@ -2108,21 +2111,21 @@ export default function TeacherDashboard() {
                             <button
                               onClick={() => openViewBatchStudents(batch)}
                               title="View Students"
-                              className="px-2.5 py-1 bg-primary-50 hover:bg-primary-100 text-primary-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
+                              className="px-2.5 py-1 bg-primary-50 dark:bg-primary-950/60 hover:bg-primary-100 dark:hover:bg-primary-900/60 text-primary-700 dark:text-primary-400 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 border border-primary-100 dark:border-primary-900/60"
                             >
                               <Eye size={13} /> View
                             </button>
                             <button
                               onClick={() => setEditingBatch(batch)}
                               title="Edit Batch"
-                              className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                              className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
                             >
                               <Edit size={16} />
                             </button>
                             <button
                               onClick={() => handleDeleteBatch(batch.batch_id)}
                               title="Delete Batch"
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors"
                             >
                               <Trash2 size={16} />
                             </button>
@@ -2137,56 +2140,56 @@ export default function TeacherDashboard() {
 
           {/* Create Batch Modal */}
           {creatingBatch && (
-            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-100">
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white dark:bg-[#111827] rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-800 animate-fadeIn">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-black text-slate-800">Create New Batch</h3>
-                  <button onClick={() => setCreatingBatch(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+                  <h3 className="text-xl font-black text-slate-800 dark:text-white">Create New Batch</h3>
+                  <button onClick={() => setCreatingBatch(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={20}/></button>
                 </div>
                 <form onSubmit={handleCreateBatch} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Batch Name</label>
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Batch Name</label>
                     <input
                       type="text"
                       required
                       value={newBatchForm.name}
                       onChange={(e) => setNewBatchForm({ ...newBatchForm, name: e.target.value })}
                       placeholder="e.g. IX,X Batch 3"
-                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500"
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Class / Course</label>
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Class / Course</label>
                     <input
                       type="text"
                       value={newBatchForm.course_class}
                       onChange={(e) => setNewBatchForm({ ...newBatchForm, course_class: e.target.value })}
                       placeholder="e.g. Class 9, 10"
-                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500"
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Academic Session</label>
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Academic Session</label>
                     <input
                       type="text"
                       value={newBatchForm.session}
                       onChange={(e) => setNewBatchForm({ ...newBatchForm, session: e.target.value })}
                       placeholder="e.g. 2026-2027"
-                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500"
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Description</label>
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Description</label>
                     <textarea
                       value={newBatchForm.description}
                       onChange={(e) => setNewBatchForm({ ...newBatchForm, description: e.target.value })}
                       rows={2}
                       placeholder="Optional notes or schedule..."
-                      className="w-full px-4 py-2 border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-primary-500"
+                      className="w-full px-4 py-2 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-medium text-sm focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                   <div className="flex gap-3 pt-4">
-                    <button type="button" onClick={() => setCreatingBatch(false)} className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl">Cancel</button>
+                    <button type="button" onClick={() => setCreatingBatch(false)} className="flex-1 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-sm transition-colors">Cancel</button>
                     <button type="submit" className="flex-1 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-md">Create Batch</button>
                   </div>
                 </form>
@@ -2196,45 +2199,45 @@ export default function TeacherDashboard() {
 
           {/* Edit Batch Modal */}
           {editingBatch && (
-            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-100">
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white dark:bg-[#111827] rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-800 animate-fadeIn">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-black text-slate-800">Edit / Rename Batch</h3>
-                  <button onClick={() => setEditingBatch(null)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+                  <h3 className="text-xl font-black text-slate-800 dark:text-white">Edit / Rename Batch</h3>
+                  <button onClick={() => setEditingBatch(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={20}/></button>
                 </div>
                 <form onSubmit={handleUpdateBatch} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Batch Name (Rename)</label>
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Batch Name (Rename)</label>
                     <input
                       type="text"
                       required
                       value={editingBatch.name}
                       onChange={(e) => setEditingBatch({ ...editingBatch, name: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500"
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Class / Course</label>
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Class / Course</label>
                     <input
                       type="text"
                       value={editingBatch.course_class || ''}
                       onChange={(e) => setEditingBatch({ ...editingBatch, course_class: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500"
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Status</label>
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Status</label>
                     <select
                       value={editingBatch.status}
                       onChange={(e) => setEditingBatch({ ...editingBatch, status: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500 bg-white"
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary-500"
                     >
-                      <option value="ACTIVE">ACTIVE</option>
-                      <option value="INACTIVE">INACTIVE</option>
+                      <option value="ACTIVE" className="dark:bg-[#111827]">ACTIVE</option>
+                      <option value="INACTIVE" className="dark:bg-[#111827]">INACTIVE</option>
                     </select>
                   </div>
                   <div className="flex gap-3 pt-4">
-                    <button type="button" onClick={() => setEditingBatch(null)} className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl">Cancel</button>
+                    <button type="button" onClick={() => setEditingBatch(null)} className="flex-1 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-sm transition-colors">Cancel</button>
                     <button type="submit" className="flex-1 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-md">Save Changes</button>
                   </div>
                 </form>
@@ -2244,26 +2247,26 @@ export default function TeacherDashboard() {
 
           {/* View Batch Students & Transfer Modal */}
           {viewingBatchStudents && (
-            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-3xl p-8 max-w-3xl w-full shadow-2xl border border-slate-100 max-h-[85vh] flex flex-col">
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white dark:bg-[#111827] rounded-3xl p-8 max-w-3xl w-full shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[85vh] flex flex-col animate-fadeIn">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-xl font-black text-slate-800">Students in {viewingBatchStudents.name}</h3>
-                    <p className="text-xs font-bold text-slate-400">{batchStudents.length} total enrolled student(s)</p>
+                    <h3 className="text-xl font-black text-slate-800 dark:text-white">Students in {viewingBatchStudents.name}</h3>
+                    <p className="text-xs font-bold text-slate-400 dark:text-slate-500">{batchStudents.length} total enrolled student(s)</p>
                   </div>
-                  <button onClick={() => setViewingBatchStudents(null)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+                  <button onClick={() => setViewingBatchStudents(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={20}/></button>
                 </div>
 
                 {/* Transfer Bar */}
-                <div className="bg-slate-50 p-4 rounded-2xl mb-4 border border-slate-200 flex flex-wrap items-center justify-between gap-3">
-                  <div className="text-xs font-bold text-slate-600">
-                    Selected: <b className="text-primary-600 font-black">{selectedStudentsToMove.length}</b> student(s)
+                <div className="bg-slate-50 dark:bg-[#1e293b]/70 p-4 rounded-2xl mb-4 border border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                    Selected: <b className="text-primary-600 dark:text-primary-400 font-black">{selectedStudentsToMove.length}</b> student(s)
                   </div>
                   <div className="flex items-center gap-2">
                     <select
                       value={targetMoveBatch}
                       onChange={(e) => setTargetMoveBatch(e.target.value)}
-                      className="px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-bold bg-white"
+                      className="px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold bg-white dark:bg-[#111827] text-slate-800 dark:text-white"
                     >
                       <option value="">Select Destination Batch...</option>
                       {batchesList
@@ -2281,10 +2284,10 @@ export default function TeacherDashboard() {
                 </div>
 
                 {/* Student Table */}
-                <div className="overflow-y-auto flex-1 border border-slate-100 rounded-2xl">
+                <div className="overflow-y-auto flex-1 border border-slate-100 dark:border-slate-800 rounded-2xl">
                   <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50 sticky top-0">
-                      <tr className="border-b border-slate-200 text-[11px] font-black text-slate-400 uppercase tracking-wider">
+                    <thead className="bg-slate-50 dark:bg-[#151f32] sticky top-0">
+                      <tr className="border-b border-slate-200 dark:border-slate-800 text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                         <th className="p-3 w-10">
                           <input
                             type="checkbox"
@@ -2293,7 +2296,7 @@ export default function TeacherDashboard() {
                               if (e.target.checked) setSelectedStudentsToMove(batchStudents.map(s => s.student_id));
                               else setSelectedStudentsToMove([]);
                             }}
-                            className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                            className="rounded border-slate-300 dark:border-slate-700 text-primary-600 focus:ring-primary-500"
                           />
                         </th>
                         <th className="p-3">Roll ID</th>
@@ -2302,16 +2305,16 @@ export default function TeacherDashboard() {
                         <th className="p-3">Phone</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
                       {batchStudents.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="p-8 text-center text-slate-400 font-bold">No students in this batch yet.</td>
+                          <td colSpan={5} className="p-8 text-center text-slate-400 dark:text-slate-500 font-bold">No students in this batch yet.</td>
                         </tr>
                       ) : (
                         batchStudents.map(s => {
                           const isSelected = selectedStudentsToMove.includes(s.student_id);
                           return (
-                            <tr key={s.student_id} className={`hover:bg-slate-50 ${isSelected ? 'bg-primary-50/50' : ''}`}>
+                            <tr key={s.student_id} className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 ${isSelected ? 'bg-primary-50/50 dark:bg-primary-950/40' : ''}`}>
                               <td className="p-3">
                                 <input
                                   type="checkbox"
@@ -2320,13 +2323,13 @@ export default function TeacherDashboard() {
                                     if (e.target.checked) setSelectedStudentsToMove(prev => [...prev, s.student_id]);
                                     else setSelectedStudentsToMove(prev => prev.filter(id => id !== s.student_id));
                                   }}
-                                  className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                                  className="rounded border-slate-300 dark:border-slate-700 text-primary-600 focus:ring-primary-500"
                                 />
                               </td>
-                              <td className="p-3 font-mono font-black text-slate-800">{s.student_id}</td>
-                              <td className="p-3 font-bold text-slate-800">{s.name}</td>
-                              <td className="p-3 text-slate-600">{s.class}</td>
-                              <td className="p-3 text-slate-500 font-mono text-xs">{s.phone_no}</td>
+                              <td className="p-3 font-mono font-black text-slate-800 dark:text-slate-100">{s.student_id}</td>
+                              <td className="p-3 font-bold text-slate-800 dark:text-slate-100">{s.name}</td>
+                              <td className="p-3 text-slate-600 dark:text-slate-400">{s.class}</td>
+                              <td className="p-3 text-slate-500 dark:text-slate-400 font-mono text-xs">{s.phone_no}</td>
                             </tr>
                           );
                         })
@@ -2346,20 +2349,20 @@ export default function TeacherDashboard() {
       {activeTab === 'EXAMS' && (
         <div className="space-y-6">
           {!selectedExamIdBuilder ? (
-            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+            <div className="bg-white dark:bg-[#111827] p-6 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 transition-colors">
               <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                 <div>
-                  <h3 className="text-xl font-black text-slate-800">Examination Sets</h3>
-                  <p className="text-xs font-semibold text-slate-400 mt-0.5">Manage question sets and multi-batch assignments</p>
+                  <h3 className="text-xl font-black text-slate-800 dark:text-white">Examination Sets</h3>
+                  <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mt-0.5">Manage question sets and multi-batch assignments</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  {/* View Mode Toggle (Icon Only) */}
-                  <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                  {/* View Mode Toggle */}
+                  <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
                     <button
                       onClick={() => setExamsViewMode('list')}
                       title="List View"
                       className={`p-1.5 rounded-lg transition-all ${
-                        examsViewMode === 'list' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                        examsViewMode === 'list' ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
                       }`}
                     >
                       <List size={18} />
@@ -2368,7 +2371,7 @@ export default function TeacherDashboard() {
                       onClick={() => setExamsViewMode('card')}
                       title="Card View"
                       className={`p-1.5 rounded-lg transition-all ${
-                        examsViewMode === 'card' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                        examsViewMode === 'card' ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
                       }`}
                     >
                       <LayoutGrid size={18} />
@@ -2385,7 +2388,7 @@ export default function TeacherDashboard() {
               </div>
 
               {deleteSuccessToast && (
-                <div className="mb-4 p-3.5 bg-green-50 border border-green-200 text-green-800 rounded-2xl text-xs font-bold flex items-center justify-between shadow-sm animate-fade-in">
+                <div className="mb-4 p-3.5 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-300 rounded-2xl text-xs font-bold flex items-center justify-between shadow-sm animate-fade-in">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-green-500"></span>
                     <span>{deleteSuccessToast}</span>
@@ -2399,7 +2402,7 @@ export default function TeacherDashboard() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead>
-                      <tr className="border-b border-slate-100 text-[11px] font-black text-slate-400 uppercase tracking-wider">
+                      <tr className="border-b border-slate-100 dark:border-slate-800 text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                         <th className="pb-3 px-3">Title</th>
                         <th className="pb-3 px-3">Assigned Batches</th>
                         <th className="pb-3 px-3">Duration</th>
@@ -2408,30 +2411,36 @@ export default function TeacherDashboard() {
                         <th className="pb-3 px-3 text-right">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
                       {examsList.map(e => (
-                        <tr key={e.exam_id} className="hover:bg-slate-50/80">
-                          <td className="py-3.5 px-3 font-bold text-slate-800">{e.title}</td>
+                        <tr key={e.exam_id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="py-3.5 px-3 font-bold text-slate-800 dark:text-slate-100">{e.title}</td>
                           <td className="py-3.5 px-3">
                             <div className="flex flex-wrap gap-1">
                               {e.assigned_batches && e.assigned_batches.length > 0 ? (
                                 e.assigned_batches.map(b => (
-                                  <span key={b.batch_name} className="px-2 py-0.5 bg-slate-100 text-slate-700 text-xs font-bold rounded flex items-center gap-1">
+                                  <span key={b.batch_name} className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold rounded flex items-center gap-1 border border-slate-200 dark:border-slate-700">
                                     {b.batch_name}
-                                    {b.shuffle_enabled && <Shuffle size={10} className="text-primary-600" />}
+                                    {b.shuffle_enabled && <Shuffle size={10} className="text-primary-600 dark:text-primary-400" />}
                                   </span>
                                 ))
                               ) : (
-                                <span className="px-2 py-0.5 bg-slate-100 text-slate-700 text-xs font-bold rounded">
+                                <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold rounded border border-slate-200 dark:border-slate-700">
                                   {e.target_batch}
                                 </span>
                               )}
                             </div>
                           </td>
-                          <td className="py-3.5 px-3 text-slate-600 font-medium">{e.duration_minutes} Mins</td>
-                          <td className="py-3.5 px-3 font-bold text-slate-700">{e.full_marks}</td>
+                          <td className="py-3.5 px-3 text-slate-600 dark:text-slate-400 font-medium">{e.duration_minutes} Mins</td>
+                          <td className="py-3.5 px-3 font-bold text-slate-700 dark:text-slate-200">{e.full_marks}</td>
                           <td className="py-3.5 px-3">
-                            <span className="px-2.5 py-0.5 bg-primary-50 text-primary-700 text-xs font-black rounded-full">
+                            <span className={`px-2.5 py-0.5 text-xs font-black rounded-full uppercase border ${
+                              e.status === 'CREATED'
+                                ? 'bg-blue-100 dark:bg-blue-950/80 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-700'
+                                : e.status === 'STARTED'
+                                  ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                                  : 'bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700'
+                            }`}>
                               {e.status}
                             </span>
                           </td>
@@ -2441,20 +2450,20 @@ export default function TeacherDashboard() {
                                 onClick={() => handleDownloadTeacherQuestionPaper(e.exam_id, e.title)}
                                 title="Download Full Question Set with Answers (PDF)"
                                 disabled={isDownloadingQuestionPaper}
-                                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors"
+                                className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors border border-slate-200 dark:border-slate-700"
                               >
                                 <Download size={14} /> Download Set
                               </button>
                               <button
                                 onClick={() => setSelectedExamIdBuilder(e.exam_id)}
-                                className="px-3 py-1.5 bg-primary-50 hover:bg-primary-100 text-primary-700 text-xs font-bold rounded-lg transition-colors"
+                                className="px-3.5 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all hover:scale-105"
                               >
                                 Edit Questions
                               </button>
                               <button
                                 onClick={() => handleOpenEditExam(e)}
                                 title="Edit Examination Configuration"
-                                className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-slate-100 rounded-lg"
+                                className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                               >
                                 <Edit size={16} />
                               </button>
@@ -2464,7 +2473,7 @@ export default function TeacherDashboard() {
                                   setConfirmDeleteExam(e);
                                 }}
                                 title="Delete Examination"
-                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors"
                               >
                                 <Trash2 size={16} />
                               </button>
@@ -2479,36 +2488,42 @@ export default function TeacherDashboard() {
                 /* Exams Card Grid View */
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {examsList.map(e => (
-                    <div key={e.exam_id} className="p-6 rounded-3xl border border-slate-100 bg-slate-50/60 hover:bg-slate-50 hover:shadow-md transition-all flex flex-col justify-between">
+                    <div key={e.exam_id} className="p-6 rounded-3xl border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-[#151f32] hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:shadow-md transition-all flex flex-col justify-between">
                       <div>
                         <div className="flex items-start justify-between gap-2 mb-3">
-                          <h4 className="font-black text-slate-800 text-base leading-snug">{e.title}</h4>
-                          <span className="px-2.5 py-0.5 bg-primary-50 text-primary-700 text-[10px] font-black rounded-full uppercase">
+                          <h4 className="font-black text-slate-800 dark:text-white text-base leading-snug">{e.title}</h4>
+                          <span className={`px-2.5 py-0.5 text-[10px] font-black rounded-full uppercase border ${
+                            e.status === 'CREATED'
+                              ? 'bg-blue-100 dark:bg-blue-950/80 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-700'
+                              : e.status === 'STARTED'
+                                ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                                : 'bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700'
+                          }`}>
                             {e.status}
                           </span>
                         </div>
 
-                        <div className="space-y-2 mb-4 text-xs font-bold text-slate-500">
+                        <div className="space-y-2 mb-4 text-xs font-bold text-slate-500 dark:text-slate-400">
                           <div className="flex items-center justify-between">
                             <span>Duration:</span>
-                            <span className="text-slate-800">{e.duration_minutes} Minutes</span>
+                            <span className="text-slate-800 dark:text-slate-200">{e.duration_minutes} Minutes</span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span>Full Marks:</span>
-                            <span className="text-slate-800">{e.full_marks}</span>
+                            <span className="text-slate-800 dark:text-slate-200">{e.full_marks}</span>
                           </div>
-                          <div className="pt-2 border-t border-slate-200/60">
-                            <span className="text-[10px] uppercase text-slate-400 tracking-wider block mb-1">Batches:</span>
+                          <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                            <span className="text-[10px] uppercase text-slate-400 dark:text-slate-500 tracking-wider block mb-1">Batches:</span>
                             <div className="flex flex-wrap gap-1">
                               {e.assigned_batches && e.assigned_batches.length > 0 ? (
                                 e.assigned_batches.map(b => (
-                                  <span key={b.batch_name} className="px-2 py-0.5 bg-white text-slate-700 text-[11px] font-bold rounded-md border border-slate-200 flex items-center gap-1">
+                                  <span key={b.batch_name} className="px-2 py-0.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-bold rounded-md border border-slate-200 dark:border-slate-700 flex items-center gap-1">
                                     {b.batch_name}
-                                    {b.shuffle_enabled && <Shuffle size={10} className="text-primary-600" />}
+                                    {b.shuffle_enabled && <Shuffle size={10} className="text-primary-600 dark:text-primary-400" />}
                                   </span>
                                 ))
                               ) : (
-                                <span className="px-2 py-0.5 bg-white text-slate-700 text-[11px] font-bold rounded-md border border-slate-200">
+                                <span className="px-2 py-0.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-bold rounded-md border border-slate-200 dark:border-slate-700">
                                   {e.target_batch}
                                 </span>
                               )}
@@ -2517,12 +2532,12 @@ export default function TeacherDashboard() {
                         </div>
                       </div>
 
-                      <div className="pt-4 border-t border-slate-200/60 flex items-center justify-between gap-2">
+                      <div className="pt-4 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between gap-2">
                         <button
                           onClick={() => handleDownloadTeacherQuestionPaper(e.exam_id, e.title)}
                           title="Download Full Question Set (PDF)"
                           disabled={isDownloadingQuestionPaper}
-                          className="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-lg flex items-center gap-1 border border-slate-200 transition-colors"
+                          className="px-2.5 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-lg flex items-center gap-1 border border-slate-200 dark:border-slate-700 transition-colors"
                         >
                           <Download size={13} /> PDF
                         </button>
@@ -2536,7 +2551,7 @@ export default function TeacherDashboard() {
                           <button
                             onClick={() => handleOpenEditExam(e)}
                             title="Edit Exam Config"
-                            className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-white rounded-lg transition-colors"
+                            className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-colors"
                           >
                             <Edit size={16} />
                           </button>
@@ -2546,7 +2561,7 @@ export default function TeacherDashboard() {
                               setConfirmDeleteExam(e);
                             }}
                             title="Delete Examination"
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-white rounded-lg transition-colors"
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-colors"
                           >
                             <Trash2 size={16} />
                           </button>
@@ -2560,16 +2575,16 @@ export default function TeacherDashboard() {
           ) : (
             /* Question & Section Builder Screen */
             <div className="space-y-6">
-              <div className="flex items-center justify-between bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+              <div className="flex items-center justify-between bg-white dark:bg-[#111827] p-4 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 transition-colors">
                 <button
                   onClick={() => setSelectedExamIdBuilder(null)}
-                  className="flex items-center gap-2 text-slate-600 hover:text-slate-900 font-bold text-sm"
+                  className="flex items-center gap-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white font-bold text-sm"
                 >
                   <ArrowLeft size={18} /> Back to Exam Sets
                 </button>
                 
                 {builderStatus && (
-                  <span className="text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-200">
+                  <span className="text-xs font-bold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/60 px-3 py-1 rounded-full border border-green-200 dark:border-green-800">
                     {builderStatus}
                   </span>
                 )}
@@ -2586,9 +2601,9 @@ export default function TeacherDashboard() {
               </div>
 
               {/* Sections Bar */}
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+              <div className="bg-white dark:bg-[#111827] p-6 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 transition-colors">
                 <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-                  <h4 className="text-sm font-black text-slate-400 uppercase tracking-wider">Examination Sections</h4>
+                  <h4 className="text-sm font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Examination Sections</h4>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 mb-6">
@@ -2606,17 +2621,17 @@ export default function TeacherDashboard() {
                         className={`px-4 py-2.5 rounded-2xl font-bold text-sm transition-all flex items-center gap-2 cursor-pointer select-none ${
                           isActive
                             ? 'bg-primary-600 text-white shadow-md'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                         }`}
                       >
                         <span>{sec.title}</span>
-                        <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${isActive ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                        <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${isActive ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'}`}>
                           {sec.questions ? sec.questions.length : 0}/{totalQ} Qs
                         </span>
-                        <span className={`text-[10px] uppercase font-black px-1.5 py-0.5 rounded ${isActive ? 'bg-primary-700 text-primary-100' : 'bg-slate-200 text-slate-600'}`}>
+                        <span className={`text-[10px] uppercase font-black px-1.5 py-0.5 rounded ${isActive ? 'bg-primary-700 text-primary-100' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
                           {sec.section_type}
                         </span>
-                        <span className={`text-[11px] font-bold ${isActive ? 'text-primary-100' : 'text-slate-500'}`}>
+                        <span className={`text-[11px] font-bold ${isActive ? 'text-primary-100' : 'text-slate-500 dark:text-slate-400'}`}>
                           ({sec.section_marks} M • {perQ} M/Q)
                         </span>
 
@@ -2626,7 +2641,7 @@ export default function TeacherDashboard() {
                           onClick={(e) => handleOpenEditSection(sec, e)}
                           title="Change Section Details & Marks Distribution"
                           className={`p-1 rounded-lg transition-colors ml-1 ${
-                            isActive ? 'hover:bg-white/20 text-white' : 'hover:bg-slate-300 text-slate-500'
+                            isActive ? 'hover:bg-white/20 text-white' : 'hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-300'
                           }`}
                         >
                           <Edit size={14} />
@@ -2641,7 +2656,7 @@ export default function TeacherDashboard() {
                           }}
                           title="Delete Section"
                           className={`p-1 rounded-lg transition-colors ${
-                            isActive ? 'hover:bg-red-500 hover:text-white text-white/80' : 'hover:bg-red-100 hover:text-red-600 text-slate-400'
+                            isActive ? 'hover:bg-red-500 hover:text-white text-white/80' : 'hover:bg-red-100 dark:hover:bg-red-950/60 hover:text-red-600 text-slate-400'
                           }`}
                         >
                           <Trash2 size={14} />
@@ -2653,22 +2668,22 @@ export default function TeacherDashboard() {
 
                 {/* Edit Section Details Modal */}
                 {editingSection && (
-                  <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-slate-100">
-                      <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+                  <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-[#111827] rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-slate-200 dark:border-slate-800 animate-fadeIn">
+                      <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 mb-4">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-10 h-10 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center">
+                          <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-950/60 text-primary-600 dark:text-primary-400 flex items-center justify-center">
                             <Edit size={20} />
                           </div>
                           <div>
-                            <h3 className="text-lg font-black text-slate-800">Change Section Details</h3>
-                            <p className="text-xs font-semibold text-slate-400">Set total questions & automatically distribute marks evenly</p>
+                            <h3 className="text-lg font-black text-slate-800 dark:text-white">Change Section Details</h3>
+                            <p className="text-xs font-semibold text-slate-400 dark:text-slate-500">Set total questions & automatically distribute marks evenly</p>
                           </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => setEditingSection(null)}
-                          className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                          className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg"
                         >
                           <X size={20} />
                         </button>
@@ -2676,7 +2691,7 @@ export default function TeacherDashboard() {
 
                       <form onSubmit={handleUpdateSection} className="space-y-4">
                         <div>
-                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5">
+                          <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
                             Section Title <span className="text-red-500">*</span>
                           </label>
                           <input
@@ -2685,29 +2700,29 @@ export default function TeacherDashboard() {
                             value={editSectionForm.title}
                             onChange={(e) => setEditSectionForm({ ...editSectionForm, title: e.target.value })}
                             placeholder="e.g. Section 1: Multiple Choice Questions"
-                            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary-500"
+                            className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary-500"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5">
+                          <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
                             Question Type
                           </label>
                           <select
                             value={editSectionForm.section_type}
                             onChange={(e) => setEditSectionForm({ ...editSectionForm, section_type: e.target.value })}
-                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-bold bg-white focus:ring-2 focus:ring-primary-500"
+                            className="w-full px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold bg-white dark:bg-[#1e293b]/70 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500"
                           >
-                            <option value="MCQ">Multiple Choice (MCQ)</option>
-                            <option value="FITB">Fill in the Blanks (FITB)</option>
-                            <option value="TF">True / False</option>
-                            <option value="MATCH">Match the Following</option>
+                            <option value="MCQ" className="dark:bg-[#111827]">Multiple Choice (MCQ)</option>
+                            <option value="FITB" className="dark:bg-[#111827]">Fill in the Blanks (FITB)</option>
+                            <option value="TF" className="dark:bg-[#111827]">True / False</option>
+                            <option value="MATCH" className="dark:bg-[#111827]">Match the Following</option>
                           </select>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                        <div className="grid grid-cols-3 gap-3 bg-slate-50 dark:bg-[#1e293b]/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700">
                           <div>
-                            <label className="block text-[11px] font-black text-slate-600 uppercase tracking-wider mb-1">
+                            <label className="block text-[11px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1">
                               Total Questions
                             </label>
                             <input
@@ -2721,12 +2736,12 @@ export default function TeacherDashboard() {
                                 const perQ = Math.round((marks / totalQ) * 100) / 100;
                                 setEditSectionForm({ ...editSectionForm, total_questions_expected: totalQ, marks_per_question: perQ });
                               }}
-                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-bold bg-white focus:ring-2 focus:ring-primary-500"
+                              className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold bg-white dark:bg-[#111827] text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500"
                             />
                           </div>
 
                           <div>
-                            <label className="block text-[11px] font-black text-slate-600 uppercase tracking-wider mb-1">
+                            <label className="block text-[11px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1">
                               Section Total Marks
                             </label>
                             <input
@@ -2740,12 +2755,12 @@ export default function TeacherDashboard() {
                                 const perQ = Math.round((marks / totalQ) * 100) / 100;
                                 setEditSectionForm({ ...editSectionForm, section_marks: marks, marks_per_question: perQ });
                               }}
-                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-bold bg-white focus:ring-2 focus:ring-primary-500"
+                              className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold bg-white dark:bg-[#111827] text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500"
                             />
                           </div>
 
                           <div>
-                            <label className="block text-[11px] font-black text-primary-700 uppercase tracking-wider mb-1">
+                            <label className="block text-[11px] font-black text-primary-700 dark:text-primary-400 uppercase tracking-wider mb-1">
                               Marks / Question
                             </label>
                             <input
@@ -2760,20 +2775,20 @@ export default function TeacherDashboard() {
                                 const totalMarks = Math.round(perQ * totalQ);
                                 setEditSectionForm({ ...editSectionForm, marks_per_question: perQ, section_marks: totalMarks });
                               }}
-                              className="w-full px-3 py-2 border border-primary-300 rounded-xl text-sm font-extrabold text-primary-700 bg-primary-50/50 focus:ring-2 focus:ring-primary-500"
+                              className="w-full px-3 py-2 border border-primary-300 dark:border-primary-700 rounded-xl text-sm font-extrabold text-primary-700 dark:text-primary-300 bg-primary-50/50 dark:bg-primary-950/40 focus:ring-2 focus:ring-primary-500"
                             />
                           </div>
                         </div>
 
-                        <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs font-bold text-emerald-800">
+                        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800 text-xs font-bold text-emerald-800 dark:text-emerald-300">
                           ✨ <b>Auto Even Distribution:</b> All questions in this section will automatically receive <b>{editSectionForm.marks_per_question} Marks</b> each ({editSectionForm.section_marks} Marks ÷ {editSectionForm.total_questions_expected} Questions).
                         </div>
 
-                        <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
+                        <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100 dark:border-slate-800">
                           <button
                             type="button"
                             onClick={() => setEditingSection(null)}
-                            className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-xs text-slate-600 hover:bg-slate-100"
+                            className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                           >
                             Cancel
                           </button>
@@ -2792,20 +2807,20 @@ export default function TeacherDashboard() {
 
                 {/* Confirm Delete Section Modal */}
                 {confirmDeleteSection && (
-                  <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-100 text-center">
-                      <div className="w-14 h-14 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                  <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-[#111827] rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-800 text-center animate-fadeIn">
+                      <div className="w-14 h-14 bg-red-50 dark:bg-red-950/60 text-red-600 dark:text-red-400 rounded-2xl flex items-center justify-center mx-auto mb-3 border border-red-200 dark:border-red-800">
                         <Trash2 size={28} />
                       </div>
-                      <h3 className="text-lg font-black text-slate-800 mb-1">Delete Section?</h3>
-                      <p className="text-xs text-slate-500 font-medium mb-4">
-                        Are you sure you want to delete <b className="text-slate-800">{confirmDeleteSection.title}</b>? All {confirmDeleteSection.questions?.length || 0} questions inside this section will also be removed.
+                      <h3 className="text-lg font-black text-slate-800 dark:text-white mb-1">Delete Section?</h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-4">
+                        Are you sure you want to delete <b className="text-slate-800 dark:text-white">{confirmDeleteSection.title}</b>? All {confirmDeleteSection.questions?.length || 0} questions inside this section will also be removed.
                       </p>
                       <div className="flex gap-2.5">
                         <button
                           type="button"
                           onClick={() => setConfirmDeleteSection(null)}
-                          className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs"
+                          className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs transition-colors"
                         >
                           Cancel
                         </button>
@@ -2822,28 +2837,28 @@ export default function TeacherDashboard() {
                 )}
 
                 {/* Add Section Form with Auto Even Marks Distribution */}
-                <form onSubmit={handleAddSection} className="flex flex-wrap items-center gap-3 pt-4 border-t border-slate-100">
+                <form onSubmit={handleAddSection} className="flex flex-wrap items-center gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
                   <input
                     type="text"
                     required
                     placeholder="New Section Title (e.g. Section A - Multiple Choice)"
                     value={newSectionForm.title}
                     onChange={(e) => setNewSectionForm({ ...newSectionForm, title: e.target.value })}
-                    className="flex-1 min-w-[200px] px-3.5 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary-500"
+                    className="flex-1 min-w-[200px] px-3.5 py-2 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary-500"
                   />
                   <select
                     value={newSectionForm.section_type}
                     onChange={(e) => setNewSectionForm({ ...newSectionForm, section_type: e.target.value })}
-                    className="px-3.5 py-2 border border-slate-200 rounded-xl text-sm font-bold bg-white"
+                    className="px-3.5 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold bg-white dark:bg-[#1e293b]/70 text-slate-900 dark:text-white"
                   >
-                    <option value="MCQ">Multiple Choice (MCQ)</option>
-                    <option value="FITB">Fill in the Blanks (FITB)</option>
-                    <option value="TF">True / False</option>
-                    <option value="MATCH">Match the Following</option>
+                    <option value="MCQ" className="dark:bg-[#111827]">Multiple Choice (MCQ)</option>
+                    <option value="FITB" className="dark:bg-[#111827]">Fill in the Blanks (FITB)</option>
+                    <option value="TF" className="dark:bg-[#111827]">True / False</option>
+                    <option value="MATCH" className="dark:bg-[#111827]">Match the Following</option>
                   </select>
 
-                  <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-200">
-                    <span className="text-[11px] font-bold text-slate-500">Total Qs:</span>
+                  <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-[#1e293b]/70 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Total Qs:</span>
                     <input
                       type="number"
                       min="1"
@@ -2855,12 +2870,12 @@ export default function TeacherDashboard() {
                         setNewSectionForm({ ...newSectionForm, total_questions_expected: totalQ, marks_per_question: perQ });
                       }}
                       placeholder="Total Qs"
-                      className="w-16 px-2 py-1 border border-slate-200 rounded-lg text-xs font-bold bg-white text-center"
+                      className="w-16 px-2 py-1 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold bg-white dark:bg-[#111827] text-slate-900 dark:text-white text-center"
                     />
                   </div>
 
-                  <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-200">
-                    <span className="text-[11px] font-bold text-slate-500">Total Marks:</span>
+                  <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-[#1e293b]/70 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Total Marks:</span>
                     <input
                       type="number"
                       min="1"
@@ -2872,17 +2887,17 @@ export default function TeacherDashboard() {
                         setNewSectionForm({ ...newSectionForm, section_marks: marks, marks_per_question: perQ });
                       }}
                       placeholder="Marks"
-                      className="w-16 px-2 py-1 border border-slate-200 rounded-lg text-xs font-bold bg-white text-center"
+                      className="w-16 px-2 py-1 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold bg-white dark:bg-[#111827] text-slate-900 dark:text-white text-center"
                     />
                   </div>
 
-                  <span className="text-xs font-black text-primary-700 bg-primary-50 px-2.5 py-1.5 rounded-lg border border-primary-200">
+                  <span className="text-xs font-black text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-950/60 px-2.5 py-1.5 rounded-lg border border-primary-200 dark:border-primary-800">
                     = {newSectionForm.marks_per_question || 2} M / Q
                   </span>
 
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-slate-800 hover:bg-black text-white font-bold text-sm rounded-xl shadow-sm"
+                    className="px-4 py-2 bg-slate-800 dark:bg-slate-700 hover:bg-black dark:hover:bg-slate-600 text-white font-bold text-sm rounded-xl shadow-sm transition-colors"
                   >
                     Add Section
                   </button>
@@ -2893,9 +2908,9 @@ export default function TeacherDashboard() {
               {activeSectionId && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Create / Edit Question Form */}
-                  <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                  <div className="bg-white dark:bg-[#111827] p-6 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 transition-colors">
                     <div className="flex items-center justify-between mb-4">
-                      <h4 className="text-base font-black text-slate-800">
+                      <h4 className="text-base font-black text-slate-800 dark:text-white">
                         {editingQuestionId ? 'Edit Question' : 'Add Question to Section'}
                       </h4>
                       {(() => {
@@ -2903,7 +2918,7 @@ export default function TeacherDashboard() {
                         const totalQ = sec?.total_questions_expected && sec.total_questions_expected > 0 ? sec.total_questions_expected : (sec?.questions?.length || 1);
                         const autoPerQ = sec ? Math.round(((sec.section_marks || 20) / totalQ) * 100) / 100 : 1;
                         return (
-                          <span className="text-xs font-bold bg-primary-50 text-primary-700 px-3 py-1 rounded-full border border-primary-100">
+                          <span className="text-xs font-bold bg-primary-50 dark:bg-primary-950/60 text-primary-700 dark:text-primary-400 px-3 py-1 rounded-full border border-primary-100 dark:border-primary-900/60">
                             Auto Marks: <b>{autoPerQ} M</b>/question
                           </span>
                         );
@@ -2912,25 +2927,25 @@ export default function TeacherDashboard() {
 
                     <form onSubmit={handleSaveQuestion} className="space-y-4">
                       <div>
-                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Question Text (English)</label>
+                        <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Question Text (English)</label>
                         <textarea
                           required
                           rows={2}
                           value={questionForm.text_en}
                           onChange={(e) => setQuestionForm({ ...questionForm, text_en: e.target.value })}
                           placeholder="e.g. Which keyword is used to inherit a class in Java?"
-                          className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary-500"
+                          className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary-500"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Question Text (Bengali Optional)</label>
+                        <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Question Text (Bengali Optional)</label>
                         <textarea
                           rows={2}
                           value={questionForm.text_bn}
                           onChange={(e) => setQuestionForm({ ...questionForm, text_bn: e.target.value })}
                           placeholder="বাংলা প্রশ্ন লিখুন (ঐচ্ছিক)..."
-                          className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary-500"
+                          className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary-500"
                         />
                       </div>
 
@@ -2940,7 +2955,7 @@ export default function TeacherDashboard() {
                         if (sec?.section_type === 'MCQ') {
                           return (
                             <div className="space-y-2">
-                              <label className="block text-xs font-black text-slate-400 uppercase tracking-wider">Options & Correct Answer</label>
+                              <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Options & Correct Answer</label>
                               {questionForm.options.map((opt, optIdx) => (
                                 <div key={optIdx} className="flex items-center gap-2">
                                   <input
@@ -2960,7 +2975,7 @@ export default function TeacherDashboard() {
                                       newOpts[optIdx] = e.target.value;
                                       setQuestionForm({ ...questionForm, options: newOpts });
                                     }}
-                                    className="flex-1 px-3 py-1.5 border border-slate-200 rounded-xl text-sm font-medium"
+                                    className="flex-1 px-3 py-1.5 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm font-medium"
                                   />
                                 </div>
                               ))}
@@ -2969,9 +2984,9 @@ export default function TeacherDashboard() {
                         } else if (sec?.section_type === 'TF') {
                           return (
                             <div>
-                              <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Select Correct Answer</label>
+                              <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Select Correct Answer</label>
                               <div className="flex gap-4">
-                                <label className="flex items-center gap-2 font-bold text-sm">
+                                <label className="flex items-center gap-2 font-bold text-sm text-slate-800 dark:text-slate-200">
                                   <input
                                     type="radio"
                                     name="tfAns"
@@ -2982,7 +2997,7 @@ export default function TeacherDashboard() {
                                   />
                                   True (সত্য)
                                 </label>
-                                <label className="flex items-center gap-2 font-bold text-sm">
+                                <label className="flex items-center gap-2 font-bold text-sm text-slate-800 dark:text-slate-200">
                                   <input
                                     type="radio"
                                     name="tfAns"
@@ -3001,10 +3016,10 @@ export default function TeacherDashboard() {
                       })()}
 
                       {/* Auto Marks Indicator with Optional Override */}
-                      <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 flex items-center justify-between">
+                      <div className="bg-slate-50 dark:bg-[#1e293b]/70 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-between">
                         <div>
-                          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">Question Marks</span>
-                          <span className="text-xs font-bold text-slate-700">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 block">Question Marks</span>
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
                             Auto-distributed from section ({builderSections.find(s => s.section_id === activeSectionId)?.section_marks || 20} Marks total)
                           </span>
                         </div>
@@ -3014,9 +3029,9 @@ export default function TeacherDashboard() {
                             step="0.1"
                             value={questionForm.marks}
                             onChange={(e) => setQuestionForm({ ...questionForm, marks: parseFloat(e.target.value) || 1 })}
-                            className="w-20 px-2.5 py-1 border border-slate-200 rounded-xl text-sm font-extrabold text-primary-700 bg-white text-center"
+                            className="w-20 px-2.5 py-1 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-extrabold text-primary-700 dark:text-primary-400 bg-white dark:bg-[#111827] text-center"
                           />
-                          <span className="text-xs font-bold text-slate-500">Marks</span>
+                          <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Marks</span>
                         </div>
                       </div>
 
@@ -3030,7 +3045,7 @@ export default function TeacherDashboard() {
                                 text_en: '', text_bn: '', options: ['', '', '', ''], correct_answer: '', marks: 1, fitb_blanks: [''], fitb_extras: [], match_pairs: [{ left: '', right: '' }, { left: '', right: '' }]
                               });
                             }}
-                            className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl text-sm"
+                            className="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-sm transition-colors"
                           >
                             Cancel
                           </button>
@@ -3046,28 +3061,37 @@ export default function TeacherDashboard() {
                   </div>
 
                   {/* Section Questions List */}
-                  <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                    <h4 className="text-base font-black text-slate-800 mb-4">Questions in Section</h4>
+                  <div className="bg-white dark:bg-[#111827] p-6 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 transition-colors">
+                    <h4 className="text-base font-black text-slate-800 dark:text-white mb-4">Questions in Section</h4>
                     <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
                       {builderSections
                         .find(s => s.section_id === activeSectionId)
                         ?.questions?.map((q, qIdx) => (
-                          <div key={q.question_id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50">
+                          <div key={q.question_id} className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-[#151f32] hover:border-primary-300 dark:hover:border-slate-700 transition-all">
                             <div className="flex items-start justify-between gap-2 mb-2">
-                              <span className="font-extrabold text-slate-800 text-sm">
-                                {qIdx + 1}. {q.question_text_en}
+                              <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm leading-snug">
+                                <span className="text-primary-600 dark:text-primary-400 mr-1.5">Q{qIdx + 1}.</span> {q.question_text_en}
                               </span>
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1 flex-shrink-0">
                                 <button
                                   onClick={() => handleEditQuestion(q)}
-                                  className="p-1 text-slate-400 hover:text-primary-600"
+                                  title="Edit Question"
+                                  className="p-1.5 text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition-colors"
                                 >
                                   <Edit size={14} />
                                 </button>
                               </div>
                             </div>
-                            <div className="text-xs text-green-700 font-bold">
-                              Correct: {q.correct_answer}
+                            {q.question_text_bn && (
+                              <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-medium">{q.question_text_bn}</p>
+                            )}
+                            <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-800/80 text-xs">
+                              <span className="text-emerald-800 dark:text-emerald-300 font-bold bg-emerald-100/80 dark:bg-emerald-950/70 px-2.5 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-800">
+                                Ans: <b>{q.correct_answer}</b>
+                              </span>
+                              <span className="text-slate-500 dark:text-slate-400 font-bold">
+                                {q.marks || 1} Mark(s)
+                              </span>
                             </div>
                           </div>
                         ))}
@@ -3080,62 +3104,62 @@ export default function TeacherDashboard() {
 
           {/* Create Exam Modal with Multi-Batch Checkboxes & Per-Batch Shuffle */}
           {creatingExam && (
-            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl border border-slate-100">
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white dark:bg-[#111827] rounded-3xl p-8 max-w-lg w-full shadow-2xl border border-slate-200 dark:border-slate-800 animate-fadeIn">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-black text-slate-800">Create Examination</h3>
-                  <button onClick={() => setCreatingExam(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+                  <h3 className="text-xl font-black text-slate-800 dark:text-white">Create Examination</h3>
+                  <button onClick={() => setCreatingExam(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={20}/></button>
                 </div>
                 <form onSubmit={handleCreateExam} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Exam Title</label>
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Exam Title</label>
                     <input
                       type="text"
                       required
                       value={examForm.title}
                       onChange={(e) => setExamForm({ ...examForm, title: e.target.value })}
                       placeholder="e.g. Mid Term Mathematics 2026"
-                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500"
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Duration (Minutes)</label>
+                      <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Duration (Minutes)</label>
                       <input
                         type="number"
                         required
                         value={examForm.duration_minutes}
                         onChange={(e) => setExamForm({ ...examForm, duration_minutes: parseInt(e.target.value) || 30 })}
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold"
+                        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-bold text-sm"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Full Marks</label>
+                      <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Full Marks</label>
                       <input
                         type="number"
                         required
                         value={examForm.full_marks}
                         onChange={(e) => setExamForm({ ...examForm, full_marks: parseInt(e.target.value) || 100 })}
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold"
+                        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-bold text-sm"
                       />
                     </div>
                   </div>
 
                   {/* Multi-Batch Selection & Shuffle Toggle */}
                   <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
                       Assign Batches & Question Shuffle
                     </label>
-                    <div className="space-y-2 max-h-48 overflow-y-auto border border-slate-200 rounded-2xl p-3">
+                    <div className="space-y-2 max-h-48 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-2xl p-3 bg-slate-50 dark:bg-[#1e293b]/50">
                       {batchesList.map(batch => {
                         const isAssigned = examForm.assigned_batches.some(b => b.batch_name === batch.name);
                         const assignedObj = examForm.assigned_batches.find(b => b.batch_name === batch.name);
                         const shuffle = assignedObj ? assignedObj.shuffle_enabled : false;
 
                         return (
-                          <div key={batch.batch_id} className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50">
-                            <label className="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer">
+                          <div key={batch.batch_id} className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800">
+                            <label className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
                               <input
                                 type="checkbox"
                                 checked={isAssigned}
@@ -3169,7 +3193,7 @@ export default function TeacherDashboard() {
                                   });
                                 }}
                                 className={`px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1 transition-all ${
-                                  shuffle ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-500'
+                                  shuffle ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                                 }`}
                               >
                                 <Shuffle size={12} /> Shuffle: {shuffle ? 'ON' : 'OFF'}
@@ -3182,7 +3206,7 @@ export default function TeacherDashboard() {
                   </div>
 
                   <div className="flex gap-3 pt-4">
-                    <button type="button" onClick={() => setCreatingExam(false)} className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-xl">Cancel</button>
+                    <button type="button" onClick={() => setCreatingExam(false)} className="flex-1 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold rounded-xl transition-colors">Cancel</button>
                     <button type="submit" className="flex-1 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-md">Create & Build Set</button>
                   </div>
                 </form>
@@ -3192,61 +3216,61 @@ export default function TeacherDashboard() {
 
           {/* Edit Exam Multi-Batch Modal */}
           {editingExamId && (
-            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl border border-slate-100">
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white dark:bg-[#111827] rounded-3xl p-8 max-w-lg w-full shadow-2xl border border-slate-200 dark:border-slate-800 animate-fadeIn">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-black text-slate-800">Edit Examination Config</h3>
-                  <button onClick={() => setEditingExamId(null)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+                  <h3 className="text-xl font-black text-slate-800 dark:text-white">Edit Examination Config</h3>
+                  <button onClick={() => setEditingExamId(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={20}/></button>
                 </div>
                 <form onSubmit={handleSaveEditExam} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Exam Title</label>
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Exam Title</label>
                     <input
                       type="text"
                       required
                       value={editExamForm.title}
                       onChange={(e) => setEditExamForm({ ...editExamForm, title: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-primary-500"
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Duration (Minutes)</label>
+                      <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Duration (Minutes)</label>
                       <input
                         type="number"
                         required
                         value={editExamForm.duration_minutes}
                         onChange={(e) => setEditExamForm({ ...editExamForm, duration_minutes: parseInt(e.target.value) || 30 })}
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold"
+                        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-bold text-sm"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Full Marks</label>
+                      <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Full Marks</label>
                       <input
                         type="number"
                         required
                         value={editExamForm.full_marks}
                         onChange={(e) => setEditExamForm({ ...editExamForm, full_marks: parseInt(e.target.value) || 100 })}
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold"
+                        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl font-bold text-sm"
                       />
                     </div>
                   </div>
 
                   {/* Multi-Batch Selection & Shuffle Toggle */}
                   <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
                       Assigned Batches & Question Shuffle
                     </label>
-                    <div className="space-y-2 max-h-48 overflow-y-auto border border-slate-200 rounded-2xl p-3">
+                    <div className="space-y-2 max-h-48 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-2xl p-3 bg-slate-50 dark:bg-[#1e293b]/50">
                       {batchesList.map(batch => {
                         const isAssigned = editExamForm.assigned_batches.some(b => b.batch_name === batch.name);
                         const assignedObj = editExamForm.assigned_batches.find(b => b.batch_name === batch.name);
                         const shuffle = assignedObj ? assignedObj.shuffle_enabled : false;
 
                         return (
-                          <div key={batch.batch_id} className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50">
-                            <label className="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer">
+                          <div key={batch.batch_id} className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800">
+                            <label className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
                               <input
                                 type="checkbox"
                                 checked={isAssigned}
@@ -3280,7 +3304,7 @@ export default function TeacherDashboard() {
                                   });
                                 }}
                                 className={`px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1 transition-all ${
-                                  shuffle ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-500'
+                                  shuffle ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                                 }`}
                               >
                                 <Shuffle size={12} /> Shuffle: {shuffle ? 'ON' : 'OFF'}
@@ -3293,7 +3317,7 @@ export default function TeacherDashboard() {
                   </div>
 
                   <div className="flex gap-3 pt-4">
-                    <button type="button" onClick={() => setEditingExamId(null)} className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-xl">Cancel</button>
+                    <button type="button" onClick={() => setEditingExamId(null)} className="flex-1 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold rounded-xl transition-colors">Cancel</button>
                     <button type="submit" className="flex-1 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-md">Save Changes</button>
                   </div>
                 </form>
@@ -3303,28 +3327,28 @@ export default function TeacherDashboard() {
 
           {/* Delete Exam Safe Confirmation Modal */}
           {confirmDeleteExam && (
-            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-100 text-center animate-scale-up">
-                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <AlertTriangle className="text-red-600" size={32} />
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white dark:bg-[#111827] rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-800 text-center animate-scale-up">
+                <div className="w-16 h-16 bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-200 dark:border-red-800">
+                  <AlertTriangle size={32} />
                 </div>
-                <h3 className="text-2xl font-black text-slate-800 mb-2">Delete Examination?</h3>
-                <p className="text-slate-600 text-sm font-semibold mb-3">
-                  Are you sure you want to delete <span className="font-bold text-slate-800">&quot;{confirmDeleteExam.title}&quot;</span>?
+                <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Delete Examination?</h3>
+                <p className="text-slate-600 dark:text-slate-300 text-sm font-semibold mb-3">
+                  Are you sure you want to delete <span className="font-bold text-slate-800 dark:text-white">&quot;{confirmDeleteExam.title}&quot;</span>?
                 </p>
                 
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs text-slate-600 font-medium mb-6 text-left space-y-1.5">
-                  <p className="flex items-center gap-2 text-slate-800 font-extrabold">
+                <div className="bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 text-xs text-slate-600 dark:text-slate-300 font-medium mb-6 text-left space-y-1.5">
+                  <p className="flex items-center gap-2 text-slate-800 dark:text-white font-extrabold">
                     <span className="w-2 h-2 rounded-full bg-green-500"></span>
                     Previously recorded examination results will NOT be deleted.
                   </p>
-                  <p className="text-slate-500 pl-4 leading-relaxed">
+                  <p className="text-slate-500 dark:text-slate-400 pl-4 leading-relaxed">
                     This will remove the examination from the active Examination Sets list. All student scores, attempt histories, and submitted answer sheets will remain safely preserved in the Results tab.
                   </p>
                 </div>
 
                 {deleteExamError && (
-                  <div className="bg-red-50 border border-red-200 text-red-600 rounded-xl p-3 text-xs font-bold mb-4">
+                  <div className="bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-xl p-3 text-xs font-bold mb-4">
                     {deleteExamError}
                   </div>
                 )}
@@ -3333,7 +3357,7 @@ export default function TeacherDashboard() {
                   <button 
                     onClick={() => { setConfirmDeleteExam(null); setDeleteExamError(''); }}
                     disabled={isDeletingExam}
-                    className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-all"
+                    className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-sm transition-all"
                   >
                     Cancel
                   </button>
@@ -3361,20 +3385,20 @@ export default function TeacherDashboard() {
       {/* ========================================================================= */}
       {activeTab === 'RESULTS' && (
         <div className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+          <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-[#111827] p-6 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 transition-colors">
             <div>
-              <h3 className="text-xl font-black text-slate-800">Examination Results & Retest History</h3>
-              <p className="text-xs font-semibold text-slate-400 mt-0.5">Paginated historical attempts (10 per page)</p>
+              <h3 className="text-xl font-black text-slate-800 dark:text-white">Examination Results & Retest History</h3>
+              <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mt-0.5">Paginated historical attempts (10 per page)</p>
             </div>
             
             <div className="flex items-center gap-3">
-              {/* View Mode Toggle (Icon Only) */}
-              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+              {/* View Mode Toggle */}
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
                 <button
                   onClick={() => setRunsViewMode('list')}
                   title="List View"
                   className={`p-1.5 rounded-lg transition-all ${
-                    runsViewMode === 'list' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                    runsViewMode === 'list' ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
                   }`}
                 >
                   <List size={18} />
@@ -3383,7 +3407,7 @@ export default function TeacherDashboard() {
                   onClick={() => setRunsViewMode('card')}
                   title="Card View"
                   className={`p-1.5 rounded-lg transition-all ${
-                    runsViewMode === 'card' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                    runsViewMode === 'card' ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
                   }`}
                 >
                   <LayoutGrid size={18} />
@@ -3392,7 +3416,7 @@ export default function TeacherDashboard() {
 
               {/* Server-side Search */}
               <div className="relative w-56 sm:w-72">
-                <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                <Search className="absolute left-3 top-2.5 text-slate-400 dark:text-slate-500" size={16} />
                 <input
                   type="text"
                   placeholder="Search exam attempt name..."
@@ -3401,7 +3425,7 @@ export default function TeacherDashboard() {
                     setExamRunsSearch(e.target.value);
                     fetchExamRuns(0, e.target.value);
                   }}
-                  className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary-500"
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary-500"
                 />
               </div>
             </div>
@@ -3409,16 +3433,16 @@ export default function TeacherDashboard() {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Runs List (10 per request) */}
-            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 h-fit space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">Latest 10 Examination Runs</h4>
-                <span className="text-xs font-bold text-slate-500">Total: {examRunsTotal}</span>
+            <div className="bg-white dark:bg-[#111827] p-6 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 h-fit space-y-4 transition-colors">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                <h4 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Latest 10 Examination Runs</h4>
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Total: {examRunsTotal}</span>
               </div>
 
               {isRunsLoading ? (
-                <div className="p-8 text-center text-slate-400 font-bold">Loading examination runs...</div>
+                <div className="p-8 text-center text-slate-400 dark:text-slate-500 font-bold">Loading examination runs...</div>
               ) : examRuns.length === 0 ? (
-                <div className="p-8 text-center text-slate-400 font-bold bg-slate-50 rounded-2xl">No examination runs found.</div>
+                <div className="p-8 text-center text-slate-400 dark:text-slate-500 font-bold bg-slate-50 dark:bg-[#1e293b]/40 rounded-2xl">No examination runs found.</div>
               ) : (
                 <div className={runsViewMode === 'card' ? 'grid grid-cols-1 gap-3' : 'space-y-2.5'}>
                   {examRuns.map(run => {
@@ -3429,12 +3453,12 @@ export default function TeacherDashboard() {
                         onClick={() => openRunResults(run)}
                         className={`p-4 rounded-2xl border transition-all cursor-pointer ${
                           isSelected
-                            ? 'border-primary-500 bg-primary-50/60 shadow-sm'
-                            : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50'
+                            ? 'border-primary-500 bg-primary-50/60 dark:bg-primary-950/40 shadow-sm'
+                            : 'border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 bg-white dark:bg-[#151f32] hover:bg-slate-50 dark:hover:bg-slate-800/60'
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2 mb-1">
-                          <h5 className="font-extrabold text-slate-800 text-sm leading-snug">{run.exam_name}</h5>
+                          <h5 className="font-extrabold text-slate-800 dark:text-white text-sm leading-snug">{run.exam_name}</h5>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -3442,15 +3466,15 @@ export default function TeacherDashboard() {
                               setDeleteRunError('');
                             }}
                             title="Delete this historical run"
-                            className="text-slate-300 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                            className="text-slate-300 dark:text-slate-600 hover:text-red-600 dark:hover:text-red-400 p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                           >
                             <Trash2 size={15} />
                           </button>
                         </div>
-                        <p className="text-xs text-slate-500 font-medium">{run.exam_title}</p>
-                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-200/50 text-[11px] font-bold text-slate-400">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">{run.exam_title}</p>
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-200/50 dark:border-slate-800 text-[11px] font-bold text-slate-400 dark:text-slate-500">
                           <span>{new Date(run.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
-                          <span className="text-primary-700 bg-primary-100/60 px-2 py-0.5 rounded-full">{run.completed_students} / {run.total_students} submitted</span>
+                          <span className="text-blue-800 dark:text-cyan-300 bg-blue-100 dark:bg-cyan-950/70 px-2.5 py-0.5 rounded-full border border-blue-300 dark:border-cyan-800 font-extrabold">{run.completed_students} / {run.total_students} submitted</span>
                         </div>
                       </div>
                     );
@@ -3459,18 +3483,18 @@ export default function TeacherDashboard() {
               )}
 
               {/* Pagination Controls */}
-              <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
                 <button
                   disabled={examRunsOffset === 0 || isRunsLoading}
                   onClick={() => {
                     const newOffset = Math.max(0, examRunsOffset - 10);
                     fetchExamRuns(newOffset, examRunsSearch);
                   }}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 text-xs font-bold rounded-lg flex items-center gap-1"
+                  className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg flex items-center gap-1 transition-colors"
                 >
                   <ChevronLeft size={14} /> Previous
                 </button>
-                <span className="text-xs font-bold text-slate-500">
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
                   Page {Math.floor(examRunsOffset / 10) + 1} of {Math.max(1, Math.ceil(examRunsTotal / 10))}
                 </span>
                 <button
@@ -3479,7 +3503,7 @@ export default function TeacherDashboard() {
                     const newOffset = examRunsOffset + 10;
                     fetchExamRuns(newOffset, examRunsSearch);
                   }}
-                  className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-40 text-white text-xs font-bold rounded-lg flex items-center gap-1 shadow-sm"
+                  className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-40 text-white text-xs font-bold rounded-lg flex items-center gap-1 shadow-sm transition-colors"
                 >
                   Next 10 <ChevronRight size={14} />
                 </button>
@@ -3487,23 +3511,23 @@ export default function TeacherDashboard() {
             </div>
 
             {/* Run Scorecard / Details View */}
-            <div className="lg:col-span-2 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+            <div className="lg:col-span-2 bg-white dark:bg-[#111827] p-6 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 transition-colors">
               {selectedRun ? (
                 <div>
-                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-6">
+                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4 mb-6">
                     <div>
-                      <span className="text-[10px] font-black uppercase tracking-wider text-primary-600 bg-primary-50 px-2.5 py-1 rounded-full">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-primary-700 dark:text-primary-300 bg-primary-100 dark:bg-primary-950/80 px-3 py-1 rounded-full border border-primary-300 dark:border-primary-800">
                         Attempt Scorecard
                       </span>
-                      <h3 className="text-xl font-black text-slate-800 mt-2">{selectedRun.exam_name}</h3>
-                      <p className="text-xs font-bold text-slate-400">Exam: {selectedRun.exam_title} • Full Marks: {selectedRun.full_marks}</p>
+                      <h3 className="text-xl font-black text-slate-800 dark:text-white mt-2">{selectedRun.exam_name}</h3>
+                      <p className="text-xs font-bold text-slate-400 dark:text-slate-500">Exam: {selectedRun.exam_title} • Full Marks: {selectedRun.full_marks}</p>
                     </div>
                   </div>
 
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
                       <thead>
-                        <tr className="border-b border-slate-100 text-[11px] font-black text-slate-400 uppercase tracking-wider">
+                        <tr className="border-b border-slate-100 dark:border-slate-800 text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                           <th className="pb-3 px-3">Roll ID</th>
                           <th className="pb-3 px-3">Student Name</th>
                           <th className="pb-3 px-3">Batch</th>
@@ -3513,27 +3537,29 @@ export default function TeacherDashboard() {
                           <th className="pb-3 px-3 text-right">Answer Sheet</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
                         {runResultsData.map((res) => (
-                          <tr key={res.student_id} className="hover:bg-slate-50/80">
-                            <td className="py-3 px-3 font-mono font-black text-slate-800">{res.student_id}</td>
-                            <td className="py-3 px-3 font-bold text-slate-800">{res.name}</td>
-                            <td className="py-3 px-3 text-xs font-bold text-slate-500">{res.batch}</td>
-                            <td className="py-3 px-3 font-extrabold text-primary-600 text-base">
+                          <tr key={res.student_id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                            <td className="py-3 px-3 font-mono font-black text-slate-800 dark:text-slate-100">{res.student_id}</td>
+                            <td className="py-3 px-3 font-bold text-slate-800 dark:text-slate-100">{res.name}</td>
+                            <td className="py-3 px-3 text-xs font-bold text-slate-500 dark:text-slate-400">{res.batch}</td>
+                            <td className="py-3 px-3 font-extrabold text-primary-600 dark:text-primary-400 text-base">
                               {res.score} / {res.full_marks}
                             </td>
                             <td className="py-3 px-3">
-                              <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
-                                res.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
+                              <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border ${
+                                res.status === 'COMPLETED' 
+                                  ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700' 
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700'
                               }`}>
                                 {res.status}
                               </span>
                             </td>
-                            <td className="py-3 px-3 font-bold text-slate-600">{res.tab_violation_count || 0}</td>
+                            <td className="py-3 px-3 font-bold text-slate-600 dark:text-slate-400">{res.tab_violation_count || 0}</td>
                             <td className="py-3 px-3 text-right">
                               <button
                                 onClick={() => openAnswerSheet(res.student_id, selectedRun.exam_id)}
-                                className="px-3 py-1 bg-primary-50 hover:bg-primary-100 text-primary-700 text-xs font-bold rounded-lg transition-colors"
+                                className="px-3 py-1 bg-primary-50 dark:bg-primary-950/60 hover:bg-primary-100 dark:hover:bg-primary-900/60 text-primary-700 dark:text-primary-400 text-xs font-bold rounded-lg transition-colors border border-primary-100 dark:border-primary-900/60"
                               >
                                 View Sheet
                               </button>
@@ -3545,7 +3571,7 @@ export default function TeacherDashboard() {
                   </div>
                 </div>
               ) : (
-                <div className="p-16 text-center text-slate-400 font-bold">
+                <div className="p-16 text-center text-slate-400 dark:text-slate-500 font-bold">
                   Select an examination run from the left list to view student scorecards and answer sheets.
                 </div>
               )}
@@ -3558,36 +3584,36 @@ export default function TeacherDashboard() {
       {/* 6. INITIALIZATION MODAL (EXAMINATION NAME PROMPT) */}
       {/* ========================================================================= */}
       {showInitModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-100">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-[#111827] rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-800 animate-fadeIn">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-black text-slate-800">Initialize Examination Run</h3>
-              <button onClick={() => setShowInitModal(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+              <h3 className="text-xl font-black text-slate-800 dark:text-white">Initialize Examination Run</h3>
+              <button onClick={() => setShowInitModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={20}/></button>
             </div>
             
-            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 mb-4 space-y-1 text-xs">
-              <p className="text-slate-500 font-bold">
-                Examination: <span className="text-slate-800 font-black">{selectedMonitorExam?.title}</span>
+            <div className="bg-slate-50 dark:bg-[#1e293b]/70 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 mb-4 space-y-1 text-xs">
+              <p className="text-slate-500 dark:text-slate-400 font-bold">
+                Examination: <span className="text-slate-800 dark:text-white font-black">{selectedMonitorExam?.title}</span>
               </p>
-              <p className="text-slate-500 font-bold">
-                Target Batch: <span className="inline-block px-2 py-0.5 bg-primary-100 text-primary-800 font-black rounded-md">{selectedMonitorBatch}</span>
+              <p className="text-slate-500 dark:text-slate-400 font-bold">
+                Target Batch: <span className="inline-block px-2 py-0.5 bg-primary-100 dark:bg-primary-950/60 text-primary-800 dark:text-primary-400 font-black rounded-md border border-primary-200 dark:border-primary-800">{selectedMonitorBatch}</span>
               </p>
             </div>
 
-            <p className="text-xs text-slate-500 font-medium mb-4">
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-4">
               Enter an examination badge / attempt name for this batch run. This name will appear on the Results panel and will preserve past scores separately.
             </p>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Examination Attempt Name</label>
+                <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Examination Attempt Name</label>
                 <input
                   type="text"
                   required
                   value={initExamName}
                   onChange={(e) => setInitExamName(e.target.value)}
                   placeholder="e.g. DITA Half Yearly - Batch A (10:00 AM)"
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary-500"
                 />
               </div>
 
@@ -3595,7 +3621,7 @@ export default function TeacherDashboard() {
                 <button
                   type="button"
                   onClick={() => setShowInitModal(false)}
-                  className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm"
+                  className="flex-1 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-sm transition-colors"
                 >
                   Cancel
                 </button>
@@ -3616,63 +3642,63 @@ export default function TeacherDashboard() {
       {/* 7. STUDENT ANSWER SHEET MODAL (SAFE WRAP & LONG CONTENT FIX) */}
       {/* ========================================================================= */}
       {selectedStudentForAnswers && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4">
-          <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-4xl w-full shadow-2xl border border-slate-100 max-h-[88vh] flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3 flex-shrink-0">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4">
+          <div className="bg-white dark:bg-[#111827] rounded-3xl p-5 sm:p-6 max-w-4xl w-full shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[88vh] flex flex-col overflow-hidden animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-3 flex-shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center text-primary-600 font-black">
+                <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-950/60 flex items-center justify-center text-primary-600 dark:text-primary-400 font-black border border-primary-100 dark:border-primary-900/60">
                   <FileText size={20} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-slate-800">
+                  <h3 className="text-lg font-black text-slate-800 dark:text-white">
                     {answerSheetData ? answerSheetData.student.name : 'Loading Answer Sheet...'}
                   </h3>
-                  <p className="text-xs font-bold text-slate-400">
+                  <p className="text-xs font-bold text-slate-400 dark:text-slate-500">
                     ID: {answerSheetData?.student?.student_id} • Score: {answerSheetData?.student?.score} / {answerSheetData?.student?.full_marks}
                   </p>
                 </div>
               </div>
-              <button onClick={closeAnswerSheet} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"><X size={20}/></button>
+              <button onClick={closeAnswerSheet} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"><X size={20}/></button>
             </div>
 
             <div className="overflow-y-auto flex-1 space-y-4 pr-1.5 overscroll-contain">
               {isAnswerSheetLoading ? (
-                <div className="p-12 text-center text-slate-400 font-bold">Loading submitted answer sheet...</div>
+                <div className="p-12 text-center text-slate-400 dark:text-slate-500 font-bold">Loading submitted answer sheet...</div>
               ) : !answerSheetData ? (
-                <div className="p-12 text-center text-slate-400 font-bold">No answers recorded for this session.</div>
+                <div className="p-12 text-center text-slate-400 dark:text-slate-500 font-bold">No answers recorded for this session.</div>
               ) : (
                 answerSheetData.answers.map((qa: any, idx: number) => {
                   const isCorrect = qa.is_correct;
                   return (
-                    <div key={qa.question_id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/60 break-words">
+                    <div key={qa.question_id} className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-[#151f32] break-words">
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <div className="flex-1 space-y-0.5">
-                          <span className="font-extrabold text-slate-800 text-sm leading-relaxed block break-words">
+                          <span className="font-extrabold text-slate-800 dark:text-white text-sm leading-relaxed block break-words">
                             {idx + 1}. {qa.question_text_en}
                           </span>
                           {qa.question_text_bn && (
-                            <span className="font-bold text-slate-600 text-xs leading-relaxed block break-words">
+                            <span className="font-bold text-slate-600 dark:text-slate-300 text-xs leading-relaxed block break-words">
                               {qa.question_text_bn}
                             </span>
                           )}
                         </div>
                         <span className={`text-xs font-black px-2.5 py-0.5 rounded-full flex-shrink-0 ${
-                          isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                          isCorrect ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800' : 'bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800'
                         }`}>
                           {isCorrect ? `+${qa.awarded_marks || qa.marks} Marks` : '0 Marks'}
                         </span>
                       </div>
 
-                      <div className="space-y-2 text-xs pt-2 border-t border-slate-200/50">
+                      <div className="space-y-2 text-xs pt-2 border-t border-slate-200/50 dark:border-slate-800">
                         <div>
-                          <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px] block mb-0.5">Student Submitted Answer:</span>
-                          <div className="text-slate-800">
+                          <span className="font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px] block mb-0.5">Student Submitted Answer:</span>
+                          <div className="text-slate-800 dark:text-slate-200">
                             {renderAnswerContent(qa, qa.student_answer, isCorrect)}
                           </div>
                         </div>
                         <div>
-                          <span className="font-bold text-emerald-700 uppercase tracking-wider text-[10px] block mb-0.5">Correct Answer Key:</span>
-                          <div className="text-emerald-900">
+                          <span className="font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider text-[10px] block mb-0.5">Correct Answer Key:</span>
+                          <div className="text-emerald-900 dark:text-emerald-300">
                             {renderAnswerContent(qa, qa.correct_answer, true)}
                           </div>
                         </div>
@@ -3683,16 +3709,16 @@ export default function TeacherDashboard() {
               )}
             </div>
 
-            <div className="flex items-center justify-between pt-3 border-t border-slate-100 flex-shrink-0">
+            <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800 flex-shrink-0">
               <button
                 onClick={() => navigateAnswerSheet('prev')}
-                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors"
+                className="px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors border border-slate-200 dark:border-slate-700"
               >
                 <ChevronLeft size={14} /> Prev Student
               </button>
               <button
                 onClick={() => navigateAnswerSheet('next')}
-                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors"
+                className="px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors border border-slate-200 dark:border-slate-700"
               >
                 Next Student <ChevronRight size={14} />
               </button>
@@ -3706,12 +3732,12 @@ export default function TeacherDashboard() {
       {/* ========================================================================= */}
       {runToDelete && (
         <div 
-          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="delete-run-modal-title"
         >
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-100 text-center animate-in fade-in zoom-in-95 duration-150 relative">
+          <div className="bg-white dark:bg-[#111827] rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-800 text-center animate-in fade-in zoom-in-95 duration-150 relative">
             <button
               onClick={() => {
                 if (!isDeletingRun) {
@@ -3720,48 +3746,48 @@ export default function TeacherDashboard() {
                 }
               }}
               disabled={isDeletingRun}
-              className="absolute right-5 top-5 text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 disabled:opacity-40 transition-colors"
+              className="absolute right-5 top-5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 transition-colors"
               aria-label="Close dialog"
             >
               <X size={20} />
             </button>
 
             {/* Trash Can Icon */}
-            <div className="w-16 h-16 rounded-3xl bg-red-50 border border-red-100 flex items-center justify-center text-red-600 mx-auto mb-4 shadow-sm">
+            <div className="w-16 h-16 rounded-3xl bg-red-50 dark:bg-red-950/60 border border-red-100 dark:border-red-900/60 flex items-center justify-center text-red-600 dark:text-red-400 mx-auto mb-4 shadow-sm">
               <Trash2 size={30} />
             </div>
 
-            <h3 id="delete-run-modal-title" className="text-xl font-black text-slate-800 mb-1">
+            <h3 id="delete-run-modal-title" className="text-xl font-black text-slate-800 dark:text-white mb-1">
               Delete Examination Run?
             </h3>
-            <p className="text-xs text-slate-500 font-medium mb-5 leading-relaxed">
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-5 leading-relaxed">
               You are about to permanently delete this examination run and its associated results.
             </p>
 
             {/* Run Details Box */}
-            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 text-left space-y-2.5 mb-4 text-xs">
+            <div className="bg-slate-50 dark:bg-[#1e293b]/70 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-700 text-left space-y-2.5 mb-4 text-xs">
               <div>
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
                   Examination
                 </span>
-                <span className="font-extrabold text-slate-800 text-sm">
+                <span className="font-extrabold text-slate-800 dark:text-white text-sm">
                   {runToDelete.exam_title || 'N/A'}
                 </span>
               </div>
-              <div className="pt-2 border-t border-slate-200/60">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+              <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
                   Attempt / Badge
                 </span>
-                <span className="font-bold text-slate-700">
+                <span className="font-bold text-slate-700 dark:text-slate-200">
                   {runToDelete.exam_name || 'N/A'}
                 </span>
               </div>
-              <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between">
+              <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
                     Date & Time
                   </span>
-                  <span className="font-bold text-slate-600">
+                  <span className="font-bold text-slate-600 dark:text-slate-300">
                     {runToDelete.created_at
                       ? new Date(runToDelete.created_at).toLocaleDateString('en-GB', {
                           day: '2-digit',
@@ -3773,7 +3799,7 @@ export default function TeacherDashboard() {
                   </span>
                 </div>
                 {runToDelete.total_students !== undefined && (
-                  <span className="text-[11px] font-bold bg-slate-200/80 text-slate-700 px-2.5 py-1 rounded-full">
+                  <span className="text-[11px] font-bold bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-700">
                     {runToDelete.completed_students || 0} / {runToDelete.total_students || 0} submitted
                   </span>
                 )}
@@ -3781,14 +3807,14 @@ export default function TeacherDashboard() {
             </div>
 
             {/* Warning Alert */}
-            <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 py-2.5 px-3.5 rounded-xl border border-amber-200 mb-4">
-              <AlertTriangle size={15} className="text-amber-600 flex-shrink-0" />
+            <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 py-2.5 px-3.5 rounded-xl border border-amber-200 dark:border-amber-800 mb-4">
+              <AlertTriangle size={15} className="text-amber-600 dark:text-amber-400 flex-shrink-0" />
               <span>This action cannot be undone.</span>
             </div>
 
             {/* Error Message if any */}
             {deleteRunError && (
-              <div className="text-xs font-bold text-red-600 bg-red-50 p-3 rounded-xl border border-red-200 mb-4 text-left">
+              <div className="text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/60 p-3 rounded-xl border border-red-200 dark:border-red-800 mb-4 text-left">
                 {deleteRunError}
               </div>
             )}
@@ -3802,7 +3828,7 @@ export default function TeacherDashboard() {
                   setRunToDelete(null);
                   setDeleteRunError('');
                 }}
-                className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors disabled:opacity-50"
+                className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-sm transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -3831,29 +3857,29 @@ export default function TeacherDashboard() {
 
       {/* Single Student End Exam Confirmation Modal */}
       {studentToEnd && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-100 text-center animate-fadeIn">
-            <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-amber-600">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-[#111827] rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-800 text-center animate-fadeIn">
+            <div className="w-16 h-16 bg-amber-100 dark:bg-amber-950/60 rounded-2xl flex items-center justify-center mx-auto mb-4 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
               <AlertTriangle size={32} />
             </div>
-            <h3 className="text-2xl font-black text-slate-800 mb-2">End Student Examination?</h3>
+            <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-2">End Student Examination?</h3>
             
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 my-4 text-left text-sm space-y-2">
+            <div className="bg-slate-50 dark:bg-[#1e293b]/70 p-4 rounded-2xl border border-slate-200/60 dark:border-slate-700 my-4 text-left text-sm space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-slate-400 font-bold text-xs uppercase">Student:</span>
-                <span className="font-extrabold text-slate-800">{studentToEnd.name}</span>
+                <span className="text-slate-400 dark:text-slate-500 font-bold text-xs uppercase">Student:</span>
+                <span className="font-extrabold text-slate-800 dark:text-white">{studentToEnd.name}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-slate-400 font-bold text-xs uppercase">Student ID:</span>
-                <span className="font-mono font-black text-slate-700">{studentToEnd.student_id}</span>
+                <span className="text-slate-400 dark:text-slate-500 font-bold text-xs uppercase">Student ID:</span>
+                <span className="font-mono font-black text-slate-700 dark:text-slate-200">{studentToEnd.student_id}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-slate-400 font-bold text-xs uppercase">Batch:</span>
-                <span className="font-bold text-primary-700">{studentToEnd.batch || selectedMonitorBatch}</span>
+                <span className="text-slate-400 dark:text-slate-500 font-bold text-xs uppercase">Batch:</span>
+                <span className="font-bold text-primary-700 dark:text-primary-400">{studentToEnd.batch || selectedMonitorBatch}</span>
               </div>
             </div>
 
-            <p className="text-slate-600 text-xs font-semibold mb-6 leading-relaxed">
+            <p className="text-slate-600 dark:text-slate-300 text-xs font-semibold mb-6 leading-relaxed">
               This will submit and finalize this student&apos;s current examination. Other students in this batch will continue their examinations uninterrupted.
             </p>
 
@@ -3861,7 +3887,7 @@ export default function TeacherDashboard() {
               <button
                 type="button"
                 onClick={() => setStudentToEnd(null)}
-                className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors"
+                className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-sm transition-colors"
               >
                 Cancel
               </button>
@@ -3879,17 +3905,17 @@ export default function TeacherDashboard() {
 
       {/* Global End Examination Confirmation Modal */}
       {showGlobalEndConfirm && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-100 text-center animate-fadeIn">
-            <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-red-600">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-[#111827] rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-800 text-center animate-fadeIn">
+            <div className="w-16 h-16 bg-red-100 dark:bg-red-950/60 rounded-2xl flex items-center justify-center mx-auto mb-4 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800">
               <Square size={32} />
             </div>
-            <h3 className="text-2xl font-black text-slate-800 mb-2">End Examination?</h3>
-            <p className="text-slate-600 text-sm font-semibold mb-4 leading-relaxed">
-              This will finalize all currently active student examinations for <b className="text-slate-900">{selectedMonitorBatch}</b> and calculate their results.
+            <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-2">End Examination?</h3>
+            <p className="text-slate-600 dark:text-slate-300 text-sm font-semibold mb-4 leading-relaxed">
+              This will finalize all currently active student examinations for <b className="text-slate-900 dark:text-white">{selectedMonitorBatch}</b> and calculate their results.
             </p>
 
-            <div className="bg-amber-50 text-amber-800 text-xs font-bold p-3.5 rounded-xl border border-amber-200 mb-6 text-left space-y-1.5">
+            <div className="bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 text-xs font-bold p-3.5 rounded-xl border border-amber-200 dark:border-amber-800 mb-6 text-left space-y-1.5">
               <p>• Students who have already completed will not be submitted again.</p>
               <p>• This action cannot be undone.</p>
             </div>
@@ -3898,7 +3924,7 @@ export default function TeacherDashboard() {
               <button
                 type="button"
                 onClick={() => setShowGlobalEndConfirm(false)}
-                className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors"
+                className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-sm transition-colors"
               >
                 Cancel
               </button>
@@ -3916,24 +3942,24 @@ export default function TeacherDashboard() {
 
       {/* Examination Run Initialization Modal (New Attempt / Retest) */}
       {showInitModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-100 text-left animate-fadeIn relative">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-[#111827] rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-800 text-left animate-fadeIn relative">
             <button
               onClick={() => setShowInitModal(false)}
-              className="absolute right-5 top-5 text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+              className="absolute right-5 top-5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               aria-label="Close"
             >
               <X size={20} />
             </button>
 
-            <div className="w-14 h-14 rounded-2xl bg-primary-50 border border-primary-100 flex items-center justify-center text-primary-600 mb-4 shadow-sm">
+            <div className="w-14 h-14 rounded-2xl bg-primary-50 dark:bg-primary-950/60 border border-primary-100 dark:border-primary-900/60 flex items-center justify-center text-primary-600 dark:text-primary-400 mb-4 shadow-sm">
               <RotateCcw size={26} />
             </div>
 
-            <h3 className="text-xl font-black text-slate-800 mb-1">
+            <h3 className="text-xl font-black text-slate-800 dark:text-white mb-1">
               {initTargetStudentId ? 'Initialize Student Session' : 'Initialize Examination Attempt'}
             </h3>
-            <p className="text-xs text-slate-500 font-medium mb-4 leading-relaxed">
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-4 leading-relaxed">
               {initTargetStudentId
                 ? `Initialize a clean examination session for student ID ${initTargetStudentId} in ${selectedMonitorBatch}.`
                 : `Create a clean examination attempt for ${selectedMonitorBatch}. Previous attempts and answer sheets will remain safely preserved in Results.`}
@@ -3941,7 +3967,7 @@ export default function TeacherDashboard() {
 
             <div className="space-y-3 mb-5">
               <div>
-                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                <label className="block text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
                   Examination Run Name / Attempt Badge
                 </label>
                 <input
@@ -3949,12 +3975,12 @@ export default function TeacherDashboard() {
                   value={initExamName}
                   onChange={(e) => setInitExamName(e.target.value)}
                   placeholder="e.g. DITA with AI Half Yearly - Retest 1"
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold text-sm text-slate-800 focus:ring-2 focus:ring-primary-500 bg-slate-50/50"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1e293b]/70 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm text-slate-800 dark:text-white focus:ring-2 focus:ring-primary-500"
                   autoFocus
                 />
               </div>
 
-              <div className="bg-amber-50 text-amber-800 text-xs font-semibold p-3 rounded-xl border border-amber-200 space-y-1">
+              <div className="bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 text-xs font-semibold p-3 rounded-xl border border-amber-200 dark:border-amber-800 space-y-1">
                 <p>• All student states (answers, score, timer, violations) will start completely fresh.</p>
                 <p>• Unique question shuffle order will be generated per examinee.</p>
               </div>
@@ -3964,7 +3990,7 @@ export default function TeacherDashboard() {
               <button
                 type="button"
                 onClick={() => setShowInitModal(false)}
-                className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors"
+                className="flex-1 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-sm transition-colors"
               >
                 Cancel
               </button>

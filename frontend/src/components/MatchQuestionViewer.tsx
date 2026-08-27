@@ -334,21 +334,21 @@ export const MatchQuestionViewer: React.FC<MatchQuestionViewerProps> = ({
 
       {/* Column Headers */}
       <div className="grid grid-cols-2 gap-12 sm:gap-24 relative z-10 px-2 mb-3">
-        <div className="flex items-center justify-between px-3.5 py-2 bg-slate-100/90 border border-slate-200 rounded-xl shadow-xs">
-          <span className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+        <div className="flex items-center justify-between px-3.5 py-2 bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xs">
+          <span className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-primary-600"></span>
             {lang === 'bn' ? 'বাম কলাম (কলাম ক)' : 'Column A'}
           </span>
-          <span className="text-[10px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+          <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-[#111827] px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700">
             {Object.keys(mapping).length}/{leftCol.length} {lang === 'bn' ? 'মিলিত' : 'Matched'}
           </span>
         </div>
-        <div className="flex items-center justify-between px-3.5 py-2 bg-slate-100/90 border border-slate-200 rounded-xl shadow-xs">
-          <span className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+        <div className="flex items-center justify-between px-3.5 py-2 bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xs">
+          <span className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-purple-600"></span>
             {lang === 'bn' ? 'ডান কলাম (কলাম খ)' : 'Column B'}
           </span>
-          <span className="text-[10px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+          <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-[#111827] px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700">
             {rightCol.length} {lang === 'bn' ? 'বিকল্প' : 'Options'}
           </span>
         </div>
@@ -376,7 +376,7 @@ export const MatchQuestionViewer: React.FC<MatchQuestionViewerProps> = ({
                     ? 'border-blue-600 bg-blue-600 text-white ring-4 ring-blue-300 shadow-md scale-[1.02]' 
                     : isMatched 
                       ? `${style.cardBorder} ${style.cardBg} ${style.cardText} ring-2 ${style.ringClass}` 
-                      : 'border-slate-200 hover:border-blue-300 bg-white hover:bg-blue-50/30 text-slate-800'
+                      : 'border-slate-200 dark:border-slate-700/80 hover:border-blue-300 dark:hover:border-blue-500 bg-white dark:bg-[#151f32] hover:bg-blue-50/30 dark:hover:bg-slate-800/60 text-slate-800 dark:text-slate-100'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2.5">
@@ -386,7 +386,7 @@ export const MatchQuestionViewer: React.FC<MatchQuestionViewerProps> = ({
                         ? 'bg-white text-blue-700' 
                         : isMatched 
                           ? `${style.badgeBg} ${style.badgeText}` 
-                          : 'bg-slate-100 text-slate-700'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'
                     }`}>
                       {idx + 1}
                     </span>
@@ -410,7 +410,7 @@ export const MatchQuestionViewer: React.FC<MatchQuestionViewerProps> = ({
                       ? 'border-blue-600 bg-white ring-2 ring-blue-300 scale-110' 
                       : isMatched 
                         ? `${style.dotBorder} ${style.dotBg} ring-2 ${style.ringClass}` 
-                        : 'border-slate-300 bg-slate-100'
+                        : 'border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-700'
                   }`} 
                 />
               </button>
@@ -434,10 +434,10 @@ export const MatchQuestionViewer: React.FC<MatchQuestionViewerProps> = ({
                 onClick={() => handleRightClick(itemId)}
                 className={`p-4 sm:p-5 text-left rounded-2xl border-2 font-bold transition-all transform hover:scale-[1.01] shadow-sm relative break-words leading-relaxed ${
                   activeMatchLeft 
-                    ? 'border-dashed border-primary-500 bg-primary-50/70 hover:bg-primary-100 hover:border-primary-600 hover:ring-4 ring-primary-300/30 cursor-pointer text-slate-900' 
+                    ? 'border-dashed border-primary-500 bg-primary-50/70 dark:bg-primary-950/50 hover:bg-primary-100 dark:hover:bg-primary-900/60 hover:border-primary-600 hover:ring-4 ring-primary-300/30 cursor-pointer text-slate-900 dark:text-white' 
                     : isMatched && matchedStyle
                       ? `${matchedStyle.cardBorder} ${matchedStyle.cardBg} ${matchedStyle.cardText} ring-2 ${matchedStyle.ringClass}` 
-                      : 'border-slate-200 hover:border-purple-300 bg-white text-slate-800'
+                      : 'border-slate-200 dark:border-slate-700/80 hover:border-purple-300 dark:hover:border-purple-500 bg-white dark:bg-[#151f32] text-slate-800 dark:text-slate-100'
                 }`}
               >
                 {/* Connecting point dot on left edge */}
@@ -447,7 +447,7 @@ export const MatchQuestionViewer: React.FC<MatchQuestionViewerProps> = ({
                       ? `${matchedStyle.dotBorder} ${matchedStyle.dotBg} ring-2 ${matchedStyle.ringClass}` 
                       : activeMatchLeft 
                         ? 'border-primary-500 bg-white animate-pulse' 
-                        : 'border-slate-300 bg-slate-100'
+                        : 'border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-700'
                   }`} 
                 />
                 

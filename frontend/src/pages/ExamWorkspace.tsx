@@ -491,7 +491,7 @@ export default function ExamWorkspace() {
     const parts = text.split(/_{2,}/);
     
     return (
-      <div className="text-2xl font-semibold text-slate-800 mb-8 mt-2 leading-[3rem]">
+      <div className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-8 mt-2 leading-[3rem]">
         {parts.map((part, idx) => {
           if (idx === parts.length - 1) return <span key={idx}>{part}</span>;
           
@@ -506,10 +506,10 @@ export default function ExamWorkspace() {
                   onClick={() => setActiveBlank({ qId: q.question_id, bIdx: idx })}
                   className={`min-w-[140px] px-4 py-1.5 pb-2 border-b-4 rounded-t-lg transition-all text-center text-lg font-bold shadow-sm ${
                     isActive 
-                      ? 'border-primary-500 bg-primary-100 text-primary-800 ring-2 ring-primary-300 ring-offset-2' 
+                      ? 'border-primary-500 bg-primary-100 dark:bg-primary-950/80 text-primary-800 dark:text-primary-200 ring-2 ring-primary-300 dark:ring-primary-600 ring-offset-2' 
                       : assignedOpt 
-                        ? 'border-slate-400 bg-slate-50 text-slate-700 hover:bg-slate-200 hover:border-slate-500' 
-                        : 'border-slate-300 bg-slate-50 text-slate-400 hover:bg-slate-200 hover:border-slate-400 border-dashed'
+                        ? 'border-slate-400 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-700 hover:border-slate-500' 
+                        : 'border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 hover:border-slate-400 border-dashed'
                   }`}
                 >
                   {assignedOpt ? getFitbOptionText(assignedOpt) : 'Click to select'}
@@ -581,8 +581,8 @@ export default function ExamWorkspace() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
         <div className="w-16 h-16 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mb-6"></div>
-        <h3 className="text-2xl font-black text-slate-800 mb-2">Connecting to Examination...</h3>
-        <p className="text-sm font-semibold text-slate-400 max-w-sm">Verifying your student session and exam configuration. Please wait a moment.</p>
+        <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Connecting to Examination...</h3>
+        <p className="text-sm font-semibold text-slate-400 dark:text-slate-500 max-w-sm">Verifying your student session and exam configuration. Please wait a moment.</p>
       </div>
     );
   }
@@ -593,14 +593,14 @@ export default function ExamWorkspace() {
   if (status === 'ERROR') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-        <div className="w-20 h-20 mb-6 rounded-3xl bg-red-100 flex items-center justify-center shadow-lg border border-red-200">
-          <AlertTriangle className="text-red-600" size={40} />
+        <div className="w-20 h-20 mb-6 rounded-3xl bg-red-100 dark:bg-red-950/60 flex items-center justify-center shadow-lg border border-red-200 dark:border-red-900/60">
+          <AlertTriangle className="text-red-600 dark:text-red-400" size={40} />
         </div>
-        <h2 className="text-2xl font-black text-red-600 mb-2">Examination Notice</h2>
-        <p className="text-slate-600 font-bold max-w-md mb-6 text-sm leading-relaxed">{errorMessage || 'Invalid session or no active exam found.'}</p>
+        <h2 className="text-2xl font-black text-red-600 dark:text-red-400 mb-2">Examination Notice</h2>
+        <p className="text-slate-600 dark:text-slate-300 font-bold max-w-md mb-6 text-sm leading-relaxed">{errorMessage || 'Invalid session or no active exam found.'}</p>
         <button 
           onClick={() => navigate('/')} 
-          className="bg-slate-800 hover:bg-black text-white px-6 py-3 rounded-xl font-bold text-sm transition-all shadow-md"
+          className="bg-slate-800 hover:bg-black dark:bg-slate-700 dark:hover:bg-slate-600 text-white px-6 py-3 rounded-xl font-bold text-sm transition-all shadow-md"
         >
           Back to Student Login
         </button>
@@ -615,23 +615,23 @@ export default function ExamWorkspace() {
     return (
       <div className="max-w-5xl mx-auto space-y-6 pb-16">
         {/* Header Hero Card */}
-        <div className="bg-gradient-vibrant p-8 rounded-3xl text-white shadow-xl flex flex-wrap items-center justify-between gap-6">
+        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 dark:from-blue-600 dark:via-indigo-700 dark:to-violet-800 p-8 rounded-3xl text-white shadow-xl flex flex-wrap items-center justify-between gap-6 border border-white/10">
           <div>
-            <span className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider mb-2">
+            <span className="inline-flex items-center gap-2 bg-white/20 dark:bg-white/15 backdrop-blur-md px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider mb-2 border border-white/20">
               <Sparkles size={14} /> Competitive Examination Portal
             </span>
             <h2 className="text-3xl font-black tracking-tight">{waitingInfo?.exam_title || 'Mid Term Examination'}</h2>
-            <p className="text-primary-100 text-sm font-medium mt-1">
+            <p className="text-blue-100 dark:text-blue-200 text-sm font-medium mt-1">
               Please read the examination guidelines carefully while waiting for the teacher to start.
             </p>
           </div>
 
-          <div className="bg-white/15 backdrop-blur-md p-4 rounded-2xl border border-white/20 flex items-center gap-4">
+          <div className="bg-white/15 dark:bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 flex items-center gap-4">
             <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center animate-pulse">
               <Clock size={28} className="text-white" />
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-wider text-primary-200">Exam Status</p>
+              <p className="text-[10px] font-black uppercase tracking-wider text-blue-200">Exam Status</p>
               <p className="text-lg font-black text-white">Waiting for Teacher</p>
             </div>
           </div>
@@ -639,50 +639,50 @@ export default function ExamWorkspace() {
 
         {/* Student Identity Card & Summary */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-primary-50 flex items-center justify-center text-primary-600 font-black text-xl">
+          <div className="bg-white dark:bg-[#111827] p-6 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 flex items-center gap-4 transition-colors">
+            <div className="w-14 h-14 rounded-2xl bg-primary-50 dark:bg-primary-950/60 flex items-center justify-center text-primary-600 dark:text-primary-400 font-black text-xl border border-primary-100 dark:border-primary-900/60">
               <User size={28} />
             </div>
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Student Identity</span>
-              <h4 className="text-lg font-black text-slate-800">{waitingInfo?.name || 'Student Examinee'}</h4>
-              <p className="text-xs font-mono font-bold text-primary-600">{waitingInfo?.exam_roll || 'NYSDB01400001'}</p>
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Student Identity</span>
+              <h4 className="text-lg font-black text-slate-800 dark:text-white">{waitingInfo?.name || 'Student Examinee'}</h4>
+              <p className="text-xs font-mono font-bold text-primary-600 dark:text-primary-400">{waitingInfo?.exam_roll || 'NYSDB01400001'}</p>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center text-green-600 font-black text-xl">
+          <div className="bg-white dark:bg-[#111827] p-6 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 flex items-center gap-4 transition-colors">
+            <div className="w-14 h-14 rounded-2xl bg-green-50 dark:bg-green-950/60 flex items-center justify-center text-green-600 dark:text-green-400 font-black text-xl border border-green-100 dark:border-green-900/60">
               <BookOpen size={28} />
             </div>
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Class & Batch</span>
-              <h4 className="text-lg font-black text-slate-800">{waitingInfo?.batch || 'Batch A'}</h4>
-              <p className="text-xs font-bold text-slate-500">{waitingInfo?.class || 'Class 5'}</p>
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Class & Batch</span>
+              <h4 className="text-lg font-black text-slate-800 dark:text-white">{waitingInfo?.batch || 'Batch A'}</h4>
+              <p className="text-xs font-bold text-slate-500 dark:text-slate-400">{waitingInfo?.class || 'Class 5'}</p>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 font-black text-xl">
+          <div className="bg-white dark:bg-[#111827] p-6 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 flex items-center gap-4 transition-colors">
+            <div className="w-14 h-14 rounded-2xl bg-purple-50 dark:bg-purple-950/60 flex items-center justify-center text-purple-600 dark:text-purple-400 font-black text-xl border border-purple-100 dark:border-purple-900/60">
               <Award size={28} />
             </div>
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Exam Specs</span>
-              <h4 className="text-lg font-black text-slate-800">{waitingInfo?.duration_minutes || 30} Minutes</h4>
-              <p className="text-xs font-bold text-slate-500">Full Marks: {waitingInfo?.full_marks || 100}</p>
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Exam Specs</span>
+              <h4 className="text-lg font-black text-slate-800 dark:text-white">{waitingInfo?.duration_minutes || 30} Minutes</h4>
+              <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Full Marks: {waitingInfo?.full_marks || 100}</p>
             </div>
           </div>
         </div>
 
         {/* Dynamic Marks Distribution Table */}
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-          <h3 className="text-base font-black text-slate-800 mb-4 flex items-center gap-2">
-            <Award className="text-primary-600" size={18} /> Dynamic Marks Distribution
+        <div className="bg-white dark:bg-[#111827] p-6 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 transition-colors">
+          <h3 className="text-base font-black text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+            <Award className="text-primary-600 dark:text-primary-400" size={18} /> Dynamic Marks Distribution
           </h3>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-100 text-[11px] font-black text-slate-400 uppercase tracking-wider">
+                <tr className="border-b border-slate-100 dark:border-slate-800 text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                   <th className="pb-3 px-4">Section Name</th>
                   <th className="pb-3 px-4">Question Type</th>
                   <th className="pb-3 px-4 text-center">Questions</th>
@@ -690,7 +690,7 @@ export default function ExamWorkspace() {
                   <th className="pb-3 px-4 text-right">Section Total</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 font-medium">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 font-medium">
                 {waitingInfo?.sections && waitingInfo.sections.length > 0 ? (
                   waitingInfo.sections.map((sec, idx) => {
                     const minM = sec.min_marks !== undefined ? sec.min_marks : (sec.question_count > 0 ? sec.section_marks / sec.question_count : 1);
@@ -698,44 +698,44 @@ export default function ExamWorkspace() {
                     const secTotal = sec.total_section_marks && sec.total_section_marks > 0 ? sec.total_section_marks : (sec.section_marks || 0);
 
                     return (
-                      <tr key={sec.section_id || idx} className="hover:bg-slate-50/80">
-                        <td className="py-3.5 px-4 font-bold text-slate-800">{sec.title}</td>
+                      <tr key={sec.section_id || idx} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
+                        <td className="py-3.5 px-4 font-bold text-slate-800 dark:text-slate-100">{sec.title}</td>
                         <td className="py-3.5 px-4">
-                          <span className="px-2.5 py-0.5 bg-slate-100 text-slate-700 text-xs font-bold rounded-md">
+                          <span className="px-2.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-md border border-slate-200 dark:border-slate-700">
                             {sec.section_type}
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 text-center font-extrabold text-slate-700">{sec.question_count}</td>
-                        <td className="py-3.5 px-4 text-center text-slate-600 font-semibold">
+                        <td className="py-3.5 px-4 text-center font-extrabold text-slate-700 dark:text-slate-300">{sec.question_count}</td>
+                        <td className="py-3.5 px-4 text-center text-slate-600 dark:text-slate-400 font-semibold">
                           {sec.question_count === 0 
                             ? '—' 
                             : minM === maxM 
                               ? `${minM} Mark${minM > 1 ? 's' : ''}` 
                               : `${minM} – ${maxM} Marks (Varying)`}
                         </td>
-                        <td className="py-3.5 px-4 text-right font-black text-primary-600">{secTotal} Marks</td>
+                        <td className="py-3.5 px-4 text-right font-black text-primary-600 dark:text-primary-400">{secTotal} Marks</td>
                       </tr>
                     );
                   })
                 ) : (
                   <tr>
-                    <td colSpan={5} className="py-4 text-center text-slate-400 font-bold">Standard configuration active.</td>
+                    <td colSpan={5} className="py-4 text-center text-slate-400 dark:text-slate-500 font-bold">Standard configuration active.</td>
                   </tr>
                 )}
               </tbody>
               {waitingInfo && (
                 <tfoot>
-                  <tr className="border-t-2 border-slate-200 bg-slate-50/70 font-black text-slate-800 text-xs uppercase tracking-wider">
-                    <td colSpan={2} className="py-3 px-4 text-slate-500">
+                  <tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/40 font-black text-slate-800 dark:text-white text-xs uppercase tracking-wider">
+                    <td colSpan={2} className="py-3 px-4 text-slate-500 dark:text-slate-400">
                       Total ({waitingInfo.total_sections || waitingInfo.sections?.length || 0} Sections)
                     </td>
-                    <td className="py-3 px-4 text-center text-slate-800 font-extrabold text-sm">
+                    <td className="py-3 px-4 text-center text-slate-800 dark:text-slate-200 font-extrabold text-sm">
                       {waitingInfo.total_questions || 0}
                     </td>
-                    <td className="py-3 px-4 text-center text-slate-400 font-semibold text-[11px]">
+                    <td className="py-3 px-4 text-center text-slate-400 dark:text-slate-500 font-semibold text-[11px]">
                       Varying Marks
                     </td>
-                    <td className="py-3 px-4 text-right text-primary-700 font-black text-sm">
+                    <td className="py-3 px-4 text-right text-primary-700 dark:text-primary-400 font-black text-sm">
                       {waitingInfo.full_marks || 100} Marks
                     </td>
                   </tr>
@@ -747,41 +747,41 @@ export default function ExamWorkspace() {
 
         {/* Answer Status & Navigation Legend Infographic */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-4">
-            <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
-              <HelpCircle className="text-primary-600" size={18} /> Answer-Status Legend
+          <div className="bg-white dark:bg-[#111827] p-6 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 space-y-4 transition-colors">
+            <h3 className="text-base font-black text-slate-800 dark:text-white flex items-center gap-2">
+              <HelpCircle className="text-primary-600 dark:text-primary-400" size={18} /> Answer-Status Legend
             </h3>
             <div className="grid grid-cols-2 gap-3 text-xs font-bold">
-              <div className="flex items-center gap-3 p-3 bg-green-50 rounded-2xl border border-green-200">
-                <span className="w-4 h-4 rounded-md bg-green-500 shadow-sm flex items-center justify-center text-white"><Check size={12}/></span>
-                <span className="text-green-900">Answered (সংরক্ষিত)</span>
+              <div className="flex items-center gap-3 p-3 bg-emerald-50 dark:bg-emerald-950/60 rounded-2xl border border-emerald-200 dark:border-emerald-800/80">
+                <span className="w-4 h-4 rounded-md bg-emerald-500 shadow-sm flex items-center justify-center text-white"><Check size={12}/></span>
+                <span className="text-emerald-900 dark:text-emerald-300">Answered (সংরক্ষিত)</span>
               </div>
-              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200">
-                <span className="w-4 h-4 rounded-md bg-slate-200 border border-slate-300"></span>
-                <span className="text-slate-700">Not Visited / Left</span>
+              <div className="flex items-center gap-3 p-3 bg-slate-100/90 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
+                <span className="w-4 h-4 rounded-md bg-slate-300 dark:bg-slate-700 border border-slate-400 dark:border-slate-600"></span>
+                <span className="text-slate-800 dark:text-slate-200">Not Visited / Left</span>
               </div>
-              <div className="flex items-center gap-3 p-3 bg-primary-50 rounded-2xl border border-primary-200">
-                <span className="w-4 h-4 rounded-md bg-primary-600 text-white shadow-sm ring-2 ring-primary-300"></span>
-                <span className="text-primary-900">Current Question</span>
+              <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-950/60 rounded-2xl border border-blue-300 dark:border-blue-700">
+                <span className="w-4 h-4 rounded-md bg-blue-600 text-white shadow-sm ring-2 ring-blue-300 dark:ring-blue-600"></span>
+                <span className="text-blue-900 dark:text-blue-300">Current Question</span>
               </div>
-              <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-2xl border border-amber-200">
+              <div className="flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-950/60 rounded-2xl border border-amber-200 dark:border-amber-800/80">
                 <span className="w-4 h-4 rounded-md bg-amber-500 text-white shadow-sm"></span>
-                <span className="text-amber-900">Marked for Review</span>
+                <span className="text-amber-900 dark:text-amber-300">Marked for Review</span>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-3">
-            <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
-              <Languages className="text-primary-600" size={18} /> Language & Post-Exam Information
+          <div className="bg-white dark:bg-[#111827] p-6 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 space-y-3 transition-colors">
+            <h3 className="text-base font-black text-slate-800 dark:text-white flex items-center gap-2">
+              <Languages className="text-primary-600 dark:text-primary-400" size={18} /> Language & Post-Exam Information
             </h3>
-            <p className="text-xs text-slate-600 font-medium leading-relaxed">
+            <p className="text-xs text-slate-600 dark:text-slate-400 font-medium leading-relaxed">
               • <b>Bilingual Support:</b> You can toggle questions between <b>English</b> and <b>বাংলা</b> anytime during the exam using the language button at the top.
             </p>
-            <p className="text-xs text-slate-600 font-medium leading-relaxed">
+            <p className="text-xs text-slate-600 dark:text-slate-400 font-medium leading-relaxed">
               • <b>Question Paper Download:</b> After you submit your examination, you will be able to download your customized question paper copy with your submitted answers.
             </p>
-            <p className="text-xs text-slate-600 font-medium leading-relaxed">
+            <p className="text-xs text-slate-600 dark:text-slate-400 font-medium leading-relaxed">
               • <b>Anti-Cheat Protection:</b> Switching tabs or minimizing the browser will automatically lock your screen until unlocked by the teacher.
             </p>
           </div>
@@ -796,11 +796,11 @@ export default function ExamWorkspace() {
   if (status === 'PAUSED') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-        <div className="w-24 h-24 mb-6 rounded-3xl bg-red-100 flex items-center justify-center shadow-lg border border-red-200 animate-bounce">
-          <AlertTriangle className="text-red-600" size={48} />
+        <div className="w-24 h-24 mb-6 rounded-3xl bg-red-100 dark:bg-red-950/60 flex items-center justify-center shadow-lg border border-red-200 dark:border-red-900/60 animate-bounce">
+          <AlertTriangle className="text-red-600 dark:text-red-400" size={48} />
         </div>
-        <h2 className="text-3xl font-black text-red-600 mb-2">Screen Locked / Tab Violation</h2>
-        <p className="text-slate-600 font-bold max-w-md mb-6 leading-relaxed text-sm">
+        <h2 className="text-3xl font-black text-red-600 dark:text-red-400 mb-2">Screen Locked / Tab Violation</h2>
+        <p className="text-slate-600 dark:text-slate-300 font-bold max-w-md mb-6 leading-relaxed text-sm">
           You have changed browser tabs or minimized the exam window. For anti-cheat security, your exam has been paused. Please raise your hand and wait for the teacher to unlock your screen.
         </p>
       </div>
@@ -813,11 +813,11 @@ export default function ExamWorkspace() {
   if (status === 'COMPLETED') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-        <div className="w-24 h-24 mb-6 rounded-3xl bg-green-100 flex items-center justify-center shadow-lg border border-green-200">
-          <CheckCircle2 className="text-green-600" size={48} />
+        <div className="w-24 h-24 mb-6 rounded-3xl bg-green-100 dark:bg-green-950/60 flex items-center justify-center shadow-lg border border-green-200 dark:border-green-900/60">
+          <CheckCircle2 className="text-green-600 dark:text-green-400" size={48} />
         </div>
-        <h2 className="text-3xl font-black text-green-700 mb-2">Examination Finished!</h2>
-        <p className="text-slate-600 font-bold max-w-md mb-8 text-sm leading-relaxed">
+        <h2 className="text-3xl font-black text-green-700 dark:text-green-400 mb-2">Examination Finished!</h2>
+        <p className="text-slate-600 dark:text-slate-300 font-bold max-w-md mb-8 text-sm leading-relaxed">
           Your answers have been saved and recorded in the database. You may download your submitted question paper below.
         </p>
 
@@ -843,14 +843,14 @@ export default function ExamWorkspace() {
   return (
     <div className={`space-y-6 pb-20 ${currentSection?.section_type === 'FITB' ? 'lg:pb-48 pb-64' : ''}`}>
       {/* Top Fixed Control Bar */}
-      <div className="flex items-center justify-between bg-white p-4 rounded-2xl shadow-sm border border-slate-100 sticky top-20 z-40">
+      <div className="flex items-center justify-between bg-white/95 dark:bg-[#111827]/95 backdrop-blur-md p-4 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 sticky top-20 z-40 transition-colors">
         <div className="flex items-center gap-3">
-          <div className="bg-primary-50 p-2.5 rounded-xl text-primary-600">
+          <div className="bg-primary-50 dark:bg-primary-950/60 p-2.5 rounded-xl text-primary-600 dark:text-primary-400 border border-primary-100 dark:border-primary-900/60">
             <Clock size={24} />
           </div>
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Time Remaining</p>
-            <p className={`text-2xl font-black ${secondsLeft && secondsLeft < 300 ? 'text-red-500 animate-pulse' : 'text-slate-800'}`}>
+            <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Time Remaining</p>
+            <p className={`text-2xl font-black ${secondsLeft && secondsLeft < 300 ? 'text-red-500 animate-pulse' : 'text-slate-800 dark:text-white'}`}>
               {formatTime(secondsLeft)}
             </p>
           </div>
@@ -859,7 +859,7 @@ export default function ExamWorkspace() {
         <div className="flex items-center gap-3">
           <button 
             onClick={() => setLang(l => l === 'en' ? 'bn' : 'en')}
-            className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl font-extrabold text-xs transition-colors"
+            className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-xl font-extrabold text-xs transition-colors border border-slate-200 dark:border-slate-700"
           >
             <Languages size={18} />
             {lang === 'en' ? 'বাংলা' : 'English'}
@@ -874,10 +874,10 @@ export default function ExamWorkspace() {
         </div>
       </div>
 
-      {/* FEATURE 6: TOP SECTION NAVIGATION BAR */}
+      {/* TOP SECTION NAVIGATION BAR */}
       {sections.length > 1 && (
-        <div className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 flex flex-wrap gap-2 items-center">
-          <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 px-2">Sections:</span>
+        <div className="bg-white dark:bg-[#111827] p-3 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 flex flex-wrap gap-2 items-center transition-colors">
+          <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 px-2">Sections:</span>
           {sections.map(sec => {
             const isActive = currentSection?.section_id === sec.section_id;
             return (
@@ -890,11 +890,11 @@ export default function ExamWorkspace() {
                 className={`px-4 py-2 rounded-xl font-black text-xs transition-all flex items-center gap-2 ${
                   isActive
                     ? 'bg-primary-600 text-white shadow-md'
-                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/60'
+                    : 'bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200/60 dark:border-slate-700'
                 }`}
               >
                 <span>{getLocalizedSectionTitle(sec.title, lang)}</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isActive ? 'bg-white/20' : 'bg-slate-200'}`}>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isActive ? 'bg-white/20' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'}`}>
                   {questionsBySection[sec.section_id]?.length || 0}
                 </span>
               </button>
@@ -908,15 +908,15 @@ export default function ExamWorkspace() {
         {/* Main Question Area */}
         <div className="w-full lg:w-3/4 flex flex-col">
           {questions.length > 0 && currentQuestion && (
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="bg-white dark:bg-[#111827] rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 overflow-hidden transition-colors">
               {currentSection && (
-                <div className="bg-slate-50 border-b border-slate-100 px-8 py-3.5 flex items-center justify-between text-slate-600 font-bold uppercase tracking-wider text-xs">
+                <div className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800 px-8 py-3.5 flex items-center justify-between text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wider text-xs">
                   <div className="flex items-center gap-2">
-                    <span className="text-primary-700 font-black">{getLocalizedSectionTitle(currentSection.title, lang)}</span>
+                    <span className="text-primary-700 dark:text-primary-400 font-black">{getLocalizedSectionTitle(currentSection.title, lang)}</span>
                     <ChevronRight size={14} className="text-slate-400" />
-                    <span className="text-slate-500">Question {currentQuestionIndex + 1} of {questions.length}</span>
+                    <span className="text-slate-500 dark:text-slate-400">Question {currentQuestionIndex + 1} of {questions.length}</span>
                   </div>
-                  <span className="bg-slate-200 text-slate-700 px-2.5 py-0.5 rounded-full font-black text-[10px]">
+                  <span className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-2.5 py-0.5 rounded-full font-black text-[10px]">
                     {currentQuestion.marks || 1} Mark(s)
                   </span>
                 </div>
@@ -924,7 +924,7 @@ export default function ExamWorkspace() {
 
               <div className="p-8">
                 <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-12 h-12 bg-gradient-vibrant text-white font-black rounded-2xl flex items-center justify-center text-xl shadow-md">
+                  <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-black rounded-2xl flex items-center justify-center text-xl shadow-md">
                     {currentQuestionIndex + 1}
                   </div>
                   
@@ -941,7 +941,7 @@ export default function ExamWorkspace() {
                       />
                     ) : (
                       <>
-                        <div className="mb-8 mt-2">
+                        <div className="mb-8 mt-2 text-slate-900 dark:text-slate-100">
                           <QuestionTextRenderer text={getLocalizedText(currentQuestion.question_text_en, currentQuestion.question_text_bn, lang)} textSize="text-2xl" />
                         </div>
                         
@@ -967,11 +967,11 @@ export default function ExamWorkspace() {
                                   onClick={() => handleAnswerSelect(currentQuestion.question_id, optionId)}
                                   className={`text-left px-6 py-5 rounded-2xl border-2 font-bold transition-all transform hover:scale-[1.01] ${
                                     isSelected 
-                                      ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm' 
-                                      : 'border-slate-200 hover:border-primary-300 hover:bg-slate-50 text-slate-600'
+                                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300 shadow-sm' 
+                                      : 'border-slate-200 dark:border-slate-700/80 hover:border-primary-300 dark:hover:border-primary-600 hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300 bg-white dark:bg-[#151f32]'
                                   }`}
                                 >
-                                  <span className="inline-block w-6 font-black text-slate-400">{String.fromCharCode(65 + optIdx)}.</span>
+                                  <span className="inline-block w-6 font-black text-slate-400 dark:text-slate-500">{String.fromCharCode(65 + optIdx)}.</span>
                                   {currentQuestion.question_type === 'TF' ? (lang === 'bn' ? (optionText === 'True' ? 'সত্য' : 'মিথ্যা') : optionText) : cleanMathDollars(optionText)}
                                 </button>
                               );
@@ -985,14 +985,14 @@ export default function ExamWorkspace() {
               </div>
 
               {/* Navigation Controls */}
-              <div className="flex items-center justify-between bg-slate-50 p-4 border-t border-slate-100">
+              <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/40 p-4 border-t border-slate-100 dark:border-slate-800">
                 <button
                   onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
                   disabled={currentQuestionIndex === 0}
                   className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-colors ${
                     currentQuestionIndex === 0 
-                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
-                      : 'bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 shadow-sm'
+                      ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed border border-transparent' 
+                      : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-sm'
                   }`}
                 >
                   Previous
@@ -1002,7 +1002,7 @@ export default function ExamWorkspace() {
                   disabled={currentQuestionIndex === questions.length - 1}
                   className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-colors ${
                     currentQuestionIndex === questions.length - 1
-                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                      ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed'
                       : 'bg-primary-600 hover:bg-primary-700 text-white shadow-md'
                   }`}
                 >
@@ -1013,11 +1013,11 @@ export default function ExamWorkspace() {
           )}
         </div>
 
-        {/* Section-wise Question Palette Sidebar (Preserved) */}
-        <div className="w-full lg:w-1/4 bg-white p-6 rounded-3xl shadow-sm border border-slate-100 lg:sticky lg:top-48">
-          <h3 className="font-extrabold text-slate-800 text-base mb-4 flex items-center justify-between">
+        {/* Section-wise Question Palette Sidebar */}
+        <div className="w-full lg:w-1/4 bg-white dark:bg-[#111827] p-6 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 lg:sticky lg:top-48 transition-colors">
+          <h3 className="font-extrabold text-slate-800 dark:text-white text-base mb-4 flex items-center justify-between">
             <span>Question Palette</span>
-            <span className="text-xs font-bold bg-slate-100 text-slate-600 px-3 py-1 rounded-full">
+            <span className="text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-3 py-1 rounded-full border border-slate-200 dark:border-slate-700">
               {Object.keys(answers).length} / {questions.length} Answered
             </span>
           </h3>
@@ -1029,7 +1029,7 @@ export default function ExamWorkspace() {
               
               return (
                 <div key={sec.section_id}>
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2 pl-1">
+                  <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 pl-1">
                     {getLocalizedSectionTitle(sec.title, lang)}
                   </h4>
                   <div className="grid grid-cols-4 gap-2">
@@ -1049,11 +1049,11 @@ export default function ExamWorkspace() {
                           key={q.question_id}
                           onClick={() => setCurrentQuestionIndex(idx)}
                           className={`w-full aspect-square rounded-xl font-black text-xs flex items-center justify-center transition-all ${
-                            isCurrent ? 'ring-4 ring-primary-300 scale-105 z-10' : 'hover:scale-105'
+                            isCurrent ? 'ring-4 ring-primary-300 dark:ring-primary-700 scale-105 z-10' : 'hover:scale-105'
                           } ${
                             isAnswered 
                               ? 'bg-green-500 text-white shadow-sm' 
-                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                           }`}
                         >
                           {idx + 1}
@@ -1066,13 +1066,13 @@ export default function ExamWorkspace() {
             })}
           </div>
           
-          <div className="mt-6 space-y-2 border-t border-slate-100 pt-4 text-xs font-bold text-slate-600">
+          <div className="mt-6 space-y-2 border-t border-slate-100 dark:border-slate-800 pt-4 text-xs font-bold text-slate-600 dark:text-slate-400">
             <div className="flex items-center gap-2.5">
               <div className="w-3.5 h-3.5 rounded-md bg-green-500 shadow-sm"></div>
               <span>Answered</span>
             </div>
             <div className="flex items-center gap-2.5">
-              <div className="w-3.5 h-3.5 rounded-md bg-slate-100 border border-slate-200"></div>
+              <div className="w-3.5 h-3.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"></div>
               <span>Not Attempted</span>
             </div>
           </div>
@@ -1081,10 +1081,10 @@ export default function ExamWorkspace() {
 
       {/* Answer Bank Drawer for FITB */}
       {currentSection?.section_type === 'FITB' && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-2xl z-50">
+        <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-[#0f172a]/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 shadow-2xl z-50">
           <div className="max-w-6xl mx-auto px-6 py-5">
-            <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-              {activeBlank ? <span className="text-primary-600 animate-pulse font-extrabold">Select an option below for the active blank</span> : 'Answer Bank (Click a blank first)'}
+            <h4 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+              {activeBlank ? <span className="text-primary-600 dark:text-primary-400 animate-pulse font-extrabold">Select an option below for the active blank</span> : 'Answer Bank (Click a blank first)'}
             </h4>
             <div className="flex flex-wrap gap-2.5">
               {(shuffledBanks[currentSection.section_id] || []).map((opt: any, idx) => {
@@ -1099,15 +1099,15 @@ export default function ExamWorkspace() {
                     disabled={!activeBlank && !usage}
                     className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-all border-2 flex items-center gap-2 ${
                       usage 
-                        ? 'bg-slate-100 border-slate-200 text-slate-400' 
+                        ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500' 
                         : activeBlank
-                          ? 'bg-white border-primary-300 text-primary-700 hover:bg-primary-50 shadow-sm cursor-pointer'
-                          : 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed opacity-75'
+                          ? 'bg-white dark:bg-slate-800 border-primary-300 dark:border-primary-600 text-primary-700 dark:text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-950/40 shadow-sm cursor-pointer'
+                          : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-75'
                     }`}
                   >
                     <span>{optText}</span>
                     {usage && (
-                      <span className="text-[10px] font-black bg-slate-300 text-slate-700 px-2 py-0.5 rounded-full">
+                      <span className="text-[10px] font-black bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-full">
                         Q{usage.qIndex + 1}
                       </span>
                     )}
@@ -1121,17 +1121,17 @@ export default function ExamWorkspace() {
 
       {/* Confirmation Modal for Submitting Exam */}
       {showSubmitConfirm && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-100 text-center">
-            <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <AlertTriangle className="text-amber-500" size={32} />
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-[#111827] rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-800 text-center animate-fadeIn">
+            <div className="w-16 h-16 bg-amber-100 dark:bg-amber-950/60 rounded-2xl flex items-center justify-center mx-auto mb-4 text-amber-600 dark:text-amber-400">
+              <AlertTriangle size={32} />
             </div>
-            <h3 className="text-2xl font-black text-slate-800 mb-2">Submit Examination?</h3>
-            <p className="text-slate-600 text-sm font-medium mb-6">
+            <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Submit Examination?</h3>
+            <p className="text-slate-600 dark:text-slate-400 text-sm font-medium mb-6">
               Are you sure you want to submit your exam? You cannot change your answers after submitting.
             </p>
             <div className="flex gap-3">
-              <button onClick={() => setShowSubmitConfirm(false)} className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm">
+              <button onClick={() => setShowSubmitConfirm(false)} className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-sm transition-colors">
                 Cancel
               </button>
               <button 
@@ -1148,12 +1148,12 @@ export default function ExamWorkspace() {
       {/* Re-enter Fullscreen Prompt Overlay */}
       {showFullscreenPrompt && fullscreenEnforced && status === 'STARTED' && (
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-200 text-center space-y-4">
-            <div className="w-16 h-16 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto text-primary-600">
+          <div className="bg-white dark:bg-[#111827] rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-800 text-center space-y-4 animate-fadeIn">
+            <div className="w-16 h-16 bg-primary-100 dark:bg-primary-950/60 rounded-2xl flex items-center justify-center mx-auto text-primary-600 dark:text-primary-400">
               <AlertTriangle size={32} />
             </div>
-            <h3 className="text-2xl font-black text-slate-800">Fullscreen Mode Required</h3>
-            <p className="text-slate-600 text-sm font-semibold leading-relaxed">
+            <h3 className="text-2xl font-black text-slate-800 dark:text-white">Fullscreen Mode Required</h3>
+            <p className="text-slate-600 dark:text-slate-400 text-sm font-semibold leading-relaxed">
               This examination requires full-screen mode to continue. Please click the button below to resume full-screen exam mode.
             </p>
             <button
